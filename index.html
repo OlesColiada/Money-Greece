@@ -1684,20 +1684,21 @@ function renderTouristDetail(){
     const panelOpen = openEditPanels.has(s.id);
     rowsHtml += `<div class="exc-select-row">
       <label class="switch">
-        <input type="checkbox" data-role="going" data-sel="${s.id}" ${s.going?'checked':''} ${locked||s.cancelled?'disabled':''}>
+        <input type="checkbox" data-role="going" data-sel="${s.id}" ${s.going?'checked':''} ${locked?'disabled':''}>
         <span class="slider"></span>
       </label>
       <span class="exc-select-name">${p.name}</span>
       ${s.cancelled
-        ? `<span class="muted" style="font-size:11.5px;">скасовано${s.cancelled_reason ? ': '+s.cancelled_reason : ''}</span>`
+        ? (s.paid
+            ? `<span class="muted" style="font-size:11.5px;">${s.refunded ? 'Кошти повернуто' : 'скасовано, очікує повернення'}</span>`
+            : `<span class="muted" style="font-size:11.5px;">скасовано${s.cancelled_reason ? ': '+s.cancelled_reason : ''}</span>`)
         : s.going
           ? `<span class="exc-price-label">${fmt(s.price)} €${s.price_mode!=='standard' ? ` <span class="muted">(${PRICE_MODE_LABELS[s.price_mode]})</span>` : ''}</span>`
           : `<span class="muted" style="font-size:12px;">не їде</span>`
       }
       ${s.going && !s.cancelled ? `<button class="edit-toggle-btn no-print" data-role="toggleEdit" data-sel="${s.id}" title="Особлива ціна (знижка/безкоштовно/квиток)">✎</button>` : ''}
       ${s.going && !s.cancelled ? `<button class="btn btn-danger-ghost btn-small no-print" data-role="cancelSel" data-sel="${s.id}" title="Скасувати цю екскурсію (якщо не набралась група, хвороба тощо)">Скасувати</button>` : ''}
-      ${s.cancelled && s.paid && !s.refunded ? `<span class="profit-neg" style="font-size:11.5px;">повернути ${fmt(s.price)} €</span> <button class="btn btn-ghost btn-small no-print" data-role="refund" data-sel="${s.id}">Повернено</button>` : ''}
-      ${s.cancelled && s.refunded ? `<span class="muted" style="font-size:11.5px;">✓ повернено</span>` : ''}
+      ${s.cancelled && s.paid && !s.refunded ? `<span class="profit-neg" style="font-size:11.5px;">повернути ${fmt(s.price)} €</span> <button class="btn btn-ghost btn-small no-print" data-role="refund" data-sel="${s.id}">Кошти повернуто</button>` : ''}
       ${s.going && !s.cancelled ? `<div class="exc-edit-panel ${panelOpen?'open':''}" data-panel="${s.id}">
           <div class="price-mode-btns">
             <button class="price-mode-btn ${s.price_mode==='discount'?'active':''}" data-role="modeDiscount" data-sel="${s.id}" ${locked?'disabled':''}>Знижка</button>
@@ -1756,7 +1757,18 @@ function renderTouristDetail(){
     renderTouristDetail();
   }));
   block.querySelectorAll('[data-role="going"]').forEach(el=> el.addEventListener('change', e=>{
-    updateSelectionLocal(t.id, e.target.dataset.sel, { going: e.target.checked });
+    const selId = e.target.dataset.sel;
+    const checked = e.target.checked;
+    const s = sels.find(x=>x.id===selId);
+    if(checked && s && s.cancelled){
+      // Re-enabling a previously cancelled excursion — start fresh.
+      updateSelectionLocal(t.id, selId, {
+        going:true, cancelled:false, cancelled_reason:'', paid:false, refunded:false,
+        price_mode:'standard', price: standardPriceFor(s.excursion_name, age)
+      });
+    } else {
+      updateSelectionLocal(t.id, selId, { going: checked });
+    }
   }));
   block.querySelectorAll('[data-role="modeDiscount"]').forEach(el=> el.addEventListener('click', e=>{
     updateSelectionLocal(t.id, e.target.dataset.sel, { price_mode:'discount' });
@@ -1790,7 +1802,9 @@ function updateSelectionLocal(touristId, selId, patch, debounce){
   renderTouristDetail();
   const doPersist = ()=> sb.from('tourist_excursion_selections').upsert({
     id:s.id, tourist_id:s.tourist_id, trip_id:s.trip_id, excursion_name:s.excursion_name,
-    going:s.going, price_mode:s.price_mode, price:Number(s.price)||0
+    going:s.going, price_mode:s.price_mode, price:Number(s.price)||0,
+    cancelled: !!s.cancelled, cancelled_reason: s.cancelled_reason||'',
+    paid: !!s.paid, refunded: !!s.refunded
   }).then(({error})=>{ if(error){ console.error(error); alert("Не вдалося зберегти: "+error.message); } });
   if(debounce) debouncedPersist('sel:'+selId, doPersist); else persistNow('sel:'+selId, doPersist);
   renderTouristStats();
@@ -1800,8 +1814,11 @@ async function payTourist(touristId){
   await flushPendingPersists();
   const { error } = await sb.rpc('mark_tourist_paid', { p_tourist_id: touristId });
   if(error){ alert(error.message || "Не вдалося підтвердити оплату"); return; }
+  openTouristId = null;
   await loadTourists();
   renderTouristSection();
+  const listBlock = document.getElementById('touristListBlock');
+  if(listBlock) listBlock.scrollIntoView({behavior:'smooth', block:'start'});
 }
 async function cancelSelection(selId, reason){
   await flushPendingPersists();
