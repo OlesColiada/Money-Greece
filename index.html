@@ -246,8 +246,9 @@
     .exc-summary{grid-template-columns:1fr 1fr; gap:8px 12px;}
     .stat .value{font-size:13.5px;}
 
-    table.report-table{font-size:11.5px;}
-    table.report-table th, table.report-table td{padding:7px 8px;}
+    table.report-table{font-size:10.5px;}
+    table.report-table th, table.report-table td{padding:5px 4px; white-space:nowrap;}
+    .table-scroll table{min-width:0;}
 
     footer.savebar{padding:8px 10px; gap:8px;}
     .save-status{font-size:10.5px; flex:1 1 100%; text-align:center; order:2;}
@@ -1173,16 +1174,16 @@ async function renderTouristRefBanner(){
     const matches = pt.count===st.count && Math.abs(pt.sum-st.sum)<0.01;
     if(!matches) anyMismatch = true;
     rows += `<tr><td>${n}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td>
-      <td>${matches ? `<span class="profit-pos">✓ збігається</span>` : `<span class="profit-neg">⚠ у прибутковості: ${pt.count} чол, ${fmt(pt.sum)} €</span>`}</td></tr>`;
+      <td>${matches ? `<span class="profit-pos">✓</span>` : `<span class="profit-neg">⚠ ${pt.count} чол, ${fmt(pt.sum)} €</span>`}</td></tr>`;
   });
   el.style.display = 'block';
   el.innerHTML = `
     <p class="report-title" style="margin:0;">Ваш список туристів (довідково)</p>
     <p class="report-note" style="margin:2px 0 8px;">Дані з розділу "Список збору коштів" — тут лише для звірки, не впливають на розрахунок автоматично.</p>
     ${anyMismatch ? `<p style="background:#fbf0ec; border:1px solid #e3b8a8; border-radius:8px; padding:8px 10px; font-size:13px; margin-bottom:8px;">⚠ Дані у списку туристів не збігаються з тим, що ти розподілив по екскурсіях нижче. Перевір кількість/суму.</p>` : ''}
-    <div class="table-scroll">
-      <table class="report-table">
-        <thead><tr><th style="text-align:left;">Екскурсія</th><th>Туристів</th><th>Сума</th><th>У прибутковості</th></tr></thead>
+    <div style="overflow-x:auto;">
+      <table class="report-table" style="font-size:12px;">
+        <thead><tr><th style="text-align:left;">Екскурсія</th><th>Тур.</th><th>Сума</th><th>У прибутковості</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
