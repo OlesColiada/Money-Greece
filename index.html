@@ -410,8 +410,8 @@ function getOrCreateTripData(tripId){
   return getTripData(tripId);
 }
 
-function newRow(defaultPersonType, defaultPerson){
-  return { id: uid(), personType:defaultPersonType, person:defaultPerson, customPartnerName:"", chol:0, zibrano:0, quitky:0 };
+function newRow(){
+  return { id: uid(), personType:"", person:"", customPartnerName:"", chol:0, zibrano:0, quitky:0 };
 }
 function newExcursion(tripGuides, presetName){
   const name = presetName || EXCURSIONS[0];
@@ -424,7 +424,7 @@ function newExcursion(tripGuides, presetName){
     recipientGuide: tripGuides[0] || "",
     payerGuide: tripGuides[0] || "",
     recipientPaid: false, payerPaid: false, recipientPaidAt: null, payerPaidAt: null,
-    rows: [ newRow('guide', tripGuides[0] || "") ]
+    rows: [ newRow() ]
   };
 }
 
@@ -610,7 +610,8 @@ async function setGuideGroup(group){
 function personSelectHTML(row, tripGuides, takenGuides){
   const restricted = (currentProfile.role === 'guide') ? [currentProfile.guide_name] : tripGuides;
   const guideOptions = restricted.filter(g => g === row.person || !(takenGuides||[]).includes(g));
-  let html = `<optgroup label="Гіди заїзду">`;
+  let html = `<option value="" ${!row.person ? 'selected' : ''} disabled hidden>— виберіть —</option>`;
+  html += `<optgroup label="Гіди заїзду">`;
   guideOptions.forEach(g=> html += `<option value="guide::${g}" ${row.personType==='guide'&&row.person===g?'selected':''}>${g}</option>`);
   html += `</optgroup><optgroup label="Постійні партнери">`;
   PARTNERS_FIXED.forEach(p=> html += `<option value="partner::${p}" ${row.personType==='partner'&&row.person===p?'selected':''}>${p}</option>`);
@@ -626,6 +627,7 @@ function canEditRow(r){
   if(!currentProfile) return false;
   if(currentProfile.role === 'manager') return true;
   if(r.personType === 'partner') return true; // partners have no login; any assigned guide can manage their headcount
+  if(!r.person) return true; // unclaimed row — any assigned guide can pick themselves
   return r.person === currentProfile.guide_name; // guides edit only their own row
 }
 
@@ -774,27 +776,33 @@ function renderExcursions(){
     calc.rowResults.forEach(r=>{
       const tr = document.createElement('tr');
       const editable = canEditRow(r);
+      const hasPerson = !!r.person;
+      const amountsEditable = editable && hasPerson;
       tr.innerHTML = `
-        <td><select class="person-select" data-role="person" style="background:${personColor(r)}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, exc.rows.filter(other=>other.id!==r.id && other.personType==='guide').map(other=>other.person))}</select>
+        <td><select class="person-select" data-role="person" style="background:${hasPerson?personColor(r):'#c9cdbe'}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, exc.rows.filter(other=>other.id!==r.id && other.personType==='guide').map(other=>other.person))}</select>
           ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" value="${r.customPartnerName||''}" data-role="customPartnerName" style="margin-top:4px; width:110px;" ${editable?'':'disabled'}>` : ''}
         </td>
-        <td><input type="number" class="num-input" data-role="chol" value="${r.chol}" ${editable?'':'disabled'}></td>
-        <td>${r.isGuide ? `<input type="number" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${editable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>
-        ${calc.ticketsApply ? `<td>${r.isGuide ? `<input type="number" class="num-input" data-role="quitky" value="${r.quitky}" ${editable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>` : ''}
-        <td class="muted">${fmt(r.totalCost)}</td>
-        <td>${r.isGuide
-            ? `<span class="${r.profit>=0?'profit-pos':'profit-neg'}">${fmt(r.profit)} €</span>`
-            : (exc.busOwner==='own'
-                ? `<span class="muted">винен нам ${fmt(r.settlement)} €</span>`
-                : `<span class="muted">розрахунок з партнером</span>`)}
+        <td><input type="number" class="num-input" data-role="chol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></td>
+        <td>${r.isGuide ? `<input type="number" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>
+        ${calc.ticketsApply ? `<td>${r.isGuide ? `<input type="number" class="num-input" data-role="quitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>` : ''}
+        <td class="muted">${hasPerson ? fmt(r.totalCost) : '—'}</td>
+        <td>${!hasPerson
+            ? `<span class="muted">оберіть гіда/партнера</span>`
+            : r.isGuide
+              ? `<span class="${r.profit>=0?'profit-pos':'profit-neg'}">${fmt(r.profit)} €</span>`
+              : (exc.busOwner==='own'
+                  ? `<span class="muted">винен нам ${fmt(r.settlement)} €</span>`
+                  : `<span class="muted">розрахунок з партнером</span>`)}
         </td>
-        <td class="muted">${r.isGuide ? fmt(r.gInc) : '—'}</td>
-        <td class="muted">${r.isGuide ? fmt(r.oInc) : '—'}</td>
+        <td class="muted">${hasPerson && r.isGuide ? fmt(r.gInc) : '—'}</td>
+        <td class="muted">${hasPerson && r.isGuide ? fmt(r.oInc) : '—'}</td>
         <td class="no-print">${editable ? `<button class="row-del" data-role="delRow">✕</button>` : ''}</td>
       `;
       tbody.appendChild(tr);
 
+
       tr.querySelector('[data-role="person"]').addEventListener('change', e=>{
+        if(!e.target.value) return;
         const [ptype, pname] = e.target.value.split('::');
         updateRow(exc.id, r.id, { personType: ptype, person: pname });
       });
@@ -832,7 +840,7 @@ function renderExcursions(){
     const unpaidBtn = card.querySelector('[data-role="unmarkPaid"]');
     if(unpaidBtn) unpaidBtn.addEventListener('click', ()=> unmarkSettlementPaid(exc.id, exc.busOwner==='own' ? 'recipient' : 'payer'));
     card.querySelector('[data-role="delExc"]').addEventListener('click', ()=> deleteExcursion(exc.id));
-    card.querySelector('[data-role="addRow"]').addEventListener('click', ()=> addRow(exc.id, currentProfile.role==='guide' ? currentProfile.guide_name : tripGuideNames[0]));
+    card.querySelector('[data-role="addRow"]').addEventListener('click', ()=> addRow(exc.id));
   });
 }
 
@@ -926,11 +934,14 @@ function renderGuideEarningsCard(){
   const pending = mine.pendingFromPartners - mine.pendingToPartners;
   el.innerHTML = `
     <p class="report-title">Ваш заробіток за цей заїзд</p>
-    <div class="exc-summary" style="margin-top:6px; border-top:none; padding-top:0;">
+    <div style="text-align:center; padding:18px 10px 10px;">
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-bottom:6px;">Ваша комісія (10%)</div>
+      <div style="font-family:'Fraunces',serif; font-weight:700; font-size:44px; color:var(--good); line-height:1;">${fmt(mine.guideIncome)} €</div>
+    </div>
+    <div class="exc-summary" style="margin-top:10px; border-top:1px dashed var(--line); padding-top:12px;">
       <div class="stat"><span class="label">Зібрано</span><span class="value">${fmt(mine.collected)} €</span></div>
       <div class="stat"><span class="label">Затрати</span><span class="value">${fmt(mine.cost)} €</span></div>
       <div class="stat"><span class="label">Прибуток</span><span class="value">${fmt(mine.profit)} €</span></div>
-      <div class="stat"><span class="label">Ваша комісія (10%)</span><span class="value profit-pos" style="font-size:19px;">${fmt(mine.guideIncome)} €</span></div>
       ${(mine.fromPartners||mine.toPartners) ? `<div class="stat"><span class="label">Взаєморозрахунок (підтв.)</span><span class="value">${fmt(mine.fromPartners - mine.toPartners)} €</span></div>` : ''}
       ${pending ? `<div class="stat"><span class="label">Довідково (не підтв.)</span><span class="value muted">${fmt(pending)} €</span></div>` : ''}
     </div>
@@ -1084,16 +1095,16 @@ function deleteRow(excId, rowId){
   exc.rows = exc.rows.filter(r=>r.id!==rowId);
   deleteRowDb(rowId);
   if(!exc.rows.length){
-    const newR = newRow('guide', tripData.guides[0]?.name || "");
+    const newR = newRow();
     exc.rows.push(newR);
     upsertRow(currentTripId, exc.id, newR);
   }
   renderAll();
 }
-function addRow(excId, defaultGuide){
+function addRow(excId){
   const tripData = getTripData(currentTripId);
   const exc = tripData.excursions.find(e=>e.id===excId);
-  const row = newRow('guide', defaultGuide);
+  const row = newRow();
   exc.rows.push(row);
   renderAll();
   upsertRow(currentTripId, exc.id, row);
