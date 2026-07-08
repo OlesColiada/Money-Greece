@@ -306,7 +306,7 @@
 
 <footer class="savebar no-print app-hidden" id="appFooter">
   <span class="save-status" id="saveStatus">—</span>
-  <button class="btn btn-ghost btn-small" id="printBtn">🖨 Друк зведеного звіту</button>
+  <button class="btn btn-ghost btn-small manager-only" id="printBtn">🖨 Друк зведеного звіту</button>
   <button class="logout-link" id="logoutBtn">Вийти</button>
 </footer>
 
@@ -936,7 +936,7 @@ function renderGuideEarningsCard(){
     <p class="report-title">Ваш заробіток за цей заїзд</p>
     <div style="text-align:center; padding:18px 10px 10px;">
       <div style="font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-bottom:6px;">Ваша комісія (10%)</div>
-      <div style="font-family:'Fraunces',serif; font-weight:700; font-size:44px; color:var(--good); line-height:1;">${fmt(mine.guideIncome)} €</div>
+      <div style="font-family:Arial,Helvetica,sans-serif; font-weight:700; font-size:44px; color:var(--good); line-height:1;">${fmt(mine.guideIncome)} €</div>
     </div>
     <div class="exc-summary" style="margin-top:10px; border-top:1px dashed var(--line); padding-top:12px;">
       <div class="stat"><span class="label">Зібрано</span><span class="value">${fmt(mine.collected)} €</span></div>
