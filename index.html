@@ -375,16 +375,17 @@
     </div>
 
     <section class="step-block" id="touristStatsSection">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-        <div>
-          <p class="report-title" style="margin:0;">Статистика по екскурсіях</p>
-          <p class="report-note" style="margin:2px 0 0;">К-сть туристів і зібрана сума по кожній екскурсії (поточна група поточного заїзду).</p>
-        </div>
-        <button class="btn btn-primary no-print" id="syncProfitabilityBtn">Оновити дані в прибутковості</button>
-      </div>
+      <p class="report-title" style="margin:0;">Статистика по екскурсіях</p>
+      <p class="report-note" style="margin:2px 0 0;">К-сть туристів і зібрана сума по кожній екскурсії (поточна група поточного заїзду).</p>
       <div class="table-scroll" style="margin-top:10px;">
         <table class="report-table" id="touristStatsTable"></table>
       </div>
+    </section>
+
+    <section class="step-block manager-only" id="mergePanelSection" style="margin-top:16px;">
+      <p class="report-title" style="margin:0;">Об'єднання гідів по екскурсіях цього заїзду</p>
+      <p class="report-note" style="margin:2px 0 0;">Кожен гід рахує свою групу окремо в списку туристів. Тут обираєш, які гіди/партнери об'єднуються в один автобус — і переносиш їхні дані в прибутковість.</p>
+      <div id="mergePanelWrap" style="margin-top:10px;"></div>
     </section>
 
     <div class="step-block no-print manager-only" id="addTouristBlock" style="display:none; margin-top:16px;">
@@ -528,7 +529,7 @@ async function fetchTrips(){
 }
 
 function rowFromDb(r){
-  return { id:r.id, personType:r.person_type, person:r.person, customPartnerName:r.custom_partner_name||"", chol:r.chol, zibrano:r.zibrano, quitky:r.quitky };
+  return { id:r.id, personType:r.person_type, person:r.person, customPartnerName:r.custom_partner_name||"", chol:r.chol, zibrano:r.zibrano, quitky:r.quitky, syncedFromTourists: !!r.synced_from_tourists };
 }
 function excFromDb(e, rows){
   return {
@@ -568,7 +569,7 @@ function getOrCreateTripData(tripId){
 }
 
 function newRow(){
-  return { id: uid(), personType:"", person:"", customPartnerName:"", chol:0, zibrano:0, quitky:0 };
+  return { id: uid(), personType:"", person:"", customPartnerName:"", chol:0, zibrano:0, quitky:0, syncedFromTourists:false };
 }
 function newExcursion(tripGuides, presetName){
   const name = presetName || EXCURSIONS[0];
@@ -936,13 +937,15 @@ function renderExcursions(){
       const tr = document.createElement('tr');
       const editable = canEditRow(r);
       const hasPerson = !!r.person;
-      const amountsEditable = editable && hasPerson;
+      const syncLocked = r.syncedFromTourists && currentProfile.role !== 'manager';
+      const amountsEditable = editable && hasPerson && !syncLocked;
       tr.innerHTML = `
         <td><select class="person-select" data-role="person" style="background:${hasPerson?personColor(r):'#c9cdbe'}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, exc.rows.filter(other=>other.id!==r.id && other.personType==='guide').map(other=>other.person))}</select>
           ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" value="${r.customPartnerName||''}" data-role="customPartnerName" style="margin-top:4px; width:110px;" ${editable?'':'disabled'}>` : ''}
+          ${r.syncedFromTourists ? `<div class="muted" style="font-size:10.5px; margin-top:3px;">зі списку туристів${currentProfile.role==='manager' ? ` <button class="edit-toggle-btn no-print" data-role="unlockSync" style="font-size:11px;" title="Дозволити редагувати вручну">🔓</button>` : ''}</div>` : ''}
         </td>
-        <td><input type="number" class="num-input" data-role="chol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></td>
-        <td>${r.isGuide ? `<input type="number" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>
+        <td><input type="number" class="num-input" data-role="chol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${syncLocked ? 'Заблоковано: дані зі списку туристів' : (hasPerson?'':'Спочатку оберіть гіда або партнера')}"></td>
+        <td>${r.isGuide ? `<input type="number" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'} title="${syncLocked ? 'Заблоковано: дані зі списку туристів' : ''}">` : `<span class="muted">—</span>`}</td>
         ${calc.ticketsApply ? `<td>${r.isGuide ? `<input type="number" class="num-input" data-role="quitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>` : ''}
         <td class="muted">${hasPerson ? fmt(r.totalCost) : '—'}</td>
         <td>${!hasPerson
@@ -958,6 +961,13 @@ function renderExcursions(){
         <td class="no-print">${editable ? `<button class="row-del" data-role="delRow">✕</button>` : ''}</td>
       `;
       tbody.appendChild(tr);
+
+      const unlockBtn = tr.querySelector('[data-role="unlockSync"]');
+      if(unlockBtn) unlockBtn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        if(!confirm("Дозволити ручне редагування цього рядка? Наступне оновлення зі списку туристів знову перезапише значення.")) return;
+        updateRow(exc.id, r.id, { syncedFromTourists:false });
+      });
 
 
       tr.querySelector('[data-role="person"]').addEventListener('change', e=>{
@@ -1135,7 +1145,8 @@ async function upsertRow(tripId, excId, row){
   const { error } = await sb.from('excursion_rows').upsert({
     id: row.id, excursion_id: excId, trip_id: tripId,
     person_type: row.personType, person: row.person, custom_partner_name: row.customPartnerName,
-    chol: Number(row.chol)||0, zibrano: Number(row.zibrano)||0, quitky: Number(row.quitky)||0
+    chol: Number(row.chol)||0, zibrano: Number(row.zibrano)||0, quitky: Number(row.quitky)||0,
+    synced_from_tourists: !!row.syncedFromTourists
   });
   setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
   if(error){ console.error(error); alert("Не вдалося зберегти зміни рядка: " + (error.message||"") + "\n\nСпробуй ще раз або онови сторінку."); }
@@ -1590,10 +1601,7 @@ function renderTouristDetail(){
       </div>
     </div>
     <div class="age-hero">
-      ${currentProfile.role==='manager'
-        ? `<div class="label">Вік</div><div class="value">${age!==null ? age : '—'}</div>`
-        : `<div class="label">Категорія</div><div class="value" style="font-size:26px;">${age===null ? '—' : (age<=11 ? 'Дитина' : 'Дорослий')}</div>`
-      }
+      <div class="label">Вік</div><div class="value">${age!==null ? age : '—'}</div>
     </div>
     <div>${rowsHtml}</div>
     <div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -1696,58 +1704,36 @@ function renderTouristStats(){
       if(s.going && !s.cancelled){ stats[s.excursion_name].count++; stats[s.excursion_name].sum += Number(s.price)||0; }
     });
   });
-  const tripData = getTripData(currentTripId);
-  const guideName = activeTouristGuideName();
   let rows = '';
-  let anyOutOfSync = false;
   TOURIST_PRICE_LIST.forEach(p=>{
     const st = stats[p.name];
-    const matchExc = tripData.excursions.find(e=> e.name===p.name || e.customName===p.name);
-    const matchRow = matchExc ? matchExc.rows.find(r=>r.personType==='guide' && r.person===guideName) : null;
-    const inSync = st.count===0 ? true : (matchRow && Number(matchRow.chol)===st.count && Number(matchRow.zibrano)===st.sum);
-    if(!inSync) anyOutOfSync = true;
-    rows += `<tr><td>${p.name}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td>
-      <td class="no-print">${st.count>0 ? (inSync ? `<span class="profit-pos" style="font-size:12px;">✓ актуально</span>` : `<span class="muted" style="font-size:12px;">потрібне оновлення</span>`) : ''}</td></tr>`;
+    rows += `<tr><td>${p.name}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td></tr>`;
   });
-  table.innerHTML = `<thead><tr><th style="text-align:left;">Екскурсія</th><th>Туристів</th><th>Сума</th><th>Прибутковість</th></tr></thead><tbody>${rows}</tbody>`;
-
-  const syncBtn = document.getElementById('syncProfitabilityBtn');
-  syncBtn.disabled = !anyOutOfSync;
-  syncBtn.textContent = anyOutOfSync ? 'Оновити дані в прибутковості' : '✓ Дані актуальні';
-  syncBtn.style.opacity = anyOutOfSync ? '1' : '.6';
-  syncBtn.style.cursor = anyOutOfSync ? 'pointer' : 'default';
-  syncBtn.onclick = anyOutOfSync ? ()=> syncAllToProfitability(stats) : null;
+  table.innerHTML = `<thead><tr><th style="text-align:left;">Екскурсія</th><th>Туристів</th><th>Сума</th></tr></thead><tbody>${rows}</tbody>`;
 }
 
-async function syncAllToProfitability(stats){
-  for(const p of TOURIST_PRICE_LIST){
-    const st = stats[p.name];
-    if(st.count > 0) await transferToProfitability(p.name, st, true);
-  }
-  renderTouristStats();
-  alert("Дані оновлено в прибутковості для всіх екскурсій цієї групи.");
-}
-
-async function transferToProfitability(excName, stat, silent){
+async function mergeGuideIntoInstance(guideName, excName, stat, targetChoice){
   const tripData = getTripData(currentTripId);
-  const matches = tripData.excursions.filter(e=> (e.name===excName) || (e.customName && e.customName===excName));
   let targetExc;
-  if(matches.length === 0){
-    if(!silent && !confirm(`В екскурсіях заїзду немає "${excName}". Створити нову?`)) return;
+  if(targetChoice === 'new'){
     targetExc = newExcursion(tripData.guides.map(g=>g.name), EXCURSIONS.includes(excName) ? excName : "Інше...");
     if(!EXCURSIONS.includes(excName)) targetExc.customName = excName;
     tripData.excursions.push(targetExc);
-  } else if(matches.length === 1){
-    targetExc = matches[0];
-  } else if(silent){
-    targetExc = matches[0]; // ambiguous during bulk sync — use the first match rather than interrupt with a prompt
   } else {
-    const idx = prompt(`Кілька екскурсій "${excName}" в цьому заїзді. Введи номер (1-${matches.length}):\n` + matches.map((m,i)=>`${i+1}) км ${m.km}, автобус ${m.busOwner}`).join('\n'));
-    const i = parseInt(idx,10)-1;
-    if(isNaN(i) || !matches[i]) return;
-    targetExc = matches[i];
+    targetExc = tripData.excursions.find(e=>e.id===targetChoice);
+    if(!targetExc) return;
   }
-  const guideName = activeTouristGuideName();
+  // If this guide was previously synced into a DIFFERENT instance of the same excursion name,
+  // clear that old row so the same people aren't counted twice.
+  tripData.excursions.forEach(e=>{
+    if(e.id===targetExc.id) return;
+    if(e.name!==excName && e.customName!==excName) return;
+    const oldRow = e.rows.find(r=>r.personType==='guide' && r.person===guideName && r.syncedFromTourists);
+    if(oldRow){
+      oldRow.chol = 0; oldRow.zibrano = 0; oldRow.syncedFromTourists = false;
+      upsertRow(currentTripId, e.id, oldRow);
+    }
+  });
   let row = targetExc.rows.find(r=>r.personType==='guide' && r.person===guideName);
   if(!row){
     row = newRow();
@@ -1756,9 +1742,80 @@ async function transferToProfitability(excName, stat, silent){
   }
   row.chol = stat.count;
   row.zibrano = stat.sum;
+  row.syncedFromTourists = true;
   await upsertExcursion(currentTripId, targetExc);
   await upsertRow(currentTripId, targetExc.id, row);
-  if(!silent) alert(`Перенесено: ${guideName} — ${stat.count} чол, ${fmt(stat.sum)} € у "Прибутковість → ${excName}".`);
+}
+
+function renderMergePanel(){
+  const wrap = document.getElementById('mergePanelWrap');
+  if(!wrap) return;
+  if(currentProfile.role !== 'manager') return;
+  loadTripGuideExcursionStats().then(byGuideExc=>{
+    const tripData = getTripData(currentTripId);
+    const guideNames = tripData.guides.map(g=>g.name);
+    let html = '';
+    TOURIST_PRICE_LIST.forEach(p=>{
+      const guidesWithData = guideNames.filter(g=> byGuideExc[g] && byGuideExc[g][p.name] && byGuideExc[g][p.name].count>0);
+      if(!guidesWithData.length) return;
+      const instances = tripData.excursions.filter(e=> e.name===p.name || e.customName===p.name);
+      html += `<div style="margin-bottom:18px;"><p style="font-weight:700; margin:0 0 8px;">${p.name}</p>`;
+      guidesWithData.forEach(g=>{
+        const st = byGuideExc[g][p.name];
+        // find current linked instance for this guide, if any
+        const linkedExc = instances.find(e=> e.rows.some(r=>r.personType==='guide' && r.person===g && r.syncedFromTourists));
+        const linkedRow = linkedExc ? linkedExc.rows.find(r=>r.personType==='guide' && r.person===g && r.syncedFromTourists) : null;
+        const inSync = linkedRow && Number(linkedRow.chol)===st.count && Number(linkedRow.zibrano)===st.sum;
+        const selId = `merge_${p.name}_${g}`.replace(/[^a-zA-Z0-9_]/g,'');
+        html += `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #f0f0ea;">
+          <span style="min-width:90px; font-weight:600;">${g}</span>
+          <span class="muted" style="font-size:12.5px;">${st.count} чол, ${fmt(st.sum)} €</span>
+          <select data-role="mergeTarget" data-guide="${g}" data-exc="${p.name}" id="${selId}" style="flex:1; min-width:180px;">
+            ${instances.map(inst=>{
+              const others = inst.rows.filter(r=> r.person !== g && r.person).map(r=>`${r.person}(${r.chol})`).join(', ');
+              const label = `Км ${inst.km||0}, автобус ${inst.busOwner==='own'?'наш':'партнер'}${others ? ' — вже: '+others : ' — порожня'}`;
+              return `<option value="${inst.id}" ${linkedExc && linkedExc.id===inst.id ? 'selected':''}>${label}</option>`;
+            }).join('')}
+            <option value="new">+ Нова екскурсія (окремий автобус)</option>
+          </select>
+          <button class="btn btn-ghost btn-small no-print" data-role="mergeBtn" data-guide="${g}" data-exc="${p.name}" data-select="${selId}">${inSync ? '✓ Оновити' : 'Перенести'}</button>
+          ${inSync ? `<span class="profit-pos" style="font-size:11.5px;">актуально</span>` : ''}
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    wrap.innerHTML = html || `<p class="report-note">Ще немає туристів, записаних на екскурсії, у жодного з гідів цього заїзду.</p>`;
+    wrap.querySelectorAll('[data-role="mergeBtn"]').forEach(btn=> btn.addEventListener('click', async e=>{
+      const g = e.target.dataset.guide, excName = e.target.dataset.exc;
+      const sel = document.getElementById(e.target.dataset.select);
+      const choice = sel.value;
+      const st = byGuideExc[g][excName];
+      btn.disabled = true; btn.textContent = 'Переношу…';
+      await mergeGuideIntoInstance(g, excName, st, choice);
+      renderAll();
+      renderMergePanel();
+    }));
+  });
+}
+
+async function loadTripGuideExcursionStats(){
+  const { data: tourists, error: tErr } = await sb.from('tourists').select('*').eq('trip_id', currentTripId);
+  if(tErr || !tourists || !tourists.length) return {};
+  const ids = tourists.map(t=>t.id);
+  const { data: selections, error: sErr } = await sb.from('tourist_excursion_selections').select('*').in('tourist_id', ids);
+  if(sErr) return {};
+  const byGuideExc = {};
+  const touristGuide = {};
+  tourists.forEach(t=>{ touristGuide[t.id]=t.guide_name; if(!byGuideExc[t.guide_name]) byGuideExc[t.guide_name]={}; });
+  (selections||[]).forEach(s=>{
+    if(!(s.going && !s.cancelled)) return;
+    const g = touristGuide[s.tourist_id];
+    if(!g) return;
+    if(!byGuideExc[g][s.excursion_name]) byGuideExc[g][s.excursion_name] = {count:0, sum:0};
+    byGuideExc[g][s.excursion_name].count++;
+    byGuideExc[g][s.excursion_name].sum += Number(s.price)||0;
+  });
+  return byGuideExc;
 }
 
 async function loadAllTouristStatsData(){
@@ -1832,6 +1889,7 @@ function renderTouristSection(){
   renderTouristList();
   renderTouristDetail();
   renderTouristStats();
+  renderMergePanel();
   scheduleTouristSeasonStats();
 }
 document.getElementById('clearTouristListBtn').addEventListener('click', async ()=>{
