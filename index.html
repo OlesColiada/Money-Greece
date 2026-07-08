@@ -1502,17 +1502,20 @@ function renderTouristList(){
     const allPaid = sels.filter(s=>s.going && !s.cancelled).length > 0 && sels.filter(s=>s.going && !s.cancelled).every(s=>s.paid);
     const row = document.createElement('div');
     row.className = 'tourist-row' + (processed ? ' processed' : '');
+    row.style.cursor = currentProfile.role==='manager' ? 'default' : 'pointer';
     row.innerHTML = `
       <span class="dot"></span>
       <span class="t-name" style="flex:1;">${(t.last_name+' '+t.first_name).toUpperCase()}</span>
       ${allPaid ? `<span class="paid-badge">✓ оплачено</span>` : ''}
       ${currentProfile.role==='manager' ? `<button class="row-del no-print" data-role="delTourist" data-id="${t.id}" title="Видалити туриста">✕</button>` : ''}
     `;
-    row.addEventListener('click', (e)=>{
-      if(e.target.dataset.role==='delTourist') return;
-      openTouristId = t.id; openEditPanels.clear(); renderTouristDetail();
-      document.getElementById('touristDetailBlock').scrollIntoView({behavior:'smooth', block:'start'});
-    });
+    if(currentProfile.role !== 'manager'){
+      row.addEventListener('click', (e)=>{
+        if(e.target.dataset.role==='delTourist') return;
+        openTouristId = t.id; openEditPanels.clear(); renderTouristDetail();
+        document.getElementById('touristDetailBlock').scrollIntoView({behavior:'smooth', block:'start'});
+      });
+    }
     const delBtn = row.querySelector('[data-role="delTourist"]');
     if(delBtn) delBtn.addEventListener('click', async (e)=>{
       e.stopPropagation();
@@ -1531,6 +1534,7 @@ const PRICE_MODE_LABELS = { standard:'Стандарт', discount:'Знижка'
 
 function renderTouristDetail(){
   const block = document.getElementById('touristDetailBlock');
+  if(currentProfile.role==='manager'){ block.style.display='none'; return; }
   if(!openTouristId){ block.style.display='none'; return; }
   const t = touristData.tourists.find(x=>x.id===openTouristId);
   if(!t){ block.style.display='none'; return; }
