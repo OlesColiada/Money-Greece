@@ -413,7 +413,7 @@
     <div class="step-block" id="touristListBlock" style="margin-top:16px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <p class="step-title" style="margin:0;">Туристи</p>
-        <button class="btn btn-danger-ghost no-print" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
+        <button class="btn btn-danger-ghost no-print manager-only" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
       </div>
       <div id="touristListWrap"></div>
     </div>
@@ -1712,39 +1712,38 @@ function renderTouristStats(){
   table.innerHTML = `<thead><tr><th style="text-align:left;">Екскурсія</th><th>Туристів</th><th>Сума</th></tr></thead><tbody>${rows}</tbody>`;
 }
 
-async function mergeGuideIntoInstance(guideName, excName, stat, targetChoice){
+async function setAllocation(guideName, excName, targetChoice, count, sum){
   const tripData = getTripData(currentTripId);
   let targetExc;
   if(targetChoice === 'new'){
     targetExc = newExcursion(tripData.guides.map(g=>g.name), EXCURSIONS.includes(excName) ? excName : "Інше...");
     if(!EXCURSIONS.includes(excName)) targetExc.customName = excName;
     tripData.excursions.push(targetExc);
+    await upsertExcursion(currentTripId, targetExc);
   } else {
     targetExc = tripData.excursions.find(e=>e.id===targetChoice);
     if(!targetExc) return;
   }
-  // If this guide was previously synced into a DIFFERENT instance of the same excursion name,
-  // clear that old row so the same people aren't counted twice.
-  tripData.excursions.forEach(e=>{
-    if(e.id===targetExc.id) return;
-    if(e.name!==excName && e.customName!==excName) return;
-    const oldRow = e.rows.find(r=>r.personType==='guide' && r.person===guideName && r.syncedFromTourists);
-    if(oldRow){
-      oldRow.chol = 0; oldRow.zibrano = 0; oldRow.syncedFromTourists = false;
-      upsertRow(currentTripId, e.id, oldRow);
-    }
-  });
   let row = targetExc.rows.find(r=>r.personType==='guide' && r.person===guideName);
   if(!row){
     row = newRow();
     row.personType='guide'; row.person=guideName;
     targetExc.rows.push(row);
   }
-  row.chol = stat.count;
-  row.zibrano = stat.sum;
+  row.chol = count;
+  row.zibrano = sum;
   row.syncedFromTourists = true;
-  await upsertExcursion(currentTripId, targetExc);
   await upsertRow(currentTripId, targetExc.id, row);
+}
+
+async function removeAllocation(instanceId, guideName){
+  const tripData = getTripData(currentTripId);
+  const exc = tripData.excursions.find(e=>e.id===instanceId);
+  if(!exc) return;
+  const row = exc.rows.find(r=>r.personType==='guide' && r.person===guideName && r.syncedFromTourists);
+  if(!row) return;
+  row.chol = 0; row.zibrano = 0; row.syncedFromTourists = false;
+  await upsertRow(currentTripId, exc.id, row);
 }
 
 function renderMergePanel(){
@@ -1759,41 +1758,82 @@ function renderMergePanel(){
       const guidesWithData = guideNames.filter(g=> byGuideExc[g] && byGuideExc[g][p.name] && byGuideExc[g][p.name].count>0);
       if(!guidesWithData.length) return;
       const instances = tripData.excursions.filter(e=> e.name===p.name || e.customName===p.name);
-      html += `<div style="margin-bottom:18px;"><p style="font-weight:700; margin:0 0 8px;">${p.name}</p>`;
+      html += `<div style="margin-bottom:20px;"><p style="font-weight:700; margin:0 0 8px;">${p.name}</p>`;
       guidesWithData.forEach(g=>{
         const st = byGuideExc[g][p.name];
-        // find current linked instance for this guide, if any
-        const linkedExc = instances.find(e=> e.rows.some(r=>r.personType==='guide' && r.person===g && r.syncedFromTourists));
-        const linkedRow = linkedExc ? linkedExc.rows.find(r=>r.personType==='guide' && r.person===g && r.syncedFromTourists) : null;
-        const inSync = linkedRow && Number(linkedRow.chol)===st.count && Number(linkedRow.zibrano)===st.sum;
-        const selId = `merge_${p.name}_${g}`.replace(/[^a-zA-Z0-9_]/g,'');
-        html += `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #f0f0ea;">
-          <span style="min-width:90px; font-weight:600;">${g}</span>
-          <span class="muted" style="font-size:12.5px;">${st.count} чол, ${fmt(st.sum)} €</span>
-          <select data-role="mergeTarget" data-guide="${g}" data-exc="${p.name}" id="${selId}" style="flex:1; min-width:180px;">
-            ${instances.map(inst=>{
-              const others = inst.rows.filter(r=> r.person !== g && r.person).map(r=>`${r.person}(${r.chol})`).join(', ');
-              const label = `Км ${inst.km||0}, автобус ${inst.busOwner==='own'?'наш':'партнер'}${others ? ' — вже: '+others : ' — порожня'}`;
-              return `<option value="${inst.id}" ${linkedExc && linkedExc.id===inst.id ? 'selected':''}>${label}</option>`;
-            }).join('')}
-            <option value="new">+ Нова екскурсія (окремий автобус)</option>
-          </select>
-          <button class="btn btn-ghost btn-small no-print" data-role="mergeBtn" data-guide="${g}" data-exc="${p.name}" data-select="${selId}">${inSync ? '✓ Оновити' : 'Перенести'}</button>
-          ${inSync ? `<span class="profit-pos" style="font-size:11.5px;">актуально</span>` : ''}
+        const allocations = instances
+          .map(inst=>({ inst, row: inst.rows.find(r=>r.personType==='guide' && r.person===g && r.syncedFromTourists) }))
+          .filter(x=>x.row);
+        const allocCount = allocations.reduce((s,a)=> s + (Number(a.row.chol)||0), 0);
+        const allocSum = allocations.reduce((s,a)=> s + (Number(a.row.zibrano)||0), 0);
+        const matches = allocCount===st.count && Math.abs(allocSum-st.sum)<0.01;
+        const addSelId = `add_${p.name}_${g}`.replace(/[^a-zA-Z0-9_]/g,'');
+
+        html += `<div style="padding:8px 0; border-bottom:1px solid #f0f0ea;">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="min-width:90px; font-weight:600;">${g}</span>
+            <span class="muted" style="font-size:12.5px;">зі списку туристів: ${st.count} чол, ${fmt(st.sum)} €</span>
+            ${matches
+              ? `<span class="profit-pos" style="font-size:12px;">✓ розподілено повністю</span>`
+              : `<span class="profit-neg" style="font-size:12px;">⚠ розподілено ${allocCount} з ${st.count} чол, ${fmt(allocSum)} з ${fmt(st.sum)} €</span>`
+            }
+          </div>`;
+
+        allocations.forEach(a=>{
+          const others = a.inst.rows.filter(r=> r.person !== g && r.person).map(r=>`${r.person}(${r.chol})`).join(', ');
+          const label = `Км ${a.inst.km||0}, автобус ${a.inst.busOwner==='own'?'наш':'партнер'}${others ? ' — разом з: '+others : ''}`;
+          html += `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0 0 0; padding-left:8px; border-left:2px solid var(--line);">
+            <span class="muted" style="font-size:12px; flex:1; min-width:160px;">${label}</span>
+            <input type="number" class="num-input" data-role="allocCount" data-inst="${a.inst.id}" data-guide="${g}" data-exc="${p.name}" value="${a.row.chol}" title="Кількість людей у цьому автобусі">
+            <input type="number" class="num-input num-input-wide" data-role="allocSum" data-inst="${a.inst.id}" data-guide="${g}" data-exc="${p.name}" value="${a.row.zibrano}" title="Сума в цьому автобусі">
+            <button class="btn btn-ghost btn-small no-print" data-role="saveAlloc" data-inst="${a.inst.id}" data-guide="${g}" data-exc="${p.name}">Зберегти</button>
+            <button class="btn btn-danger-ghost btn-small no-print" data-role="removeAlloc" data-inst="${a.inst.id}" data-guide="${g}">✕ Прибрати</button>
+          </div>`;
+        });
+
+        html += `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px;">
+            <select id="${addSelId}" style="flex:1; min-width:180px;">
+              ${instances.filter(inst=> !allocations.some(a=>a.inst.id===inst.id)).map(inst=>{
+                const others = inst.rows.filter(r=> r.person).map(r=>`${r.person}(${r.chol})`).join(', ');
+                const label = `Км ${inst.km||0}, автобус ${inst.busOwner==='own'?'наш':'партнер'}${others ? ' — вже: '+others : ' — порожня'}`;
+                return `<option value="${inst.id}">${label}</option>`;
+              }).join('')}
+              <option value="new">+ Нова екскурсія (окремий автобус)</option>
+            </select>
+            <input type="number" class="num-input" id="${addSelId}_count" placeholder="чол" value="${matches ? 0 : (st.count-allocCount)}">
+            <input type="number" class="num-input num-input-wide" id="${addSelId}_sum" placeholder="€" value="${matches ? 0 : Math.round((st.sum-allocSum+Number.EPSILON)*100)/100}">
+            <button class="btn btn-primary btn-small no-print" data-role="addAlloc" data-guide="${g}" data-exc="${p.name}" data-select="${addSelId}">+ Додати автобус</button>
+          </div>
         </div>`;
       });
       html += `</div>`;
     });
     wrap.innerHTML = html || `<p class="report-note">Ще немає туристів, записаних на екскурсії, у жодного з гідів цього заїзду.</p>`;
-    wrap.querySelectorAll('[data-role="mergeBtn"]').forEach(btn=> btn.addEventListener('click', async e=>{
-      const g = e.target.dataset.guide, excName = e.target.dataset.exc;
-      const sel = document.getElementById(e.target.dataset.select);
-      const choice = sel.value;
-      const st = byGuideExc[g][excName];
-      btn.disabled = true; btn.textContent = 'Переношу…';
-      await mergeGuideIntoInstance(g, excName, st, choice);
-      renderAll();
-      renderMergePanel();
+
+    wrap.querySelectorAll('[data-role="saveAlloc"]').forEach(btn=> btn.addEventListener('click', async e=>{
+      const { inst, guide, exc } = e.target.dataset;
+      const countEl = wrap.querySelector(`[data-role="allocCount"][data-inst="${inst}"][data-guide="${guide}"][data-exc="${exc}"]`);
+      const sumEl = wrap.querySelector(`[data-role="allocSum"][data-inst="${inst}"][data-guide="${guide}"][data-exc="${exc}"]`);
+      btn.disabled = true; btn.textContent = '…';
+      await setAllocation(guide, exc, inst, Number(countEl.value)||0, Number(sumEl.value)||0);
+      renderAll(); renderMergePanel();
+    }));
+    wrap.querySelectorAll('[data-role="removeAlloc"]').forEach(btn=> btn.addEventListener('click', async e=>{
+      if(!confirm("Прибрати цей розподіл? Дані в цьому автобусі для цього гіда обнуляться.")) return;
+      await removeAllocation(e.target.dataset.inst, e.target.dataset.guide);
+      renderAll(); renderMergePanel();
+    }));
+    wrap.querySelectorAll('[data-role="addAlloc"]').forEach(btn=> btn.addEventListener('click', async e=>{
+      const { guide, exc, select } = e.target.dataset;
+      const sel = document.getElementById(select);
+      const countEl = document.getElementById(select+'_count');
+      const sumEl = document.getElementById(select+'_sum');
+      const count = Number(countEl.value)||0;
+      const sum = Number(sumEl.value)||0;
+      if(count<=0){ alert("Вкажи кількість людей більше нуля."); return; }
+      btn.disabled = true; btn.textContent = '…';
+      await setAllocation(guide, exc, sel.value, count, sum);
+      renderAll(); renderMergePanel();
     }));
   });
 }
