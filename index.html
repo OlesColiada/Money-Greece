@@ -99,6 +99,7 @@
   table.rows-table td{padding:6px 8px; border-bottom:1px solid #eee; vertical-align:middle;}
   table.rows-table tr:last-child td{border-bottom:none;}
   .num-input{width:68px; text-align:right;}
+  .num-input-wide{width:92px;}
   .person-select{border:none; border-radius:6px; padding:5px 9px; font-weight:600; font-size:12.5px; color:#fff; min-width:100px; cursor:pointer;}
   .row-del{background:none; border:none; color:#b0b6a6; cursor:pointer; font-size:16px; padding:0 4px;}
   .row-del:hover{color:var(--bad);}
@@ -139,6 +140,7 @@
     .exc-name-select{min-width:120px;}
     table.rows-table{font-size:12px;}
     .num-input{width:54px;}
+    .num-input-wide{width:78px;}
   }
 
   /* ---------- Mobile pass ---------- */
@@ -182,6 +184,7 @@
     table.rows-table th{font-size:9.5px; padding:5px 6px;}
     table.rows-table td{padding:5px 6px;}
     .num-input{width:52px;}
+    .num-input-wide{width:76px;}
     .person-select{min-width:84px; font-size:11.5px; padding:5px 6px;}
 
     .exc-summary{grid-template-columns:1fr 1fr; gap:8px 12px;}
@@ -281,13 +284,15 @@
     <button class="btn btn-primary" id="addExcursionBtn">+ Додати екскурсію</button>
   </div>
 
-  <section class="step-block" id="tripReportSection" style="margin-top:34px;">
+  <section class="step-block manager-only" id="tripReportSection" style="margin-top:34px;">
     <p class="report-title">Зведений звіт по заїзду (на гіда)</p>
     <p class="report-note">Зібрано, витрати (з квитками для Скіатосу), прибуток і розподіл 10% / 90%, плюс чистий взаєморозрахунок із партнерами.</p>
     <div class="table-scroll">
       <table class="report-table" id="tripReportTable"></table>
     </div>
   </section>
+
+  <section class="step-block guide-only" id="guideEarningsCard" style="margin-top:34px; display:none;"></section>
 
   <section class="step-block season-only" id="seasonReportSection" style="margin-top:20px;">
     <p class="report-title">Загальна статистика за сезон</p>
@@ -602,8 +607,9 @@ async function setGuideGroup(group){
   for(const g of tripData.guides) await upsertGuide(currentTripId, g);
 }
 
-function personSelectHTML(row, tripGuides){
-  const guideOptions = (currentProfile.role === 'guide') ? [currentProfile.guide_name] : tripGuides;
+function personSelectHTML(row, tripGuides, takenGuides){
+  const restricted = (currentProfile.role === 'guide') ? [currentProfile.guide_name] : tripGuides;
+  const guideOptions = restricted.filter(g => g === row.person || !(takenGuides||[]).includes(g));
   let html = `<optgroup label="Гіди заїзду">`;
   guideOptions.forEach(g=> html += `<option value="guide::${g}" ${row.personType==='guide'&&row.person===g?'selected':''}>${g}</option>`);
   html += `</optgroup><optgroup label="Постійні партнери">`;
@@ -769,18 +775,18 @@ function renderExcursions(){
       const tr = document.createElement('tr');
       const editable = canEditRow(r);
       tr.innerHTML = `
-        <td><select class="person-select" data-role="person" style="background:${personColor(r)}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames)}</select>
+        <td><select class="person-select" data-role="person" style="background:${personColor(r)}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, exc.rows.filter(other=>other.id!==r.id && other.personType==='guide').map(other=>other.person))}</select>
           ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" value="${r.customPartnerName||''}" data-role="customPartnerName" style="margin-top:4px; width:110px;" ${editable?'':'disabled'}>` : ''}
         </td>
         <td><input type="number" class="num-input" data-role="chol" value="${r.chol}" ${editable?'':'disabled'}></td>
-        <td>${r.isGuide ? `<input type="number" class="num-input" data-role="zibrano" value="${r.zibrano}" ${editable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>
+        <td>${r.isGuide ? `<input type="number" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${editable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>
         ${calc.ticketsApply ? `<td>${r.isGuide ? `<input type="number" class="num-input" data-role="quitky" value="${r.quitky}" ${editable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>` : ''}
         <td class="muted">${fmt(r.totalCost)}</td>
         <td>${r.isGuide
             ? `<span class="${r.profit>=0?'profit-pos':'profit-neg'}">${fmt(r.profit)} €</span>`
             : (exc.busOwner==='own'
                 ? `<span class="muted">винен нам ${fmt(r.settlement)} €</span>`
-                : `<span class="muted">розрахунок з бус-партнером напряму</span>`)}
+                : `<span class="muted">розрахунок з партнером</span>`)}
         </td>
         <td class="muted">${r.isGuide ? fmt(r.gInc) : '—'}</td>
         <td class="muted">${r.isGuide ? fmt(r.oInc) : '—'}</td>
@@ -904,6 +910,33 @@ function scheduleSeasonReport(){
   seasonReportTimer = setTimeout(renderSeasonReport, 1000);
 }
 
+function renderGuideEarningsCard(){
+  const el = document.getElementById('guideEarningsCard');
+  if(!currentProfile || currentProfile.role !== 'guide'){ el.style.display='none'; return; }
+  el.style.display='block';
+  if(!currentTripId){ el.innerHTML = `<p class="report-note">Оберіть заїзд.</p>`; return; }
+  const tripData = getOrCreateTripData(currentTripId);
+  const perGuide = calcTripByGuide(tripData);
+  const mine = perGuide[currentProfile.guide_name];
+  if(!mine){
+    el.innerHTML = `<p class="report-title">Ваш заробіток</p><p class="report-note">Ще немає даних по цьому заїзду.</p>`;
+    return;
+  }
+  const net = mine.profit + mine.fromPartners - mine.toPartners;
+  const pending = mine.pendingFromPartners - mine.pendingToPartners;
+  el.innerHTML = `
+    <p class="report-title">Ваш заробіток за цей заїзд</p>
+    <div class="exc-summary" style="margin-top:6px; border-top:none; padding-top:0;">
+      <div class="stat"><span class="label">Зібрано</span><span class="value">${fmt(mine.collected)} €</span></div>
+      <div class="stat"><span class="label">Затрати</span><span class="value">${fmt(mine.cost)} €</span></div>
+      <div class="stat"><span class="label">Прибуток</span><span class="value">${fmt(mine.profit)} €</span></div>
+      <div class="stat"><span class="label">Ваша комісія (10%)</span><span class="value profit-pos" style="font-size:19px;">${fmt(mine.guideIncome)} €</span></div>
+      ${(mine.fromPartners||mine.toPartners) ? `<div class="stat"><span class="label">Взаєморозрахунок (підтв.)</span><span class="value">${fmt(mine.fromPartners - mine.toPartners)} €</span></div>` : ''}
+      ${pending ? `<div class="stat"><span class="label">Довідково (не підтв.)</span><span class="value muted">${fmt(pending)} €</span></div>` : ''}
+    </div>
+  `;
+}
+
 function renderAll(){
   renderTripGrid();
   renderGuideTripSelect();
@@ -913,6 +946,7 @@ function renderAll(){
   document.getElementById('tripSubtitle').textContent = def ? `Заїзд ${def.label}` : "Немає доступних заїздів";
   renderExcursions();
   renderTripReport();
+  renderGuideEarningsCard();
   scheduleSeasonReport();
 }
 
@@ -1182,6 +1216,11 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
 });
 
 /* ---------- Bootstrap ---------- */
+document.addEventListener('focus', function(e){
+  if(e.target.matches && e.target.matches('input[type="number"], input.km-input')){
+    e.target.select();
+  }
+}, true);
 (async function bootstrap(){
   const { data:{ session } } = await sb.auth.getSession();
   if(session) await afterAuthSuccess();
