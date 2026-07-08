@@ -258,6 +258,7 @@
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   .login-overlay{
     position:fixed; inset:0; background:var(--whitewash); z-index:1000;
@@ -397,11 +398,18 @@
       <div class="field-group" style="margin-top:8px;">
         <button class="btn btn-primary btn-small" id="addTouristBtn">+ Додати</button>
       </div>
+
+      <details style="margin-top:14px;" open>
+        <summary style="cursor:pointer; font-size:13px; font-weight:600; color:var(--ink);">📎 Завантажити файлом (Excel / CSV) — надійніше</summary>
+        <p class="report-note" style="margin-top:8px;">Файл повинен мати рівно <b>3 колонки в такому порядку</b>: <b>Прізвище Ім'я</b> (разом, в одній колонці), <b>Дата народження</b>, <b>Паспортні дані</b>. Перший рядок може бути заголовком (система сама визначить і пропустить його) або одразу даними. Дата — будь-який зрозумілий формат (2014-04-22, 22.04.2014, або звичайна дата-комірка з Excel).</p>
+        <input type="file" id="touristFileInput" accept=".csv,.xlsx,.xls" style="margin-top:6px;">
+        <div id="fileImportStatus" class="report-note" style="margin-top:6px;"></div>
+      </details>
+
       <details style="margin-top:10px;">
-        <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft);">Масове додавання (вставити весь список одразу)</summary>
-        <p class="report-note" style="margin-top:8px;">По одному туристу на рядок. Розпізнає вставку прямо з таблиці (через табуляцію) або через крапку з комою: <code>Прізвище Ім'я; РРРР-ММ-ДД або ДД.ММ.РРРР; Паспортні дані</code><br>Паспортні дані можна лишити порожніми, якщо ще невідомі.</p>
-        <p class="report-note" style="margin-top:4px;">Порада: якщо список у Excel/Google Таблиці, просто виділи потрібні стовпці і встав сюди — табуляція розпізнається автоматично.</p>
-        <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Іван; Петренко; 1990-05-12; ФГ123456&#10;Марія; Іваненко; 2015-08-03;"></textarea>
+        <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft);">Або вставити текстом (без файлу)</summary>
+        <p class="report-note" style="margin-top:8px;">По одному туристу на рядок, розділювач — табуляція (як при копіюванні з таблиці) або крапка з комою, завжди в порядку: <code>Прізвище Ім'я [Tab] Дата народження [Tab] Паспортні дані</code></p>
+        <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Петренко Іван	1990-05-12	ФГ123456&#10;Іваненко Марія	2015-08-03	"></textarea>
         <button class="btn btn-ghost btn-small" id="bulkAddTouristBtn" style="margin-top:6px;">Додати список</button>
       </details>
     </div>
@@ -1553,22 +1561,22 @@ function renderTouristList(){
     const processed = touristIsProcessed(t.id);
     const sels = touristData.selectionsByTourist[t.id] || [];
     const allPaid = sels.filter(s=>s.going && !s.cancelled).length > 0 && sels.filter(s=>s.going && !s.cancelled).every(s=>s.paid);
+    const age = def ? calcAgeAtTrip(t.birth_date, def.start) : null;
     const row = document.createElement('div');
     row.className = 'tourist-row' + (processed ? ' processed' : '');
-    row.style.cursor = currentProfile.role==='manager' ? 'default' : 'pointer';
+    row.style.cursor = 'pointer';
     row.innerHTML = `
       <span class="dot"></span>
       <span class="t-name" style="flex:1;">${(t.last_name+' '+t.first_name).toUpperCase()}</span>
+      ${age===null ? `<span class="profit-neg" style="font-size:11px;" title="Дата народження не вказана або не розпізналась — ціна за замовчуванням доросла">❓ дата?</span>` : `<span class="muted" style="font-size:11.5px;">${age} р.</span>`}
       ${allPaid ? `<span class="paid-badge">✓ оплачено</span>` : ''}
       ${currentProfile.role==='manager' ? `<button class="row-del no-print" data-role="delTourist" data-id="${t.id}" title="Видалити туриста">✕</button>` : ''}
     `;
-    if(currentProfile.role !== 'manager'){
-      row.addEventListener('click', (e)=>{
-        if(e.target.dataset.role==='delTourist') return;
-        openTouristId = t.id; openEditPanels.clear(); renderTouristDetail();
-        document.getElementById('touristDetailBlock').scrollIntoView({behavior:'smooth', block:'start'});
-      });
-    }
+    row.addEventListener('click', (e)=>{
+      if(e.target.dataset.role==='delTourist') return;
+      openTouristId = t.id; openEditPanels.clear(); renderTouristDetail();
+      document.getElementById('touristDetailBlock').scrollIntoView({behavior:'smooth', block:'start'});
+    });
     const delBtn = row.querySelector('[data-role="delTourist"]');
     if(delBtn) delBtn.addEventListener('click', async (e)=>{
       e.stopPropagation();
@@ -1585,13 +1593,77 @@ function renderTouristList(){
 
 const PRICE_MODE_LABELS = { standard:'Стандарт', discount:'Знижка', free:'Безкоштовно', ticket:'Вартість квитка' };
 
+function renderTouristEditForm(block, t){
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const age = def ? calcAgeAtTrip(t.birth_date, def.start) : null;
+  block.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:10px;">
+      <p class="report-title" style="margin:0;">Редагувати дані туриста</p>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-danger-ghost btn-small no-print" id="deleteTouristBtn" title="Видалити туриста">🗑 Видалити</button>
+        <button class="btn btn-ghost btn-small no-print" id="closeTouristDetailBtn">✕ Закрити</button>
+      </div>
+    </div>
+    <div class="subgrid">
+      <div class="field-group"><span>Ім'я:</span><input type="text" id="editFirst" value="${t.first_name||''}" style="flex:1;"></div>
+      <div class="field-group"><span>Прізвище:</span><input type="text" id="editLast" value="${t.last_name||''}" style="flex:1;"></div>
+    </div>
+    <div class="subgrid" style="margin-top:8px;">
+      <div class="field-group"><span>Дата народження:</span><input type="date" id="editBirth" value="${t.birth_date||''}"></div>
+      <div class="field-group"><span>Паспортні дані:</span><input type="text" id="editPassport" value="${t.passport_data||''}" style="flex:1;"></div>
+    </div>
+    <div class="field-group" style="margin-top:10px;">
+      <span class="muted">${age===null ? '⚠ Вік не визначено — перевір дату народження вище.' : `Вік на момент туру: ${age} р.`}</span>
+    </div>
+    <div class="field-group" style="margin-top:12px;">
+      <button class="btn btn-primary btn-small" id="saveTouristEditBtn">Зберегти</button>
+    </div>
+  `;
+  document.getElementById('closeTouristDetailBtn').addEventListener('click', ()=>{ openTouristId=null; renderTouristDetail(); });
+  const delBtn = document.getElementById('deleteTouristBtn');
+  if(delBtn) delBtn.addEventListener('click', async ()=>{
+    if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
+    const { error } = await sb.from('tourists').delete().eq('id', t.id);
+    if(error){ alert("Не вдалося видалити: "+error.message); return; }
+    openTouristId = null;
+    await loadTourists();
+    renderTouristSection();
+  });
+  document.getElementById('saveTouristEditBtn').addEventListener('click', async ()=>{
+    const first = document.getElementById('editFirst').value.trim();
+    const last = document.getElementById('editLast').value.trim();
+    const birth = document.getElementById('editBirth').value || null;
+    const passport = document.getElementById('editPassport').value.trim();
+    const birthChanged = birth !== (t.birth_date || null);
+    const { error } = await sb.from('tourists').update({ first_name:first, last_name:last, birth_date:birth, passport_data:passport }).eq('id', t.id);
+    if(error){ alert("Не вдалося зберегти: "+error.message); return; }
+    // If the birth date changed, re-price any selections still on standard pricing (don't touch manual overrides).
+    if(birthChanged){
+      const newDef = TRIPS_DEF.find(d=>d.id===currentTripId);
+      const newAge = newDef ? calcAgeAtTrip(birth, newDef.start) : null;
+      const sels = touristData.selectionsByTourist[t.id] || [];
+      for(const s of sels){
+        if(s.price_mode === 'standard'){
+          const newPrice = standardPriceFor(s.excursion_name, newAge);
+          if(newPrice !== s.price){
+            await sb.from('tourist_excursion_selections').update({ price:newPrice }).eq('id', s.id);
+          }
+        }
+      }
+    }
+    await loadTourists();
+    renderTouristSection();
+    alert("Збережено.");
+  });
+}
+
 function renderTouristDetail(){
   const block = document.getElementById('touristDetailBlock');
-  if(currentProfile.role==='manager'){ block.style.display='none'; return; }
   if(!openTouristId){ block.style.display='none'; return; }
   const t = touristData.tourists.find(x=>x.id===openTouristId);
   if(!t){ block.style.display='none'; return; }
   block.style.display='block';
+  if(currentProfile.role==='manager'){ renderTouristEditForm(block, t); return; }
   const def = TRIPS_DEF.find(d=>d.id===currentTripId);
   const age = def ? calcAgeAtTrip(t.birth_date, def.start) : null;
   const sels = touristData.selectionsByTourist[t.id] || [];
@@ -1615,7 +1687,7 @@ function renderTouristDetail(){
           : `<span class="muted" style="font-size:12px;">не їде</span>`
       }
       ${s.going && !s.cancelled ? `<button class="edit-toggle-btn no-print" data-role="toggleEdit" data-sel="${s.id}" title="Особлива ціна (знижка/безкоштовно/квиток)">✎</button>` : ''}
-      ${s.going && !s.cancelled && !locked ? `<button class="btn btn-danger-ghost btn-small no-print" data-role="cancelSel" data-sel="${s.id}" title="Скасувати цю екскурсію (якщо не набралась група, хвороба тощо)">Скасувати</button>` : ''}
+      ${s.going && !s.cancelled ? `<button class="btn btn-danger-ghost btn-small no-print" data-role="cancelSel" data-sel="${s.id}" title="Скасувати цю екскурсію (якщо не набралась група, хвороба тощо)">Скасувати</button>` : ''}
       ${s.cancelled && s.paid && !s.refunded ? `<span class="profit-neg" style="font-size:11.5px;">повернути ${fmt(s.price)} €</span> <button class="btn btn-ghost btn-small no-print" data-role="refund" data-sel="${s.id}">Повернено</button>` : ''}
       ${s.cancelled && s.refunded ? `<span class="muted" style="font-size:11.5px;">✓ повернено</span>` : ''}
       ${s.going && !s.cancelled ? `<div class="exc-edit-panel ${panelOpen?'open':''}" data-panel="${s.id}">
@@ -1883,41 +1955,35 @@ function parseBulkDate(raw){
   if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
   return null;
 }
-function parseBulkTouristLine(line){
-  // Try tab-separated first (common when pasted from a spreadsheet), then ';', then 2+ spaces.
-  let parts;
-  if(line.includes('\t')) parts = line.split('\t');
-  else if(line.includes(';')) parts = line.split(';');
-  else parts = line.split(/\s{2,}/);
-  parts = parts.map(p=>p.trim()).filter(p=>p!=='');
-  if(!parts.length) return null;
-
-  // Figure out which parts are the date and passport (by pattern), whatever's left is the name.
-  let dateIdx = -1, passportIdx = -1;
-  parts.forEach((p,i)=>{
-    if(dateIdx===-1 && parseBulkDate(p)) dateIdx = i;
-  });
-  const nameParts = [];
-  let passport = '';
-  parts.forEach((p,i)=>{
-    if(i===dateIdx) return;
-    if(parseBulkDate(p)) return; // stray second date-like token, ignore
-    if(nameParts.length < (dateIdx===-1?2:2) && passportIdx===-1 && !/\d/.test(p)){
-      nameParts.push(p);
-    } else {
-      passport = passport ? passport+' '+p : p;
-    }
-  });
-
-  let first='', last='';
-  if(nameParts.length >= 2){ last = nameParts[0]; first = nameParts.slice(1).join(' '); }
-  else if(nameParts.length === 1){
-    const words = nameParts[0].split(' ').filter(Boolean);
-    if(words.length >= 2){ last = words[0]; first = words.slice(1).join(' '); }
-    else { last = nameParts[0]; }
+function excelSerialToDate(serial){
+  const utc_days = Math.floor(serial - 25569);
+  const utc_value = utc_days * 86400;
+  return new Date(utc_value * 1000);
+}
+function normalizeDateValue(raw){
+  if(raw === null || raw === undefined || raw === '') return null;
+  if(typeof raw === 'number'){
+    const d = excelSerialToDate(raw);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
   }
-  const birth = dateIdx>-1 ? parseBulkDate(parts[dateIdx]) : null;
-  return { first_name:first, last_name:last, birth_date:birth, passport_data:passport };
+  return parseBulkDate(String(raw));
+}
+// Strict fixed-column format: [Прізвище, Ім'я, Дата народження, Паспортні дані] — no guessing.
+function parseStrictRow(cells){
+  const fullName = (cells[0]||'').toString().trim();
+  const spaceIdx = fullName.indexOf(' ');
+  const last_name = spaceIdx === -1 ? fullName : fullName.slice(0, spaceIdx);
+  const first_name = spaceIdx === -1 ? '' : fullName.slice(spaceIdx+1).trim();
+  return {
+    last_name,
+    first_name,
+    birth_date: normalizeDateValue(cells[1]),
+    passport_data: (cells[2]||'').toString().trim()
+  };
+}
+function looksLikeHeaderRow(cells){
+  const joined = cells.map(c=>String(c||'').toLowerCase()).join(' ');
+  return /прізвищ|ім.я|піб|дата|паспорт|name|birth|surname/.test(joined);
 }
 
 document.getElementById('bulkAddTouristBtn').addEventListener('click', async ()=>{
@@ -1925,17 +1991,58 @@ document.getElementById('bulkAddTouristBtn').addEventListener('click', async ()=
   const guideName = activeTouristGuideName();
   if(!guideName) return;
   const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
-  const inserts = lines.map(line=>{
-    const parsed = parseBulkTouristLine(line);
-    if(!parsed) return null;
+  const rows = lines.map(line=> line.includes('\t') ? line.split('\t') : line.split(';'));
+  const dataRows = rows.length && looksLikeHeaderRow(rows[0]) ? rows.slice(1) : rows;
+  const inserts = dataRows.map(cells=>{
+    const parsed = parseStrictRow(cells);
     return { trip_id: currentTripId, guide_name: guideName, ...parsed };
-  }).filter(r=> r && (r.first_name || r.last_name));
+  }).filter(r=> r.first_name || r.last_name);
   if(!inserts.length) return;
   const { error } = await sb.from('tourists').insert(inserts);
   if(error){ alert("Не вдалося додати список: "+error.message); return; }
   document.getElementById('bulkTouristInput').value='';
   await loadTourists();
   renderTouristSection();
+});
+
+document.getElementById('touristFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('fileImportStatus');
+  statusEl.textContent = 'Читаю файл…';
+  const guideName = activeTouristGuideName();
+  if(!guideName){ statusEl.textContent = 'Спочатку обери гіда вище.'; e.target.value=''; return; }
+  try{
+    let rows;
+    if(/\.csv$/i.test(file.name)){
+      const text = await file.text();
+      rows = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>{
+        const delim = l.includes(';') ? ';' : ',';
+        return l.split(delim).map(c=>c.trim().replace(/^"|"$/g,''));
+      });
+    } else {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:''});
+    }
+    if(!rows.length){ statusEl.textContent = 'Файл порожній.'; return; }
+    const dataRows = looksLikeHeaderRow(rows[0]) ? rows.slice(1) : rows;
+    const inserts = dataRows.map(cells=>{
+      const parsed = parseStrictRow(cells);
+      return { trip_id: currentTripId, guide_name: guideName, ...parsed };
+    }).filter(r=> r.first_name || r.last_name);
+    if(!inserts.length){ statusEl.textContent = 'Не знайдено жодного рядка з даними.'; return; }
+    const { error } = await sb.from('tourists').insert(inserts);
+    if(error){ statusEl.textContent = 'Помилка: '+error.message; return; }
+    statusEl.textContent = `✓ Додано ${inserts.length} туристів.`;
+    e.target.value = '';
+    await loadTourists();
+    renderTouristSection();
+  } catch(err){
+    console.error(err);
+    statusEl.textContent = 'Не вдалося прочитати файл: '+(err.message||err);
+  }
 });
 
 /* ---------- Bootstrap ---------- */
