@@ -374,7 +374,15 @@
       <div class="guide-chips" id="guideFilterChips"></div>
     </div>
 
-    <div class="step-block no-print manager-only" id="addTouristBlock" style="display:none;">
+    <section class="step-block" id="touristStatsSection">
+      <p class="report-title">Статистика по екскурсіях</p>
+      <p class="report-note">К-сть туристів і зібрана сума по кожній екскурсії (поточна група поточного заїзду).</p>
+      <div class="table-scroll">
+        <table class="report-table" id="touristStatsTable"></table>
+      </div>
+    </section>
+
+    <div class="step-block no-print manager-only" id="addTouristBlock" style="display:none; margin-top:16px;">
       <p class="step-title">Додати туриста</p>
       <div class="subgrid">
         <div class="field-group"><span>Ім'я:</span><input type="text" id="newTouristFirst" style="flex:1;"></div>
@@ -396,7 +404,7 @@
       </details>
     </div>
 
-    <div class="step-block" id="touristListBlock">
+    <div class="step-block" id="touristListBlock" style="margin-top:16px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <p class="step-title" style="margin:0;">Туристи</p>
         <button class="btn btn-danger-ghost no-print" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
@@ -404,15 +412,7 @@
       <div id="touristListWrap"></div>
     </div>
 
-    <div class="step-block" id="touristDetailBlock" style="display:none;"></div>
-
-    <section class="step-block" id="touristStatsSection" style="margin-top:20px;">
-      <p class="report-title">Статистика по екскурсіях</p>
-      <p class="report-note">К-сть туристів і зібрана сума по кожній екскурсії (поточна група поточного заїзду).</p>
-      <div class="table-scroll">
-        <table class="report-table" id="touristStatsTable"></table>
-      </div>
-    </section>
+    <div class="step-block" id="touristDetailBlock" style="display:none; margin-top:16px;"></div>
 
     <section class="step-block manager-only" id="touristSeasonStatsSection" style="margin-top:20px;">
       <p class="report-title">Загальна статистика туристів (усі гіди, усі заїзди)</p>
@@ -1552,7 +1552,8 @@ function renderTouristDetail(){
           ? `<span class="exc-price-label">${fmt(s.price)} €${s.price_mode!=='standard' ? ` <span class="muted">(${PRICE_MODE_LABELS[s.price_mode]})</span>` : ''}</span>`
           : `<span class="muted" style="font-size:12px;">не їде</span>`
       }
-      ${s.going && !s.cancelled ? `<button class="edit-toggle-btn no-print" data-role="toggleEdit" data-sel="${s.id}" title="Особлива ціна / скасувати">✎</button>` : ''}
+      ${s.going && !s.cancelled ? `<button class="edit-toggle-btn no-print" data-role="toggleEdit" data-sel="${s.id}" title="Особлива ціна (знижка/безкоштовно/квиток)">✎</button>` : ''}
+      ${s.going && !s.cancelled && !locked ? `<button class="btn btn-danger-ghost btn-small no-print" data-role="cancelSel" data-sel="${s.id}" title="Скасувати цю екскурсію (якщо не набралась група, хвороба тощо)">Скасувати</button>` : ''}
       ${s.cancelled && s.paid && !s.refunded ? `<span class="profit-neg" style="font-size:11.5px;">повернути ${fmt(s.price)} €</span> <button class="btn btn-ghost btn-small no-print" data-role="refund" data-sel="${s.id}">Повернено</button>` : ''}
       ${s.cancelled && s.refunded ? `<span class="muted" style="font-size:11.5px;">✓ повернено</span>` : ''}
       ${s.going && !s.cancelled ? `<div class="exc-edit-panel ${panelOpen?'open':''}" data-panel="${s.id}">
@@ -1562,7 +1563,6 @@ function renderTouristDetail(){
             <button class="price-mode-btn ${s.price_mode==='ticket'?'active':''}" data-role="modeTicket" data-sel="${s.id}" ${locked?'disabled':''}>Вартість квитка</button>
           </div>
           <input type="number" class="price-display" data-role="price" data-sel="${s.id}" value="${s.price}" ${locked || s.price_mode==='free' ?'disabled':''}> €
-          ${!locked ? `<button class="btn btn-danger-ghost btn-small no-print" data-role="cancelSel" data-sel="${s.id}" title="Скасувати цю екскурсію (якщо не набралась група, хвороба тощо)">Скасувати екскурсію</button>` : ''}
         </div>` : ''}
     </div>`;
   });
@@ -1579,8 +1579,10 @@ function renderTouristDetail(){
     </div>
     ${(currentProfile.role==='manager' && t.passport_data) ? `<p class="muted" style="font-size:12px; margin:2px 0 0;">Паспорт: ${t.passport_data}</p>` : ''}
     <div class="age-hero">
-      <div class="label">Вік</div>
-      <div class="value">${age!==null ? age : '—'}</div>
+      ${currentProfile.role==='manager'
+        ? `<div class="label">Вік</div><div class="value">${age!==null ? age : '—'}</div>`
+        : `<div class="label">Категорія</div><div class="value" style="font-size:26px;">${age===null ? '—' : (age<=11 ? 'Дитина' : 'Дорослий')}</div>`
+      }
     </div>
     <div>${rowsHtml}</div>
     <div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -1674,11 +1676,21 @@ function renderTouristStats(){
       if(s.going && !s.cancelled){ stats[s.excursion_name].count++; stats[s.excursion_name].sum += Number(s.price)||0; }
     });
   });
+  const tripData = getTripData(currentTripId);
+  const guideName = activeTouristGuideName();
   let rows = '';
   TOURIST_PRICE_LIST.forEach(p=>{
     const st = stats[p.name];
-    rows += `<tr><td>${p.name}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td>
-      <td class="no-print">${currentProfile.role==='manager' && st.count>0 ? `<button class="btn btn-ghost btn-small" data-role="transfer" data-name="${p.name}">Перенести в прибутковість</button>` : ''}</td></tr>`;
+    const matchExc = tripData.excursions.find(e=> e.name===p.name || e.customName===p.name);
+    const matchRow = matchExc ? matchExc.rows.find(r=>r.personType==='guide' && r.person===guideName) : null;
+    const inSync = matchRow && Number(matchRow.chol)===st.count && Number(matchRow.zibrano)===st.sum;
+    let statusHtml = '';
+    if(st.count>0){
+      statusHtml = inSync
+        ? `<span class="profit-pos" style="font-size:12px;">✓ синхронізовано</span>`
+        : `<button class="btn btn-ghost btn-small no-print" data-role="transfer" data-name="${p.name}">${matchRow ? 'Оновити в прибутковості' : 'Перенести в прибутковість'}</button>`;
+    }
+    rows += `<tr><td>${p.name}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td><td class="no-print">${statusHtml}</td></tr>`;
   });
   table.innerHTML = `<thead><tr><th style="text-align:left;">Екскурсія</th><th>Туристів</th><th>Сума</th><th></th></tr></thead><tbody>${rows}</tbody>`;
   table.querySelectorAll('[data-role="transfer"]').forEach(btn=> btn.addEventListener('click', e=> transferToProfitability(e.target.dataset.name, stats[e.target.dataset.name])));
