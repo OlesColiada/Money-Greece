@@ -38,6 +38,62 @@
   body.guide-mode .season-only{display:none !important;}
   body.guide-mode .manager-detail{display:none !important;}
   .mode-toggle .btn.active-tab{background:var(--aegean); color:#fff; border-color:var(--aegean);}
+
+  .section-tabs{display:flex; gap:8px; margin-bottom:18px;}
+  .section-tab{flex:1; text-align:center;}
+  .section-tab.active-tab{background:var(--ochre); color:#fff; border-color:var(--ochre);}
+
+  .tourist-row{
+    display:flex; align-items:center; gap:10px; padding:11px 4px; border-bottom:1px solid #eee;
+    cursor:pointer; background:#fff;
+  }
+  .tourist-row:hover{background:var(--whitewash-2);}
+  .tourist-row .dot{width:11px; height:11px; border-radius:50%; background:transparent; flex-shrink:0;}
+  .tourist-row.processed .dot{background:var(--good);}
+  .tourist-row.processed .t-name{font-weight:700;}
+  .tourist-row .t-name{font-size:14.5px;}
+  .tourist-row .paid-badge{font-size:11px; color:var(--good); font-weight:700; margin-left:auto;}
+
+  .age-hero{text-align:center; padding:6px 0 16px;}
+  .age-hero .label{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft);}
+  .age-hero .value{font-size:38px; font-weight:700; color:var(--ink); line-height:1.1;}
+
+  .exc-select-row{
+    display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid #eee; flex-wrap:wrap;
+  }
+  .exc-select-row:last-child{border-bottom:none;}
+  .exc-select-name{font-weight:600; flex:1; min-width:140px;}
+  .exc-price-label{font-size:13px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;}
+
+  /* iOS-style toggle switch */
+  .switch{position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0;}
+  .switch input{opacity:0; width:0; height:0;}
+  .switch .slider{
+    position:absolute; cursor:pointer; inset:0; background:#d8dccf; border-radius:999px; transition:.15s;
+  }
+  .switch .slider::before{
+    content:""; position:absolute; height:20px; width:20px; left:3px; bottom:3px;
+    background:#fff; border-radius:50%; transition:.15s; box-shadow:0 1px 2px rgba(0,0,0,.2);
+  }
+  .switch input:checked + .slider{background:var(--ochre);}
+  .switch input:checked + .slider::before{transform:translateX(20px);}
+  .switch input:disabled + .slider{opacity:.5; cursor:not-allowed;}
+
+  .edit-toggle-btn{
+    background:none; border:none; cursor:pointer; color:var(--ink-soft); font-size:16px; padding:2px 4px;
+  }
+  .edit-toggle-btn:hover{color:var(--aegean);}
+  .exc-edit-panel{
+    width:100%; display:none; gap:8px; align-items:center; flex-wrap:wrap;
+    background:var(--whitewash-2); border-radius:8px; padding:8px 10px; margin-top:6px;
+  }
+  .exc-edit-panel.open{display:flex;}
+  .price-mode-btns{display:flex; gap:4px;}
+  .price-mode-btn{
+    font-size:11px; padding:4px 8px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer;
+  }
+  .price-mode-btn.active{background:var(--ochre); color:#fff; border-color:var(--ochre);}
+  .price-display{width:64px; text-align:right; font-family:'IBM Plex Mono',monospace;}
   main{max-width:1040px; margin:0 auto; padding:20px 16px 100px;}
 
   select, input[type=text], input[type=number]{
@@ -255,6 +311,13 @@
 
 <main class="app-hidden" id="appMain">
 
+  <div class="section-tabs no-print">
+    <button class="btn btn-ghost section-tab active-tab" id="sectionProfitBtn">Прибутковість</button>
+    <button class="btn btn-ghost section-tab" id="sectionTouristsBtn">Список збору коштів</button>
+  </div>
+
+  <div id="profitSection">
+
   <div class="step-block no-print manager-only">
     
     <p class="step-title">Заїзд</p>
@@ -302,7 +365,70 @@
     </div>
   </section>
 
+  </div>
+
+  <div id="touristSection" style="display:none;">
+
+    <div class="step-block no-print manager-only" id="guideFilterBlock" style="display:none;">
+      <p class="step-title">Група якого гіда</p>
+      <div class="guide-chips" id="guideFilterChips"></div>
+    </div>
+
+    <div class="step-block no-print manager-only" id="addTouristBlock" style="display:none;">
+      <p class="step-title">Додати туриста</p>
+      <div class="subgrid">
+        <div class="field-group"><span>Ім'я:</span><input type="text" id="newTouristFirst" style="flex:1;"></div>
+        <div class="field-group"><span>Прізвище:</span><input type="text" id="newTouristLast" style="flex:1;"></div>
+      </div>
+      <div class="subgrid" style="margin-top:8px;">
+        <div class="field-group"><span>Дата народження:</span><input type="date" id="newTouristBirth"></div>
+        <div class="field-group"><span>Паспортні дані:</span><input type="text" id="newTouristPassport" placeholder="серія/номер, ким виданий..." style="flex:1;"></div>
+      </div>
+      <div class="field-group" style="margin-top:8px;">
+        <button class="btn btn-primary btn-small" id="addTouristBtn">+ Додати</button>
+      </div>
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft);">Масове додавання (вставити весь список одразу)</summary>
+        <p class="report-note" style="margin-top:8px;">По одному туристу на рядок. Розпізнає вставку прямо з таблиці (через табуляцію) або через крапку з комою: <code>Прізвище Ім'я; РРРР-ММ-ДД або ДД.ММ.РРРР; Паспортні дані</code><br>Паспортні дані можна лишити порожніми, якщо ще невідомі.</p>
+        <p class="report-note" style="margin-top:4px;">Порада: якщо список у Excel/Google Таблиці, просто виділи потрібні стовпці і встав сюди — табуляція розпізнається автоматично.</p>
+        <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Іван; Петренко; 1990-05-12; ФГ123456&#10;Марія; Іваненко; 2015-08-03;"></textarea>
+        <button class="btn btn-ghost btn-small" id="bulkAddTouristBtn" style="margin-top:6px;">Додати список</button>
+      </details>
+    </div>
+
+    <div class="step-block" id="touristListBlock">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <p class="step-title" style="margin:0;">Туристи</p>
+        <button class="btn btn-danger-ghost no-print" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
+      </div>
+      <div id="touristListWrap"></div>
+    </div>
+
+    <div class="step-block" id="touristDetailBlock" style="display:none;"></div>
+
+    <section class="step-block" id="touristStatsSection" style="margin-top:20px;">
+      <p class="report-title">Статистика по екскурсіях</p>
+      <p class="report-note">К-сть туристів і зібрана сума по кожній екскурсії (поточна група поточного заїзду).</p>
+      <div class="table-scroll">
+        <table class="report-table" id="touristStatsTable"></table>
+      </div>
+    </section>
+
+    <section class="step-block manager-only" id="touristSeasonStatsSection" style="margin-top:20px;">
+      <p class="report-title">Загальна статистика туристів (усі гіди, усі заїзди)</p>
+      <p class="report-note">Зведення по всьому сезону, з розбивкою по гідах і по екскурсіях.</p>
+      <div class="table-scroll">
+        <table class="report-table" id="touristSeasonByGuideTable"></table>
+      </div>
+      <div class="table-scroll" style="margin-top:14px;">
+        <table class="report-table" id="touristSeasonByExcTable"></table>
+      </div>
+    </section>
+
+  </div>
+
 </main>
+
 
 <footer class="savebar no-print app-hidden" id="appFooter">
   <span class="save-status" id="saveStatus">—</span>
@@ -323,6 +449,32 @@ const EXCURSIONS = ["Скіатос","Салоніки транс","Салоні
 const DEFAULT_GUIDE_FEE = {"Едеса/Позар":100,"Метеори":160,"Олімп":100,"Салоніки транс":120,"Салоніки екск":120};
 const TICKET_EXCURSIONS = ["Скіатос"];
 const NO_GUIDE_FEE_EXCURSIONS = ["Скіатос"]; // no local escort/guide needed — only bus is shared, tickets are per-person
+
+/* ---------- Tourist collection list ---------- */
+const TOURIST_PRICE_LIST = [
+  { name:"Халкідіки", adult:40, child:25 },
+  { name:"Скіатос", adult:60, child:45 },
+  { name:"Метеори", adult:40, child:35 },
+  { name:"Салоніки екск", adult:30, child:25 },
+  { name:"Салоніки транс", adult:25, child:20 },
+  { name:"Грязі", adult:15, child:10 },
+  { name:"Едеса/Позар", adult:40, child:30 },
+  { name:"Олімп", adult:35, child:25 },
+];
+function calcAgeAtTrip(birthDateStr, tripStartDate){
+  if(!birthDateStr) return null;
+  const b = new Date(birthDateStr+"T00:00:00");
+  let age = tripStartDate.getFullYear() - b.getFullYear();
+  const m = tripStartDate.getMonth() - b.getMonth();
+  if(m < 0 || (m===0 && tripStartDate.getDate() < b.getDate())) age--;
+  return age;
+}
+function standardPriceFor(excName, age){
+  const def = TOURIST_PRICE_LIST.find(e=>e.name===excName);
+  if(!def) return 0;
+  const isChild = age !== null && age <= 11;
+  return isChild ? def.child : def.adult;
+}
 
 const GUIDE_COLORS = {"Галя":"#7a2230","Ліда":"#274a72","Марта":"#6f9fc4","Іра":"#6fa383","Таня":"#c9a45c","Мирослава":"#d98a8a"};
 function guideColor(name){ return GUIDE_COLORS[name] || "#4a6b57"; }
@@ -523,7 +675,9 @@ function renderTripGrid(){
       if(!state.trips[currentTripId]) await loadTripData(currentTripId);
       const td = getTripData(currentTripId);
       guidesEditMode = td.guides.length < 3;
+      touristGuideFilter = null; openTouristId = null;
       renderAll();
+      if(currentSection==='tourists'){ await loadTourists(); renderTouristSection(); }
     });
     grid.appendChild(chip);
   });
@@ -1167,7 +1321,9 @@ document.getElementById('guideTripSelect').addEventListener('change', async e=>{
   currentTripId = e.target.value;
   setStatus("Завантаження…");
   if(!state.trips[currentTripId]) await loadTripData(currentTripId);
+  openTouristId = null;
   renderAll();
+  if(currentSection==='tourists'){ await loadTourists(); renderTouristSection(); }
 });
 
 /* ---------- Auth / login ---------- */
@@ -1224,6 +1380,502 @@ document.getElementById('loginInput').addEventListener('keydown', e=>{ if(e.key=
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   await sb.auth.signOut();
   location.reload();
+});
+
+/* ============================================================
+   TOURIST COLLECTION LIST MODULE
+   ============================================================ */
+let currentSection = 'profit'; // 'profit' | 'tourists'
+let touristGuideFilter = null; // for manager: which guide's group is being viewed
+let touristData = { tourists: [], selectionsByTourist: {} }; // cache for current (trip, guideFilter)
+let openTouristId = null;
+let openEditPanels = new Set();
+
+function activeTouristGuideName(){
+  if(currentProfile.role === 'guide') return currentProfile.guide_name;
+  return touristGuideFilter;
+}
+
+async function loadTourists(){
+  const guideName = activeTouristGuideName();
+  touristData = { tourists: [], selectionsByTourist: {} };
+  if(!currentTripId || !guideName) return;
+  const { data: tourists, error: tErr } = await sb.from('tourists').select('*')
+    .eq('trip_id', currentTripId).eq('guide_name', guideName).order('created_at');
+  if(tErr){ console.error(tErr); return; }
+  touristData.tourists = tourists || [];
+  if(!touristData.tourists.length) return;
+  const ids = touristData.tourists.map(t=>t.id);
+  const { data: selections, error: sErr } = await sb.from('tourist_excursion_selections').select('*').in('tourist_id', ids);
+  if(sErr){ console.error(sErr); return; }
+  touristData.tourists.forEach(t=>{
+    touristData.selectionsByTourist[t.id] = (selections||[]).filter(s=>s.tourist_id===t.id);
+  });
+  // Ensure every tourist has all 8 excursion rows (create missing ones with standard price)
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const toInsert = [];
+  touristData.tourists.forEach(t=>{
+    const existingNames = touristData.selectionsByTourist[t.id].map(s=>s.excursion_name);
+    const missing = TOURIST_PRICE_LIST.filter(p=>!existingNames.includes(p.name));
+    missing.forEach(p=>{
+      const age = def ? calcAgeAtTrip(t.birth_date, def.start) : null;
+      const newSel = {
+        id: uid(), tourist_id: t.id, trip_id: currentTripId, excursion_name: p.name,
+        going:false, price_mode:'standard', price: standardPriceFor(p.name, age),
+        paid:false, paid_at:null, cancelled:false, cancelled_at:null, cancelled_reason:'',
+        refunded:false, refunded_at:null
+      };
+      touristData.selectionsByTourist[t.id].push(newSel);
+      toInsert.push({ id:newSel.id, tourist_id:newSel.tourist_id, trip_id:newSel.trip_id, excursion_name:newSel.excursion_name,
+        going:false, price_mode:'standard', price:newSel.price });
+    });
+  });
+  if(toInsert.length){
+    const { error: insErr } = await sb.from('tourist_excursion_selections').upsert(toInsert);
+    if(insErr) console.error(insErr);
+  }
+}
+
+function touristIsProcessed(touristId){
+  const sels = touristData.selectionsByTourist[touristId] || [];
+  return sels.some(s=>s.going);
+}
+
+function renderSectionTabs(){
+  document.getElementById('sectionProfitBtn').classList.toggle('active-tab', currentSection==='profit');
+  document.getElementById('sectionTouristsBtn').classList.toggle('active-tab', currentSection==='tourists');
+  document.getElementById('profitSection').style.display = currentSection==='profit' ? 'block' : 'none';
+  document.getElementById('touristSection').style.display = currentSection==='tourists' ? 'block' : 'none';
+}
+document.getElementById('sectionProfitBtn').addEventListener('click', ()=>{ currentSection='profit'; renderSectionTabs(); });
+document.getElementById('sectionTouristsBtn').addEventListener('click', async ()=>{
+  currentSection='tourists'; renderSectionTabs();
+  if(currentProfile.role==='manager' && !touristGuideFilter){
+    const td = getTripData(currentTripId);
+    touristGuideFilter = td.guides[0]?.name || null;
+  }
+  await loadTourists();
+  renderTouristSection();
+});
+
+function renderGuideFilterChips(){
+  const block = document.getElementById('guideFilterBlock');
+  if(currentProfile.role !== 'manager'){ block.style.display='none'; return; }
+  const td = getTripData(currentTripId);
+  if(!td.guides.length){ block.style.display='none'; return; }
+  block.style.display='block';
+  const wrap = document.getElementById('guideFilterChips');
+  wrap.innerHTML = '';
+  td.guides.forEach(g=>{
+    const chip = document.createElement('button');
+    chip.className = 'btn btn-ghost btn-small' + (touristGuideFilter===g.name ? ' active-tab' : '');
+    if(touristGuideFilter===g.name){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
+    chip.textContent = g.name;
+    chip.addEventListener('click', async ()=>{ touristGuideFilter = g.name; openTouristId=null; await loadTourists(); renderTouristSection(); });
+    wrap.appendChild(chip);
+  });
+}
+
+function renderTouristList(){
+  document.getElementById('addTouristBlock').style.display = currentProfile.role==='manager' ? 'block' : 'none';
+  const wrap = document.getElementById('touristListWrap');
+  wrap.innerHTML = '';
+  const clearBtn = document.getElementById('clearTouristListBtn');
+  if(clearBtn) clearBtn.style.display = (currentProfile.role==='manager' && touristData.tourists.length) ? 'inline-block' : 'none';
+  if(!activeTouristGuideName()){
+    wrap.innerHTML = `<p class="report-note">Оберіть гіда вище.</p>`;
+    return;
+  }
+  if(!touristData.tourists.length){
+    wrap.innerHTML = `<p class="report-note">Ще немає туристів у цій групі.</p>`;
+    return;
+  }
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  touristData.tourists.forEach(t=>{
+    const processed = touristIsProcessed(t.id);
+    const sels = touristData.selectionsByTourist[t.id] || [];
+    const allPaid = sels.filter(s=>s.going && !s.cancelled).length > 0 && sels.filter(s=>s.going && !s.cancelled).every(s=>s.paid);
+    const row = document.createElement('div');
+    row.className = 'tourist-row' + (processed ? ' processed' : '');
+    row.innerHTML = `
+      <span class="dot"></span>
+      <span class="t-name" style="flex:1;">${(t.last_name+' '+t.first_name).toUpperCase()}</span>
+      ${allPaid ? `<span class="paid-badge">✓ оплачено</span>` : ''}
+      ${currentProfile.role==='manager' ? `<button class="row-del no-print" data-role="delTourist" data-id="${t.id}" title="Видалити туриста">✕</button>` : ''}
+    `;
+    row.addEventListener('click', (e)=>{
+      if(e.target.dataset.role==='delTourist') return;
+      openTouristId = t.id; openEditPanels.clear(); renderTouristDetail();
+    });
+    const delBtn = row.querySelector('[data-role="delTourist"]');
+    if(delBtn) delBtn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
+      const { error } = await sb.from('tourists').delete().eq('id', t.id);
+      if(error){ alert("Не вдалося видалити: "+error.message); return; }
+      if(openTouristId===t.id) openTouristId=null;
+      await loadTourists();
+      renderTouristSection();
+    });
+    wrap.appendChild(row);
+  });
+}
+
+const PRICE_MODE_LABELS = { standard:'Стандарт', discount:'Знижка', free:'Безкоштовно', ticket:'Вартість квитка' };
+
+function renderTouristDetail(){
+  const block = document.getElementById('touristDetailBlock');
+  if(!openTouristId){ block.style.display='none'; return; }
+  const t = touristData.tourists.find(x=>x.id===openTouristId);
+  if(!t){ block.style.display='none'; return; }
+  block.style.display='block';
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const age = def ? calcAgeAtTrip(t.birth_date, def.start) : null;
+  const sels = touristData.selectionsByTourist[t.id] || [];
+
+  let rowsHtml = '';
+  TOURIST_PRICE_LIST.forEach(p=>{
+    const s = sels.find(x=>x.excursion_name===p.name);
+    if(!s) return;
+    const locked = s.paid && !s.cancelled;
+    const panelOpen = openEditPanels.has(s.id);
+    rowsHtml += `<div class="exc-select-row">
+      <label class="switch">
+        <input type="checkbox" data-role="going" data-sel="${s.id}" ${s.going?'checked':''} ${locked||s.cancelled?'disabled':''}>
+        <span class="slider"></span>
+      </label>
+      <span class="exc-select-name">${p.name}</span>
+      ${s.cancelled
+        ? `<span class="muted" style="font-size:11.5px;">скасовано${s.cancelled_reason ? ': '+s.cancelled_reason : ''}</span>`
+        : s.going
+          ? `<span class="exc-price-label">${fmt(s.price)} €${s.price_mode!=='standard' ? ` <span class="muted">(${PRICE_MODE_LABELS[s.price_mode]})</span>` : ''}</span>`
+          : `<span class="muted" style="font-size:12px;">не їде</span>`
+      }
+      ${s.going && !s.cancelled ? `<button class="edit-toggle-btn no-print" data-role="toggleEdit" data-sel="${s.id}" title="Особлива ціна / скасувати">✎</button>` : ''}
+      ${s.cancelled && s.paid && !s.refunded ? `<span class="profit-neg" style="font-size:11.5px;">повернути ${fmt(s.price)} €</span> <button class="btn btn-ghost btn-small no-print" data-role="refund" data-sel="${s.id}">Повернено</button>` : ''}
+      ${s.cancelled && s.refunded ? `<span class="muted" style="font-size:11.5px;">✓ повернено</span>` : ''}
+      ${s.going && !s.cancelled ? `<div class="exc-edit-panel ${panelOpen?'open':''}" data-panel="${s.id}">
+          <div class="price-mode-btns">
+            <button class="price-mode-btn ${s.price_mode==='discount'?'active':''}" data-role="modeDiscount" data-sel="${s.id}" ${locked?'disabled':''}>Знижка</button>
+            <button class="price-mode-btn ${s.price_mode==='free'?'active':''}" data-role="modeFree" data-sel="${s.id}" ${locked?'disabled':''}>Безкоштовно</button>
+            <button class="price-mode-btn ${s.price_mode==='ticket'?'active':''}" data-role="modeTicket" data-sel="${s.id}" ${locked?'disabled':''}>Вартість квитка</button>
+          </div>
+          <input type="number" class="price-display" data-role="price" data-sel="${s.id}" value="${s.price}" ${locked || s.price_mode==='free' ?'disabled':''}> €
+          ${!locked ? `<button class="btn btn-danger-ghost btn-small no-print" data-role="cancelSel" data-sel="${s.id}" title="Скасувати цю екскурсію (якщо не набралась група, хвороба тощо)">Скасувати екскурсію</button>` : ''}
+        </div>` : ''}
+    </div>`;
+  });
+
+  const activeSels = sels.filter(s=>s.going && !s.cancelled);
+  const totalDue = activeSels.reduce((sum,s)=> sum + (Number(s.price)||0), 0);
+  const unpaidSum = activeSels.filter(s=>!s.paid).reduce((sum,s)=> sum + (Number(s.price)||0), 0);
+  const allPaid = activeSels.length > 0 && activeSels.every(s=>s.paid);
+
+  block.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:4px;">
+      <p class="report-title" style="margin:0;">${(t.last_name+' '+t.first_name).toUpperCase()}</p>
+      <button class="btn btn-ghost btn-small no-print" id="closeTouristDetailBtn">✕ Закрити</button>
+    </div>
+    ${t.passport_data ? `<p class="muted" style="font-size:12px; margin:2px 0 0;">Паспорт: ${t.passport_data}</p>` : ''}
+    <div class="age-hero">
+      <div class="label">Вік</div>
+      <div class="value">${age!==null ? age : '—'}</div>
+    </div>
+    <div>${rowsHtml}</div>
+    <div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div><span class="label" style="display:block; font-size:11px; text-transform:uppercase; color:var(--ink-soft);">Сума до оплати</span>
+        <span style="font-size:22px; font-weight:700;">${fmt(totalDue)} €</span>
+      </div>
+      ${allPaid
+        ? `<span class="profit-pos" style="font-weight:700;">✓ Оплачено</span>`
+        : unpaidSum > 0
+          ? `<button class="btn btn-primary no-print" id="payTouristBtn">Оплатити ${fmt(unpaidSum)} €</button>`
+          : `<span class="muted">Немає обраних екскурсій</span>`
+      }
+    </div>
+  `;
+
+  document.getElementById('closeTouristDetailBtn').addEventListener('click', ()=>{ openTouristId=null; renderTouristDetail(); });
+
+  block.querySelectorAll('[data-role="toggleEdit"]').forEach(el=> el.addEventListener('click', e=>{
+    const sel = e.target.dataset.sel;
+    if(openEditPanels.has(sel)) openEditPanels.delete(sel); else openEditPanels.add(sel);
+    renderTouristDetail();
+  }));
+  block.querySelectorAll('[data-role="going"]').forEach(el=> el.addEventListener('change', e=>{
+    updateSelectionLocal(t.id, e.target.dataset.sel, { going: e.target.checked });
+  }));
+  block.querySelectorAll('[data-role="modeDiscount"]').forEach(el=> el.addEventListener('click', e=>{
+    updateSelectionLocal(t.id, e.target.dataset.sel, { price_mode:'discount' });
+  }));
+  block.querySelectorAll('[data-role="modeFree"]').forEach(el=> el.addEventListener('click', e=>{
+    updateSelectionLocal(t.id, e.target.dataset.sel, { price_mode:'free', price:0 });
+  }));
+  block.querySelectorAll('[data-role="modeTicket"]').forEach(el=> el.addEventListener('click', e=>{
+    updateSelectionLocal(t.id, e.target.dataset.sel, { price_mode:'ticket' });
+  }));
+  block.querySelectorAll('[data-role="price"]').forEach(el=> el.addEventListener('input', e=>{
+    updateSelectionLocal(t.id, e.target.dataset.sel, { price:e.target.value }, true);
+  }));
+  block.querySelectorAll('[data-role="cancelSel"]').forEach(el=> el.addEventListener('click', e=>{
+    const reason = prompt("Причина скасування (не набралась група, хвороба тощо):", "");
+    if(reason===null) return;
+    cancelSelection(e.target.dataset.sel, reason);
+  }));
+  block.querySelectorAll('[data-role="refund"]').forEach(el=> el.addEventListener('click', e=>{
+    if(!confirm("Підтвердити, що кошти повернуто туристу?")) return;
+    refundSelection(e.target.dataset.sel);
+  }));
+  const payBtn = document.getElementById('payTouristBtn');
+  if(payBtn) payBtn.addEventListener('click', ()=> payTourist(t.id));
+}
+
+function updateSelectionLocal(touristId, selId, patch, debounce){
+  const sels = touristData.selectionsByTourist[touristId];
+  const s = sels.find(x=>x.id===selId);
+  Object.assign(s, patch);
+  renderTouristDetail();
+  const doPersist = ()=> sb.from('tourist_excursion_selections').upsert({
+    id:s.id, tourist_id:s.tourist_id, trip_id:s.trip_id, excursion_name:s.excursion_name,
+    going:s.going, price_mode:s.price_mode, price:Number(s.price)||0
+  }).then(({error})=>{ if(error){ console.error(error); alert("Не вдалося зберегти: "+error.message); } });
+  if(debounce) debouncedPersist('sel:'+selId, doPersist); else persistNow('sel:'+selId, doPersist);
+  renderTouristStats();
+}
+
+async function payTourist(touristId){
+  await flushPendingPersists();
+  const { error } = await sb.rpc('mark_tourist_paid', { p_tourist_id: touristId });
+  if(error){ alert(error.message || "Не вдалося підтвердити оплату"); return; }
+  await loadTourists();
+  renderTouristSection();
+}
+async function cancelSelection(selId, reason){
+  await flushPendingPersists();
+  const { error } = await sb.rpc('cancel_tourist_selection', { p_selection_id: selId, p_reason: reason });
+  if(error){ alert(error.message || "Не вдалося скасувати"); return; }
+  await loadTourists();
+  renderTouristSection();
+}
+async function refundSelection(selId){
+  const { error } = await sb.rpc('refund_tourist_selection', { p_selection_id: selId });
+  if(error){ alert(error.message || "Не вдалося зафіксувати повернення"); return; }
+  await loadTourists();
+  renderTouristSection();
+}
+
+function renderTouristStats(){
+  const table = document.getElementById('touristStatsTable');
+  const stats = {};
+  TOURIST_PRICE_LIST.forEach(p=> stats[p.name] = { count:0, sum:0 });
+  Object.values(touristData.selectionsByTourist).forEach(sels=>{
+    sels.forEach(s=>{
+      if(s.going && !s.cancelled){ stats[s.excursion_name].count++; stats[s.excursion_name].sum += Number(s.price)||0; }
+    });
+  });
+  let rows = '';
+  TOURIST_PRICE_LIST.forEach(p=>{
+    const st = stats[p.name];
+    rows += `<tr><td>${p.name}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td>
+      <td class="no-print">${currentProfile.role==='manager' && st.count>0 ? `<button class="btn btn-ghost btn-small" data-role="transfer" data-name="${p.name}">Перенести в прибутковість</button>` : ''}</td></tr>`;
+  });
+  table.innerHTML = `<thead><tr><th style="text-align:left;">Екскурсія</th><th>Туристів</th><th>Сума</th><th></th></tr></thead><tbody>${rows}</tbody>`;
+  table.querySelectorAll('[data-role="transfer"]').forEach(btn=> btn.addEventListener('click', e=> transferToProfitability(e.target.dataset.name, stats[e.target.dataset.name])));
+}
+
+async function transferToProfitability(excName, stat){
+  const tripData = getTripData(currentTripId);
+  const matches = tripData.excursions.filter(e=> (e.name===excName) || (e.customName && e.customName===excName));
+  let targetExc;
+  if(matches.length === 0){
+    if(!confirm(`В екскурсіях заїзду немає "${excName}". Створити нову?`)) return;
+    targetExc = newExcursion(tripData.guides.map(g=>g.name), EXCURSIONS.includes(excName) ? excName : "Інше...");
+    if(!EXCURSIONS.includes(excName)) targetExc.customName = excName;
+    tripData.excursions.push(targetExc);
+  } else if(matches.length === 1){
+    targetExc = matches[0];
+  } else {
+    const idx = prompt(`Кілька екскурсій "${excName}" в цьому заїзді. Введи номер (1-${matches.length}):\n` + matches.map((m,i)=>`${i+1}) км ${m.km}, автобус ${m.busOwner}`).join('\n'));
+    const i = parseInt(idx,10)-1;
+    if(isNaN(i) || !matches[i]) return;
+    targetExc = matches[i];
+  }
+  const guideName = activeTouristGuideName();
+  let row = targetExc.rows.find(r=>r.personType==='guide' && r.person===guideName);
+  if(!row){
+    row = newRow();
+    row.personType='guide'; row.person=guideName;
+    targetExc.rows.push(row);
+  }
+  row.chol = stat.count;
+  row.zibrano = stat.sum;
+  await upsertExcursion(currentTripId, targetExc);
+  await upsertRow(currentTripId, targetExc.id, row);
+  alert(`Перенесено: ${guideName} — ${stat.count} чол, ${fmt(stat.sum)} € у "Прибутковість → ${excName}".`);
+}
+
+async function loadAllTouristStatsData(){
+  const [{data:allTourists, error:e1}, {data:allSelections, error:e2}] = await Promise.all([
+    sb.from('tourists').select('*'),
+    sb.from('tourist_excursion_selections').select('*')
+  ]);
+  if(e1||e2){ console.error(e1||e2); return null; }
+  return { tourists: allTourists||[], selections: allSelections||[] };
+}
+
+async function renderTouristSeasonStats(){
+  if(!currentProfile || currentProfile.role !== 'manager') return;
+  const data = await loadAllTouristStatsData();
+  if(!data) return;
+  const touristGuide = {};
+  data.tourists.forEach(t=> touristGuide[t.id]=t.guide_name);
+  const byGuide = {};
+  const byExc = {};
+  TOURIST_PRICE_LIST.forEach(p=> byExc[p.name] = {count:0, sum:0});
+  data.selections.forEach(s=>{
+    if(!(s.going && !s.cancelled)) return;
+    const guideName = touristGuide[s.tourist_id];
+    if(!guideName) return;
+    if(!byGuide[guideName]) byGuide[guideName] = {count:0, sum:0};
+    byGuide[guideName].count++; byGuide[guideName].sum += Number(s.price)||0;
+    if(byExc[s.excursion_name]){ byExc[s.excursion_name].count++; byExc[s.excursion_name].sum += Number(s.price)||0; }
+  });
+
+  const guideTable = document.getElementById('touristSeasonByGuideTable');
+  let gRows='', gTotalCount=0, gTotalSum=0;
+  Object.keys(byGuide).sort().forEach(name=>{
+    const g = byGuide[name]; gTotalCount+=g.count; gTotalSum+=g.sum;
+    gRows += `<tr><td>${name}</td><td>${g.count}</td><td>${fmt(g.sum)} €</td></tr>`;
+  });
+  guideTable.innerHTML = gRows
+    ? `<thead><tr><th style="text-align:left;">Гід</th><th>Записів на екскурсії</th><th>Зібрано</th></tr></thead><tbody>${gRows}</tbody><tfoot><tr><td>Разом</td><td>${gTotalCount}</td><td>${fmt(gTotalSum)} €</td></tr></tfoot>`
+    : `<tr><td style="padding:12px;color:var(--ink-soft);">Ще немає даних.</td></tr>`;
+
+  const excTable = document.getElementById('touristSeasonByExcTable');
+  let eRows='', eTotalCount=0, eTotalSum=0;
+  TOURIST_PRICE_LIST.forEach(p=>{
+    const st = byExc[p.name]; eTotalCount+=st.count; eTotalSum+=st.sum;
+    eRows += `<tr><td>${p.name}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td></tr>`;
+  });
+  excTable.innerHTML = `<thead><tr><th style="text-align:left;">Екскурсія</th><th>Туристів</th><th>Зібрано</th></tr></thead><tbody>${eRows}</tbody><tfoot><tr><td>Разом</td><td>${eTotalCount}</td><td>${fmt(eTotalSum)} €</td></tr></tfoot>`;
+}
+let touristSeasonStatsTimer;
+function scheduleTouristSeasonStats(){
+  if(!currentProfile || currentProfile.role !== 'manager') return;
+  clearTimeout(touristSeasonStatsTimer);
+  touristSeasonStatsTimer = setTimeout(renderTouristSeasonStats, 800);
+}
+
+function renderTouristSection(){
+  const td = getTripData(currentTripId);
+  const noGuideBanner = document.getElementById('noGuidesBanner');
+  if(currentProfile.role==='manager' && (!td.guides || !td.guides.length)){
+    if(!noGuideBanner){
+      const el = document.createElement('div');
+      el.id = 'noGuidesBanner';
+      el.className = 'step-block';
+      el.style.cssText = 'background:#fbf6ec; border-color:var(--ochre);';
+      el.innerHTML = `<p style="margin:0;"><strong>Спочатку признач гідів для цього заїзду</strong> — перейди на вкладку "Прибутковість" і обери трьох гідів (Крок "Хто з гідів на цьому заїзді"), потім повернись сюди.</p>`;
+      document.getElementById('touristSection').insertBefore(el, document.getElementById('touristSection').firstChild);
+    }
+  } else if(noGuideBanner){
+    noGuideBanner.remove();
+  }
+  renderGuideFilterChips();
+  renderTouristList();
+  renderTouristDetail();
+  renderTouristStats();
+  scheduleTouristSeasonStats();
+}
+document.getElementById('clearTouristListBtn').addEventListener('click', async ()=>{
+  const guideName = activeTouristGuideName();
+  if(!guideName || !touristData.tourists.length) return;
+  if(!confirm(`Видалити ВЕСЬ список туристів групи "${guideName}" для цього заїзду (${touristData.tourists.length} осіб)? Це не можна скасувати.`)) return;
+  const ids = touristData.tourists.map(t=>t.id);
+  const { error } = await sb.from('tourists').delete().in('id', ids);
+  if(error){ alert("Не вдалося видалити список: "+error.message); return; }
+  openTouristId = null;
+  await loadTourists();
+  renderTouristSection();
+});
+document.getElementById('addTouristBtn').addEventListener('click', async ()=>{
+  const first = document.getElementById('newTouristFirst').value.trim();
+  const last = document.getElementById('newTouristLast').value.trim();
+  const birth = document.getElementById('newTouristBirth').value;
+  const passport = document.getElementById('newTouristPassport').value.trim();
+  const guideName = activeTouristGuideName();
+  if(!first || !last || !guideName) return;
+  const { error } = await sb.from('tourists').insert({ trip_id: currentTripId, guide_name: guideName, first_name:first, last_name:last, birth_date: birth||null, passport_data: passport });
+  if(error){ alert("Не вдалося додати туриста: "+error.message); return; }
+  document.getElementById('newTouristFirst').value='';
+  document.getElementById('newTouristLast').value='';
+  document.getElementById('newTouristBirth').value='';
+  document.getElementById('newTouristPassport').value='';
+  await loadTourists();
+  renderTouristSection();
+});
+function parseBulkDate(raw){
+  if(!raw) return null;
+  raw = raw.trim();
+  let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/); // YYYY-MM-DD
+  if(m) return raw;
+  m = raw.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/); // DD.MM.YYYY or DD/MM/YYYY
+  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return null;
+}
+function parseBulkTouristLine(line){
+  // Try tab-separated first (common when pasted from a spreadsheet), then ';', then 2+ spaces.
+  let parts;
+  if(line.includes('\t')) parts = line.split('\t');
+  else if(line.includes(';')) parts = line.split(';');
+  else parts = line.split(/\s{2,}/);
+  parts = parts.map(p=>p.trim()).filter(p=>p!=='');
+  if(!parts.length) return null;
+
+  // Figure out which parts are the date and passport (by pattern), whatever's left is the name.
+  let dateIdx = -1, passportIdx = -1;
+  parts.forEach((p,i)=>{
+    if(dateIdx===-1 && parseBulkDate(p)) dateIdx = i;
+  });
+  const nameParts = [];
+  let passport = '';
+  parts.forEach((p,i)=>{
+    if(i===dateIdx) return;
+    if(parseBulkDate(p)) return; // stray second date-like token, ignore
+    if(nameParts.length < (dateIdx===-1?2:2) && passportIdx===-1 && !/\d/.test(p)){
+      nameParts.push(p);
+    } else {
+      passport = passport ? passport+' '+p : p;
+    }
+  });
+
+  let first='', last='';
+  if(nameParts.length >= 2){ last = nameParts[0]; first = nameParts.slice(1).join(' '); }
+  else if(nameParts.length === 1){
+    const words = nameParts[0].split(' ').filter(Boolean);
+    if(words.length >= 2){ last = words[0]; first = words.slice(1).join(' '); }
+    else { last = nameParts[0]; }
+  }
+  const birth = dateIdx>-1 ? parseBulkDate(parts[dateIdx]) : null;
+  return { first_name:first, last_name:last, birth_date:birth, passport_data:passport };
+}
+
+document.getElementById('bulkAddTouristBtn').addEventListener('click', async ()=>{
+  const raw = document.getElementById('bulkTouristInput').value;
+  const guideName = activeTouristGuideName();
+  if(!guideName) return;
+  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  const inserts = lines.map(line=>{
+    const parsed = parseBulkTouristLine(line);
+    if(!parsed) return null;
+    return { trip_id: currentTripId, guide_name: guideName, ...parsed };
+  }).filter(r=> r && (r.first_name || r.last_name));
+  if(!inserts.length) return;
+  const { error } = await sb.from('tourists').insert(inserts);
+  if(error){ alert("Не вдалося додати список: "+error.message); return; }
+  document.getElementById('bulkTouristInput').value='';
+  await loadTourists();
+  renderTouristSection();
 });
 
 /* ---------- Bootstrap ---------- */
