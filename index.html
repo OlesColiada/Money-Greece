@@ -579,6 +579,43 @@ function setStatus(text){
   if(el) el.textContent = text;
 }
 
+/* ---------- Offline support: cache last-loaded data for read-only viewing,
+   and give clear "not saved" messaging instead of cryptic network errors. ---------- */
+let isOfflineCacheActive = false;
+
+function cacheOffline(key, data){
+  try{ localStorage.setItem('offline_cache_'+key, JSON.stringify({ data, ts: Date.now() })); }catch(e){}
+}
+function getOfflineCache(key){
+  try{
+    const raw = localStorage.getItem('offline_cache_'+key);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  }catch(e){ return null; }
+}
+function friendlyErrorMessage(error){
+  if(!navigator.onLine || (error && /fetch|network|failed to fetch/i.test(error.message||''))){
+    return "Немає інтернету — зміни НЕ збережено. Спробуй ще раз, коли з'явиться зв'язок.";
+  }
+  return (error && error.message) || 'Невідома помилка.';
+}
+function renderOfflineBanner(){
+  let banner = document.getElementById('offlineBanner');
+  const shouldShow = !navigator.onLine || isOfflineCacheActive;
+  if(!shouldShow){ if(banner) banner.remove(); return; }
+  if(!banner){
+    banner = document.createElement('div');
+    banner.id = 'offlineBanner';
+    banner.style.cssText = 'position:sticky; top:0; z-index:500; background:#c65b43; color:#fff; text-align:center; padding:8px 12px; font-size:13px; font-weight:600;';
+    document.body.insertBefore(banner, document.body.firstChild);
+  }
+  banner.textContent = !navigator.onLine
+    ? '📴 Немає інтернету — показані раніше збережені дані, зміни не будуть збережені'
+    : '📴 Не вдалося оновити дані з сервера — показано збережену раніше копію (може бути застарілою)';
+}
+window.addEventListener('online', renderOfflineBanner);
+window.addEventListener('offline', renderOfflineBanner);
+
 async function fetchTrips(){
   const { data, error } = await sb.from('trips').select('id,label,start_date,end_date').order('start_date');
   if(error){ console.error(error); setStatus("Помилка завантаження заїздів"); return []; }
@@ -608,13 +645,28 @@ async function loadTripData(tripId){
     sb.from('excursions').select('*').eq('trip_id', tripId).order('created_at'),
     sb.from('excursion_rows').select('*').eq('trip_id', tripId).order('created_at')
   ]);
-  if(gErr || eErr || rErr){ console.error(gErr||eErr||rErr); setStatus("Помилка завантаження даних"); return; }
+  if(gErr || eErr || rErr){
+    console.error(gErr||eErr||rErr);
+    const cached = getOfflineCache('trip:'+tripId);
+    if(cached){
+      state.trips[tripId] = cached.data;
+      isOfflineCacheActive = true;
+      renderOfflineBanner();
+      setStatus("Офлайн · показано збережену копію (" + new Date(cached.ts).toLocaleString('uk-UA') + ")");
+      return;
+    }
+    setStatus("Помилка завантаження даних — немає й збереженої копії");
+    return;
+  }
+  isOfflineCacheActive = false;
+  renderOfflineBanner();
   const guides = (guidesData||[]).map(g=>({ id:g.id, name:g.guide_name, ownBus:g.own_bus, substituteNote:g.substitute_note||'' }));
   const excursions = (excData||[]).map(e=>{
     const rows = (rowsData||[]).filter(r=>r.excursion_id===e.id);
     return excFromDb(e, rows);
   });
   state.trips[tripId] = { guides, excursions };
+  cacheOffline('trip:'+tripId, state.trips[tripId]);
   setStatus("Оновлено · " + new Date().toLocaleTimeString('uk-UA'));
 }
 
@@ -838,8 +890,7 @@ async function setGuideGroup(group){
 }
 
 function personSelectHTML(row, tripGuides, takenGuides){
-  const restricted = (currentProfile.role === 'guide') ? [currentProfile.guide_name] : tripGuides;
-  const guideOptions = restricted.filter(g => g === row.person || !(takenGuides||[]).includes(g));
+  const guideOptions = tripGuides.filter(g => g === row.person || !(takenGuides||[]).includes(g));
   let html = `<option value="" ${!row.person ? 'selected' : ''} disabled hidden>— виберіть —</option>`;
   html += `<optgroup label="Гіди заїзду">`;
   guideOptions.forEach(g=> html += `<option value="guide::${g}" ${row.personType==='guide'&&row.person===g?'selected':''}>${g}</option>`);
@@ -855,10 +906,10 @@ function personColor(row){
 }
 function canEditRow(r){
   if(!currentProfile) return false;
-  if(currentProfile.role === 'manager') return true;
-  if(r.personType === 'partner') return true; // partners have no login; any assigned guide can manage their headcount
-  if(!r.person) return true; // unclaimed row — any assigned guide can pick themselves
-  return r.person === currentProfile.guide_name; // guides edit only their own row
+  // Any authenticated person with access to this trip (manager, or a guide within the
+  // ±3-day window enforced by RLS) can edit any row — not just their own. Real security
+  // (who can even reach this trip's data at all) is enforced at the database level.
+  return true;
 }
 
 function renderExcursionPicker(){
@@ -970,7 +1021,7 @@ function renderExcursions(){
                 + (canConfirm ? ` <button class="btn btn-primary btn-small no-print" data-role="markPaid">Оплатити</button>` : ` <span class="muted">(підтвердити може лише ${assignedGuide})</span>`);
             }
             return `<div class="settlement-note">
-              <div class="manager-detail">
+              <div>
                 ${isOwn
                   ? `Партнери оплачують нам — кому з гідів зараховується: <select data-role="recipientGuide">${tripGuideNames.map(g=>`<option value="${g}" ${exc.recipientGuide===g?'selected':''}>${g}</option>`).join('')}</select>`
                   : `Ми оплачуємо партнеру за наших учасників — хто оплатив: <select data-role="payerGuide">${tripGuideNames.map(g=>`<option value="${g}" ${exc.payerGuide===g?'selected':''}>${g}</option>`).join('')}</select>`
@@ -1287,7 +1338,7 @@ async function upsertExcursion(tripId, exc){
     guide_fee_reason: exc.guideFeeReason, recipient_guide: exc.recipientGuide, payer_guide: exc.payerGuide
   });
   setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
-  if(error){ console.error(error); alert("Не вдалося зберегти зміни екскурсії: " + (error.message||"") + "\n\nСпробуй ще раз або онови сторінку."); }
+  if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
 }
 async function upsertRow(tripId, excId, row){
   const { error } = await sb.from('excursion_rows').upsert({
@@ -1296,7 +1347,7 @@ async function upsertRow(tripId, excId, row){
     chol: Number(row.chol)||0, zibrano: Number(row.zibrano)||0, quitky: Number(row.quitky)||0
   });
   setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
-  if(error){ console.error(error); alert("Не вдалося зберегти зміни рядка: " + (error.message||"") + "\n\nСпробуй ще раз або онови сторінку."); }
+  if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
 }
 async function upsertGuide(tripId, guide){
   const { error } = await sb.from('trip_guides').upsert({ id: guide.id, trip_id: tripId, guide_name: guide.name, own_bus: !!guide.ownBus, substitute_note: guide.substituteNote||'' });
@@ -1311,14 +1362,14 @@ async function markSettlementPaid(excId, which){
   setStatus("Підтвердження…");
   await flushPendingPersists();
   const { error } = await sb.rpc('mark_settlement_paid', { p_excursion_id: excId, p_which: which });
-  if(error){ alert(error.message || "Не вдалося підтвердити оплату"); setStatus("Помилка"); return; }
+  if(error){ alert(friendlyErrorMessage(error)); setStatus("Помилка"); return; }
   await loadTripData(currentTripId);
   renderAll();
 }
 async function unmarkSettlementPaid(excId, which){
   setStatus("Скасування…");
   const { error } = await sb.rpc('unmark_settlement_paid', { p_excursion_id: excId, p_which: which });
-  if(error){ alert(error.message || "Не вдалося скасувати"); setStatus("Помилка"); return; }
+  if(error){ alert(friendlyErrorMessage(error)); setStatus("Помилка"); return; }
   await loadTripData(currentTripId);
   renderAll();
 }
@@ -1563,7 +1614,7 @@ document.getElementById('savePasswordBtn').addEventListener('click', async ()=>{
   if(!p1 || p1.length < 6){ errEl.textContent = 'Пароль має бути щонайменше 6 символів.'; return; }
   if(p1 !== p2){ errEl.textContent = 'Паролі не збігаються.'; return; }
   const { error } = await sb.auth.updateUser({ password: p1 });
-  if(error){ errEl.textContent = 'Не вдалося змінити пароль: ' + error.message; return; }
+  if(error){ errEl.textContent = friendlyErrorMessage(error); return; }
   document.getElementById('changePasswordOverlay').classList.add('app-hidden');
   alert('Пароль змінено.');
 });
@@ -1586,11 +1637,23 @@ async function loadTourists(){
   const guideName = activeTouristGuideName();
   touristData = { tourists: [], selectionsByTourist: {} };
   if(!currentTripId || !guideName) return;
+  const cacheKey = 'tourists:'+currentTripId+':'+guideName;
   const { data: tourists, error: tErr } = await sb.from('tourists').select('*')
     .eq('trip_id', currentTripId).eq('guide_name', guideName).order('created_at');
-  if(tErr){ console.error(tErr); return; }
+  if(tErr){
+    console.error(tErr);
+    const cached = getOfflineCache(cacheKey);
+    if(cached){
+      touristData = cached.data;
+      isOfflineCacheActive = true;
+      renderOfflineBanner();
+    }
+    return;
+  }
+  isOfflineCacheActive = false;
+  renderOfflineBanner();
   touristData.tourists = tourists || [];
-  if(!touristData.tourists.length) return;
+  if(!touristData.tourists.length){ cacheOffline(cacheKey, touristData); return; }
   const ids = touristData.tourists.map(t=>t.id);
   const { data: selections, error: sErr } = await sb.from('tourist_excursion_selections').select('*').in('tourist_id', ids);
   if(sErr){ console.error(sErr); return; }
@@ -1620,6 +1683,7 @@ async function loadTourists(){
     const { error: insErr } = await sb.from('tourist_excursion_selections').upsert(toInsert);
     if(insErr) console.error(insErr);
   }
+  cacheOffline(cacheKey, touristData);
 }
 
 function touristIsProcessed(touristId){
@@ -1712,7 +1776,7 @@ function renderTouristList(){
       e.stopPropagation();
       if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
       const { error } = await sb.from('tourists').delete().eq('id', t.id);
-      if(error){ alert("Не вдалося видалити: "+error.message); return; }
+      if(error){ alert(friendlyErrorMessage(error)); return; }
       if(openTouristId===t.id) openTouristId=null;
       await loadTourists();
       renderTouristSection();
@@ -1754,7 +1818,7 @@ function renderTouristEditForm(block, t){
   if(delBtn) delBtn.addEventListener('click', async ()=>{
     if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
     const { error } = await sb.from('tourists').delete().eq('id', t.id);
-    if(error){ alert("Не вдалося видалити: "+error.message); return; }
+    if(error){ alert(friendlyErrorMessage(error)); return; }
     openTouristId = null;
     await loadTourists();
     renderTouristSection();
@@ -1766,7 +1830,7 @@ function renderTouristEditForm(block, t){
     const passport = document.getElementById('editPassport').value.trim();
     const birthChanged = birth !== (t.birth_date || null);
     const { error } = await sb.from('tourists').update({ first_name:first, last_name:last, birth_date:birth, passport_data:passport }).eq('id', t.id);
-    if(error){ alert("Не вдалося зберегти: "+error.message); return; }
+    if(error){ alert(friendlyErrorMessage(error)); return; }
     // If the birth date changed, re-price any selections still on standard pricing (don't touch manual overrides).
     if(birthChanged){
       const newDef = TRIPS_DEF.find(d=>d.id===currentTripId);
@@ -1867,7 +1931,7 @@ function renderTouristDetail(){
   if(delBtn) delBtn.addEventListener('click', async ()=>{
     if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
     const { error } = await sb.from('tourists').delete().eq('id', t.id);
-    if(error){ alert("Не вдалося видалити: "+error.message); return; }
+    if(error){ alert(friendlyErrorMessage(error)); return; }
     openTouristId = null;
     await loadTourists();
     renderTouristSection();
@@ -1927,7 +1991,7 @@ function updateSelectionLocal(touristId, selId, patch, debounce){
     going:s.going, price_mode:s.price_mode, price:Number(s.price)||0,
     cancelled: !!s.cancelled, cancelled_reason: s.cancelled_reason||'',
     paid: !!s.paid, refunded: !!s.refunded
-  }).then(({error})=>{ if(error){ console.error(error); alert("Не вдалося зберегти: "+error.message); } });
+  }).then(({error})=>{ if(error){ console.error(error); alert(friendlyErrorMessage(error)); } });
   if(debounce) debouncedPersist('sel:'+selId, doPersist); else persistNow('sel:'+selId, doPersist);
   renderTouristStats();
 }
@@ -1935,7 +1999,7 @@ function updateSelectionLocal(touristId, selId, patch, debounce){
 async function payTourist(touristId){
   await flushPendingPersists();
   const { error } = await sb.rpc('mark_tourist_paid', { p_tourist_id: touristId });
-  if(error){ alert(error.message || "Не вдалося підтвердити оплату"); return; }
+  if(error){ alert(friendlyErrorMessage(error)); return; }
   openTouristId = null;
   await loadTourists();
   renderTouristSection();
@@ -1945,13 +2009,13 @@ async function payTourist(touristId){
 async function cancelSelection(selId, reason){
   await flushPendingPersists();
   const { error } = await sb.rpc('cancel_tourist_selection', { p_selection_id: selId, p_reason: reason });
-  if(error){ alert(error.message || "Не вдалося скасувати"); return; }
+  if(error){ alert(friendlyErrorMessage(error)); return; }
   await loadTourists();
   renderTouristSection();
 }
 async function refundSelection(selId){
   const { error } = await sb.rpc('refund_tourist_selection', { p_selection_id: selId });
-  if(error){ alert(error.message || "Не вдалося зафіксувати повернення"); return; }
+  if(error){ alert(friendlyErrorMessage(error)); return; }
   await loadTourists();
   renderTouristSection();
 }
@@ -2072,7 +2136,7 @@ document.getElementById('clearTouristListBtn').addEventListener('click', async (
   if(!confirm(`Видалити ВЕСЬ список туристів групи "${guideName}" для цього заїзду (${touristData.tourists.length} осіб)? Це не можна скасувати.`)) return;
   const ids = touristData.tourists.map(t=>t.id);
   const { error } = await sb.from('tourists').delete().in('id', ids);
-  if(error){ alert("Не вдалося видалити список: "+error.message); return; }
+  if(error){ alert(friendlyErrorMessage(error)); return; }
   openTouristId = null;
   await loadTourists();
   renderTouristSection();
@@ -2085,7 +2149,7 @@ document.getElementById('addTouristBtn').addEventListener('click', async ()=>{
   const guideName = activeTouristGuideName();
   if(!first || !last || !guideName) return;
   const { error } = await sb.from('tourists').insert({ trip_id: currentTripId, guide_name: guideName, first_name:first, last_name:last, birth_date: birth||null, passport_data: passport });
-  if(error){ alert("Не вдалося додати туриста: "+error.message); return; }
+  if(error){ alert(friendlyErrorMessage(error)); return; }
   document.getElementById('newTouristFirst').value='';
   document.getElementById('newTouristLast').value='';
   document.getElementById('newTouristBirth').value='';
@@ -2146,7 +2210,7 @@ document.getElementById('bulkAddTouristBtn').addEventListener('click', async ()=
   }).filter(r=> r.first_name || r.last_name);
   if(!inserts.length) return;
   const { error } = await sb.from('tourists').insert(inserts);
-  if(error){ alert("Не вдалося додати список: "+error.message); return; }
+  if(error){ alert(friendlyErrorMessage(error)); return; }
   document.getElementById('bulkTouristInput').value='';
   await loadTourists();
   renderTouristSection();
@@ -2181,7 +2245,7 @@ document.getElementById('touristFileInput').addEventListener('change', async (e)
     }).filter(r=> r.first_name || r.last_name);
     if(!inserts.length){ statusEl.textContent = 'Не знайдено жодного рядка з даними.'; return; }
     const { error } = await sb.from('tourists').insert(inserts);
-    if(error){ statusEl.textContent = 'Помилка: '+error.message; return; }
+    if(error){ statusEl.textContent = friendlyErrorMessage(error); return; }
     statusEl.textContent = `✓ Додано ${inserts.length} туристів.`;
     e.target.value = '';
     await loadTourists();
@@ -2260,7 +2324,7 @@ async function saveFinanceReport(report){
     trip_id: report.trip_id, guide_name: report.guide_name,
     handed_over: Number(report.handed_over)||0, entries: report.entries
   }, { onConflict: 'trip_id,guide_name' });
-  if(error){ console.error(error); alert('Не вдалося зберегти звіт: '+error.message); }
+  if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
 }
 
 function renderFinanceGuideFilterChips(){
@@ -2307,7 +2371,7 @@ function renderFinanceReport(report){
 
   const rowHtml = (e)=>{
     const idx = report.entries.indexOf(e);
-    const isPerDiem = e.label==='Добові';
+    const isPerDiem = e.label==='Добові' || e.label==='Добові супроводжуючого';
     return `<div class="fin-row">
       <input type="text" class="fin-label-input" data-role="finLabel" data-idx="${idx}" value="${e.label}">
       ${isPerDiem ? `<label style="display:flex; align-items:center; gap:4px; font-size:11.5px; color:var(--ink-soft); white-space:nowrap; flex-shrink:0;">
@@ -2429,6 +2493,7 @@ document.addEventListener('focus', function(e){
   }
 }, true);
 (async function bootstrap(){
+  renderOfflineBanner();
   const { data:{ session } } = await sb.auth.getSession();
   if(session) await afterAuthSuccess();
 })();
