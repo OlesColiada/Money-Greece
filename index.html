@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Прибутковість екскурсій - напрям Греція, 2026</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1c5a7a">
+<link rel="icon" href="icon-192.png">
+<!-- iOS "Add to Home Screen" support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rich Tour">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
@@ -318,6 +326,11 @@
     </div>
   </div>
 
+  <div class="step-block no-print manager-only" id="managerTripPickBlock">
+    <p class="step-title" style="margin:0 0 8px;">Заїзд</p>
+    <div class="trip-grid" id="tripGrid"></div>
+  </div>
+
   <div class="step-block no-print guide-only" id="guideTripPickBlock" style="display:none; margin:0 0 16px;">
     <span class="step-label">Заїзд</span>
     <select id="guideTripSelect" style="width:100%; max-width:340px;"></select>
@@ -333,12 +346,6 @@
   </div>
 
   <div id="profitSection">
-
-  <div class="step-block no-print manager-only">
-    
-    <p class="step-title">Заїзд</p>
-    <div class="trip-grid" id="tripGrid"></div>
-  </div>
 
   <div class="step-block no-print manager-only" id="guidesBlock" style="display:none;">
     
@@ -469,8 +476,20 @@
 <footer class="savebar no-print app-hidden" id="appFooter">
   <span class="save-status" id="saveStatus">—</span>
   <button class="btn btn-ghost btn-small manager-only" id="printBtn">🖨 Друк зведеного звіту</button>
+  <button class="logout-link" id="changePasswordBtn">Змінити пароль</button>
   <button class="logout-link" id="logoutBtn">Вийти</button>
 </footer>
+
+<div class="login-overlay app-hidden" id="changePasswordOverlay">
+  <div class="login-card">
+    <h2>Змінити пароль</h2>
+    <input type="password" id="newPasswordInput" placeholder="Новий пароль" autocomplete="new-password">
+    <input type="password" id="newPasswordConfirm" placeholder="Повторити новий пароль" autocomplete="new-password">
+    <button class="btn btn-primary" id="savePasswordBtn">Зберегти</button>
+    <button class="btn btn-ghost btn-small" id="cancelPasswordBtn" style="margin-top:8px;">Скасувати</button>
+    <div class="login-error" id="passwordChangeError"></div>
+  </div>
+</div>
 
 <script>
 /* ---------- Reference data ---------- */
@@ -590,7 +609,7 @@ async function loadTripData(tripId){
     sb.from('excursion_rows').select('*').eq('trip_id', tripId).order('created_at')
   ]);
   if(gErr || eErr || rErr){ console.error(gErr||eErr||rErr); setStatus("Помилка завантаження даних"); return; }
-  const guides = (guidesData||[]).map(g=>({ name:g.guide_name, ownBus:g.own_bus, _rowId:g.id }));
+  const guides = (guidesData||[]).map(g=>({ id:g.id, name:g.guide_name, ownBus:g.own_bus, substituteNote:g.substitute_note||'' }));
   const excursions = (excData||[]).map(e=>{
     const rows = (rowsData||[]).filter(r=>r.excursion_id===e.id);
     return excFromDb(e, rows);
@@ -748,10 +767,22 @@ function renderGuidesBlock(){
       const chip = document.createElement('div');
       chip.className = 'guide-chip selected';
       chip.style.background = guideColor(g.name);
-      chip.innerHTML = `<span>${g.name}</span><span class="bus-toggle"><input type="checkbox" data-role="ownBus" ${g.ownBus?'checked':''}> наш автобус</span>`;
+      chip.innerHTML = `<span>${g.name}</span>
+        ${g.substituteNote ? `<span style="font-size:10px; opacity:.9;">(заміна: ${g.substituteNote})</span>` : ''}
+        <span class="bus-toggle"><input type="checkbox" data-role="ownBus" ${g.ownBus?'checked':''}> наш автобус</span>
+        <button type="button" data-role="editSub" style="background:none; border:none; color:#fff; opacity:.85; cursor:pointer; font-size:12px;" title="Позначити заміну гіда на цьому заїзді">✎ заміна</button>
+      `;
       chip.querySelector('[data-role="ownBus"]').addEventListener('change', e=>{
         g.ownBus = e.target.checked;
         upsertGuide(currentTripId, g);
+      });
+      chip.querySelector('[data-role="editSub"]').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const val = prompt(`Заміна на (ім'я і прізвище) для ${g.name} на цьому заїзді. Залиш порожнім, щоб прибрати нотатку:`, g.substituteNote||'');
+        if(val === null) return;
+        g.substituteNote = val.trim();
+        upsertGuide(currentTripId, g);
+        renderAll();
       });
       chips.appendChild(chip);
     });
@@ -1268,7 +1299,7 @@ async function upsertRow(tripId, excId, row){
   if(error){ console.error(error); alert("Не вдалося зберегти зміни рядка: " + (error.message||"") + "\n\nСпробуй ще раз або онови сторінку."); }
 }
 async function upsertGuide(tripId, guide){
-  const { error } = await sb.from('trip_guides').upsert({ id: guide.id, trip_id: tripId, guide_name: guide.name, own_bus: !!guide.ownBus });
+  const { error } = await sb.from('trip_guides').upsert({ id: guide.id, trip_id: tripId, guide_name: guide.name, own_bus: !!guide.ownBus, substitute_note: guide.substituteNote||'' });
   if(error) console.error(error);
 }
 async function deleteExcursionDb(excId){ const { error } = await sb.from('excursions').delete().eq('id', excId); if(error) console.error(error); }
@@ -1515,6 +1546,28 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   location.reload();
 });
 
+document.getElementById('changePasswordBtn').addEventListener('click', ()=>{
+  document.getElementById('newPasswordInput').value = '';
+  document.getElementById('newPasswordConfirm').value = '';
+  document.getElementById('passwordChangeError').textContent = '';
+  document.getElementById('changePasswordOverlay').classList.remove('app-hidden');
+});
+document.getElementById('cancelPasswordBtn').addEventListener('click', ()=>{
+  document.getElementById('changePasswordOverlay').classList.add('app-hidden');
+});
+document.getElementById('savePasswordBtn').addEventListener('click', async ()=>{
+  const p1 = document.getElementById('newPasswordInput').value;
+  const p2 = document.getElementById('newPasswordConfirm').value;
+  const errEl = document.getElementById('passwordChangeError');
+  errEl.textContent = '';
+  if(!p1 || p1.length < 6){ errEl.textContent = 'Пароль має бути щонайменше 6 символів.'; return; }
+  if(p1 !== p2){ errEl.textContent = 'Паролі не збігаються.'; return; }
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if(error){ errEl.textContent = 'Не вдалося змінити пароль: ' + error.message; return; }
+  document.getElementById('changePasswordOverlay').classList.add('app-hidden');
+  alert('Пароль змінено.');
+});
+
 /* ============================================================
    TOURIST COLLECTION LIST MODULE
    ============================================================ */
@@ -1613,7 +1666,7 @@ function renderGuideFilterChips(){
     const chip = document.createElement('button');
     chip.className = 'btn btn-ghost btn-small' + (touristGuideFilter===g.name ? ' active-tab' : '');
     if(touristGuideFilter===g.name){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
-    chip.textContent = g.name;
+    chip.textContent = g.name + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
     chip.addEventListener('click', async ()=>{ touristGuideFilter = g.name; openTouristId=null; await loadTourists(); renderTouristSection(); });
     wrap.appendChild(chip);
   });
@@ -2222,7 +2275,7 @@ function renderFinanceGuideFilterChips(){
     const chip = document.createElement('button');
     chip.className = 'btn btn-ghost btn-small';
     if(financeGuideFilter===g.name){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
-    chip.textContent = g.name;
+    chip.textContent = g.name + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
     chip.addEventListener('click', async ()=>{ financeGuideFilter=g.name; await renderFinanceSection(); });
     wrap.appendChild(chip);
   });
@@ -2248,6 +2301,9 @@ function renderFinanceReport(report){
   const addedKeys = report.entries.filter(e=>e.key).map(e=>e.key);
   const suggestions = computeFinanceSuggestions(activeFinanceGuideName()).filter(s=>!addedKeys.includes(s.key));
   const suggestChip = (s)=> `<button class="btn btn-ghost btn-small no-print" data-role="finAddSuggestion" data-key="${s.key}" style="font-size:11px;">+ ${s.label} (${fmt(s.amount)} €)</button>`;
+  const tripDataForNote = getTripData(currentTripId);
+  const guideRecord = tripDataForNote.guides.find(g=>g.name===report.guide_name);
+  const substituteNote = guideRecord && guideRecord.substituteNote ? ` (заміна: ${guideRecord.substituteNote})` : '';
 
   const rowHtml = (e)=>{
     const idx = report.entries.indexOf(e);
@@ -2266,7 +2322,7 @@ function renderFinanceReport(report){
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <div>
         <p class="report-title" style="margin:0;">Фінансовий звіт</p>
-        <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${report.guide_name}</p>
+        <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${report.guide_name}${substituteNote}</p>
       </div>
       <button class="btn btn-ghost btn-small no-print" id="finPrintBtn">🖨 Друк</button>
     </div>
