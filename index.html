@@ -43,6 +43,19 @@
   .section-tab{flex:1; text-align:center;}
   .section-tab.active-tab{background:var(--ochre); color:#fff; border-color:var(--ochre);}
 
+  .fin-row{display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #f0f0ea; flex-wrap:nowrap;}
+  .fin-row:last-child{border-bottom:none;}
+  .fin-label{flex:1; min-width:0; font-size:13.5px;}
+  .fin-label-input{flex:1; min-width:0; font-size:13.5px; border:1px solid var(--line); border-radius:6px; padding:6px 8px;}
+  .fin-amount{width:110px; flex-shrink:0; text-align:right; font-size:15px; padding:6px 8px;}
+  .fin-auto-badge{font-size:10px; background:var(--whitewash-2); color:var(--ink-soft); padding:2px 6px; border-radius:5px; text-transform:uppercase; letter-spacing:.03em;}
+  .fin-section-title{font-weight:700; margin:16px 0 4px;}
+  .fin-total-row{display:flex; justify-content:space-between; font-weight:700; padding-top:8px; border-top:1px solid var(--line); margin-top:6px;}
+
+  /* No spinner arrows on any number field — easy to type on phone and laptop alike */
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+  input[type=number]{-moz-appearance:textfield;}
+
   .tourist-row{
     display:flex; align-items:center; gap:10px; padding:11px 4px; border-bottom:1px solid #eee;
     cursor:pointer; background:#fff;
@@ -314,8 +327,9 @@
 <main class="app-hidden" id="appMain">
 
   <div class="section-tabs no-print">
-    <button class="btn btn-ghost section-tab active-tab" id="sectionProfitBtn">Прибутковість</button>
-    <button class="btn btn-ghost section-tab" id="sectionTouristsBtn">Список збору коштів</button>
+    <button class="btn btn-ghost section-tab active-tab" id="sectionTouristsBtn">Список збору коштів</button>
+    <button class="btn btn-ghost section-tab" id="sectionProfitBtn">Прибутковість</button>
+    <button class="btn btn-ghost section-tab" id="sectionFinanceBtn">Фінансовий звіт</button>
   </div>
 
   <div id="profitSection">
@@ -343,7 +357,7 @@
     <div class="guide-chips" id="excursionPicker"></div>
   </div>
 
-  <section class="step-block guide-only" id="touristRefBanner" style="display:none;"></section>
+  <section class="step-block manager-only" id="touristRefBanner" style="display:none;"></section>
 
   <div id="excursionsWrap"></div>
 
@@ -435,6 +449,17 @@
         <table class="report-table" id="touristSeasonByExcTable"></table>
       </div>
     </section>
+
+  </div>
+
+  <div id="financeSection" style="display:none;">
+
+    <div class="step-block no-print manager-only" id="financeGuideFilterBlock" style="display:none;">
+      <p class="step-title">Звіт якого гіда</p>
+      <div class="guide-chips" id="financeGuideFilterChips"></div>
+    </div>
+
+    <div class="step-block" id="financeReportBlock"></div>
 
   </div>
 
@@ -694,9 +719,10 @@ function renderTripGrid(){
       if(!state.trips[currentTripId]) await loadTripData(currentTripId);
       const td = getTripData(currentTripId);
       guidesEditMode = td.guides.length < 3;
-      touristGuideFilter = null; openTouristId = null;
+      touristGuideFilter = null; openTouristId = null; financeGuideFilter = null;
       renderAll();
       if(currentSection==='tourists'){ await loadTourists(); renderTouristSection(); }
+      if(currentSection==='finance'){ await renderFinanceSection(); }
     });
     grid.appendChild(chip);
   });
@@ -954,6 +980,7 @@ function renderExcursions(){
       tr.innerHTML = `
         <td><select class="person-select" data-role="person" style="background:${hasPerson?personColor(r):'#c9cdbe'}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, exc.rows.filter(other=>other.id!==r.id && other.personType==='guide').map(other=>other.person))}</select>
           ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" value="${r.customPartnerName||''}" data-role="customPartnerName" style="margin-top:4px; width:110px;" ${editable?'':'disabled'}>` : ''}
+          ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" data-role="fillFromTourists" title="Заповнити чол/суму з даних гіда в списку туристів" style="display:block; margin-top:4px; font-size:11px;">📋 зі списку туристів</button>` : ''}
         </td>
         <td><input type="number" class="num-input" data-role="chol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></td>
         <td>${r.isGuide ? `<input type="number" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>
@@ -973,6 +1000,22 @@ function renderExcursions(){
       `;
       tbody.appendChild(tr);
 
+      const fillBtn = tr.querySelector('[data-role="fillFromTourists"]');
+      if(fillBtn) fillBtn.addEventListener('click', async ()=>{
+        fillBtn.disabled = true; fillBtn.textContent = 'Перевіряю…';
+        const byGuideExc = await loadTripGuideExcursionStats();
+        const stats = (byGuideExc[r.person]||{})[exc.name];
+        if(!stats || stats.count<=0){
+          alert('У списку туристів поки немає даних для цієї екскурсії у гіда '+r.person+'.');
+          fillBtn.disabled = false; fillBtn.textContent = '📋 зі списку туристів';
+          return;
+        }
+        if(confirm(`Підставити з списку туристів: ${stats.count} чол, ${fmt(stats.sum)} €?\n\n(Поточні значення: ${r.chol} чол, ${fmt(r.zibrano)} €)`)){
+          updateRow(exc.id, r.id, { chol: stats.count, zibrano: stats.sum });
+        } else {
+          fillBtn.disabled = false; fillBtn.textContent = '📋 зі списку туристів';
+        }
+      });
 
       tr.querySelector('[data-role="person"]').addEventListener('change', e=>{
         if(!e.target.value) return;
@@ -1137,7 +1180,7 @@ function renderAll(){
 
 let touristRefBannerTimer;
 function scheduleTouristRefBanner(){
-  if(!currentProfile || currentProfile.role !== 'guide') return;
+  if(!currentProfile || currentProfile.role !== 'manager') return;
   clearTimeout(touristRefBannerTimer);
   touristRefBannerTimer = setTimeout(renderTouristRefBanner, 500);
 }
@@ -1160,33 +1203,47 @@ function computeGuideProfitabilityTotals(guideName){
 async function renderTouristRefBanner(){
   const el = document.getElementById('touristRefBanner');
   if(!el) return;
-  if(!currentProfile || currentProfile.role !== 'guide'){ el.style.display='none'; return; }
+  if(!currentProfile || currentProfile.role !== 'manager'){ el.style.display='none'; return; }
+  const tripData = getTripData(currentTripId);
+  const guideNames = tripData.guides.map(g=>g.name);
+  if(!guideNames.length){ el.style.display='none'; return; }
   const byGuideExc = await loadTripGuideExcursionStats();
-  const ownStats = byGuideExc[currentProfile.guide_name] || {};
-  const names = Object.keys(ownStats).filter(n=>ownStats[n].count>0);
-  if(!names.length){ el.style.display='none'; return; }
-  const profTotals = computeGuideProfitabilityTotals(currentProfile.guide_name);
-  let rows = '';
-  let anyMismatch = false;
-  names.forEach(n=>{
-    const st = ownStats[n];
-    const pt = profTotals[n] || {count:0, sum:0};
-    const matches = pt.count===st.count && Math.abs(pt.sum-st.sum)<0.01;
-    if(!matches) anyMismatch = true;
-    rows += `<tr><td>${n}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td>
-      <td>${matches ? `<span class="profit-pos">✓</span>` : `<span class="profit-neg">⚠ ${pt.count} чол, ${fmt(pt.sum)} €</span>`}</td></tr>`;
+
+  let anySections = false;
+  let bodyHtml = '';
+  guideNames.forEach(g=>{
+    const ownStats = byGuideExc[g] || {};
+    const names = Object.keys(ownStats).filter(n=>ownStats[n].count>0);
+    if(!names.length) return;
+    anySections = true;
+    const profTotals = computeGuideProfitabilityTotals(g);
+    let rows = '';
+    names.forEach(n=>{
+      const st = ownStats[n];
+      const pt = profTotals[n] || {count:0, sum:0};
+      const notStarted = pt.count===0 && Math.abs(pt.sum)<0.01;
+      const matches = pt.count===st.count && Math.abs(pt.sum-st.sum)<0.01;
+      let statusHtml;
+      if(matches) statusHtml = `<span class="profit-pos">✓</span>`;
+      else if(notStarted) statusHtml = `<span class="muted">ще не перенесено</span>`;
+      else statusHtml = `<span class="profit-neg">⚠ ${pt.count} чол, ${fmt(pt.sum)} €</span>`;
+      rows += `<tr><td>${n}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td><td>${statusHtml}</td></tr>`;
+    });
+    bodyHtml += `<p style="font-weight:700; margin:14px 0 6px;">${g}</p>
+      <div style="overflow-x:auto;">
+        <table class="report-table" style="font-size:12px;">
+          <thead><tr><th style="text-align:left;">Екскурсія</th><th>Тур.</th><th>Сума</th><th>У прибутковості</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
   });
+
+  if(!anySections){ el.style.display='none'; return; }
   el.style.display = 'block';
   el.innerHTML = `
-    <p class="report-title" style="margin:0;">Ваш список туристів (довідково)</p>
-    <p class="report-note" style="margin:2px 0 8px;">Дані з розділу "Список збору коштів" — тут лише для звірки, не впливають на розрахунок автоматично.</p>
-    ${anyMismatch ? `<p style="background:#fbf0ec; border:1px solid #e3b8a8; border-radius:8px; padding:8px 10px; font-size:13px; margin-bottom:8px;">⚠ Дані у списку туристів не збігаються з тим, що ти розподілив по екскурсіях нижче. Перевір кількість/суму.</p>` : ''}
-    <div style="overflow-x:auto;">
-      <table class="report-table" style="font-size:12px;">
-        <thead><tr><th style="text-align:left;">Екскурсія</th><th>Тур.</th><th>Сума</th><th>У прибутковості</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
+    <p class="report-title" style="margin:0;">Список туристів vs Прибутковість (звірка)</p>
+    <p class="report-note" style="margin:2px 0 8px;">Порівняння даних зі "Список збору коштів" із тим, що вже введено в калькулятор прибутковості — по кожному гіду. Видно тільки тобі, не гідам.</p>
+    ${bodyHtml}
   `;
 }
 
@@ -1399,6 +1456,7 @@ document.getElementById('guideTripSelect').addEventListener('change', async e=>{
   openTouristId = null;
   renderAll();
   if(currentSection==='tourists'){ await loadTourists(); renderTouristSection(); }
+  if(currentSection==='finance'){ await renderFinanceSection(); }
 });
 
 /* ---------- Auth / login ---------- */
@@ -1519,8 +1577,10 @@ function touristIsProcessed(touristId){
 function renderSectionTabs(){
   document.getElementById('sectionProfitBtn').classList.toggle('active-tab', currentSection==='profit');
   document.getElementById('sectionTouristsBtn').classList.toggle('active-tab', currentSection==='tourists');
+  document.getElementById('sectionFinanceBtn').classList.toggle('active-tab', currentSection==='finance');
   document.getElementById('profitSection').style.display = currentSection==='profit' ? 'block' : 'none';
   document.getElementById('touristSection').style.display = currentSection==='tourists' ? 'block' : 'none';
+  document.getElementById('financeSection').style.display = currentSection==='finance' ? 'block' : 'none';
 }
 document.getElementById('sectionProfitBtn').addEventListener('click', ()=>{ currentSection='profit'; renderSectionTabs(); });
 document.getElementById('sectionTouristsBtn').addEventListener('click', async ()=>{
@@ -1531,6 +1591,14 @@ document.getElementById('sectionTouristsBtn').addEventListener('click', async ()
   }
   await loadTourists();
   renderTouristSection();
+});
+document.getElementById('sectionFinanceBtn').addEventListener('click', async ()=>{
+  currentSection='finance'; renderSectionTabs();
+  if(currentProfile.role==='manager' && !financeGuideFilter){
+    const td = getTripData(currentTripId);
+    financeGuideFilter = td.guides[0]?.name || null;
+  }
+  await renderFinanceSection();
 });
 
 function renderGuideFilterChips(){
@@ -2070,6 +2138,233 @@ document.getElementById('touristFileInput').addEventListener('change', async (e)
     statusEl.textContent = 'Не вдалося прочитати файл: '+(err.message||err);
   }
 });
+
+/* ============================================================
+   FINANCIAL REPORT MODULE (all amounts in EUR)
+   Everything here is a plain, editable, deletable manual entry.
+   "Suggestions" just prefill a new entry with a number pulled from
+   the system once — nothing is auto-locked or auto-regenerated.
+   ============================================================ */
+let financeGuideFilter = null;
+
+const DEFAULT_MANUAL_ENTRIES = [
+  {section:'received', label:'Офіс', amount:0},
+  {section:'received', label:'Інше', amount:0},
+  {section:'paid', label:'Готель', amount:0},
+  {section:'paid', label:'Автобус', amount:0},
+  {section:'paid', label:'Добові', amount:500, kpi:false},
+  {section:'paid', label:'Телефон', amount:10},
+  {section:'paid', label:'Кордони', amount:0},
+  {section:'paid', label:'Інтеграція', amount:0},
+  {section:'paid', label:'Інше', amount:0},
+];
+
+function activeFinanceGuideName(){
+  if(currentProfile.role === 'guide') return currentProfile.guide_name;
+  return financeGuideFilter;
+}
+
+// Available pull-in suggestions, computed fresh each time — purely informational
+// until the person clicks one, at which point it becomes a normal manual entry.
+function computeFinanceSuggestions(guideName){
+  const tripData = getTripData(currentTripId);
+  const suggestions = [];
+  tripData.excursions.forEach(exc=>{
+    const calc = calcExcursion(exc);
+    const excLabel = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+    const row = calc.rowResults.find(r=>r.isGuide && r.person===guideName);
+    if(row){
+      if(Number(row.zibrano) > 0){
+        suggestions.push({ section:'received', label:`Зібрано: ${excLabel}`, amount:row.zibrano, key:'collected:'+exc.id });
+      }
+      if(row.gInc){
+        suggestions.push({ section:'paid', label:`Комісія гіда 10%: ${excLabel}`, amount:row.gInc, key:'commission:'+exc.id });
+      }
+      if(Number(row.quitky) > 0){
+        suggestions.push({ section:'paid', label:`Квитки: ${excLabel}`, amount:row.quitky, key:'tickets:'+exc.id });
+      }
+    }
+    if(exc.busOwner==='own' && exc.recipientGuide===guideName && exc.recipientPaid && calc.settlementAmount>0){
+      suggestions.push({ section:'received', label:`Партнери підтвердили: ${excLabel}`, amount:calc.settlementAmount, key:'fromPartners:'+exc.id });
+    }
+    if(exc.busOwner==='partner' && exc.payerGuide===guideName && exc.payerPaid && calc.settlementAmount>0){
+      suggestions.push({ section:'paid', label:`Сплачено партнеру: ${excLabel}`, amount:calc.settlementAmount, key:'toPartners:'+exc.id });
+    }
+  });
+  return suggestions;
+}
+
+async function loadFinanceReport(tripId, guideName){
+  const { data, error } = await sb.from('financial_reports').select('*').eq('trip_id', tripId).eq('guide_name', guideName).maybeSingle();
+  if(error){ console.error(error); }
+  if(data) return { trip_id: tripId, guide_name: guideName, handed_over: data.handed_over||0, entries: data.entries||[] };
+  const manual = DEFAULT_MANUAL_ENTRIES.map(e=>({ section:e.section, label:e.label, amount:e.amount, kpi:e.kpi }));
+  return { trip_id: tripId, guide_name: guideName, handed_over: 0, entries: manual };
+}
+
+async function saveFinanceReport(report){
+  const { error } = await sb.from('financial_reports').upsert({
+    trip_id: report.trip_id, guide_name: report.guide_name,
+    handed_over: Number(report.handed_over)||0, entries: report.entries
+  }, { onConflict: 'trip_id,guide_name' });
+  if(error){ console.error(error); alert('Не вдалося зберегти звіт: '+error.message); }
+}
+
+function renderFinanceGuideFilterChips(){
+  const wrap = document.getElementById('financeGuideFilterChips');
+  const blockEl = document.getElementById('financeGuideFilterBlock');
+  if(currentProfile.role !== 'manager'){ blockEl.style.display='none'; return; }
+  const td = getTripData(currentTripId);
+  if(!td.guides.length){ blockEl.style.display='none'; return; }
+  blockEl.style.display='block';
+  wrap.innerHTML = '';
+  td.guides.forEach(g=>{
+    const chip = document.createElement('button');
+    chip.className = 'btn btn-ghost btn-small';
+    if(financeGuideFilter===g.name){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
+    chip.textContent = g.name;
+    chip.addEventListener('click', async ()=>{ financeGuideFilter=g.name; await renderFinanceSection(); });
+    wrap.appendChild(chip);
+  });
+}
+
+let financeRerenderTimer;
+function debouncedFinanceRerender(report){
+  clearTimeout(financeRerenderTimer);
+  financeRerenderTimer = setTimeout(()=> renderFinanceReport(report), 700);
+}
+
+function renderFinanceReport(report){
+  const block = document.getElementById('financeReportBlock');
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const received = report.entries.filter(e=>e.section==='received');
+  const paid = report.entries.filter(e=>e.section==='paid');
+  const totalReceived = received.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const totalPaid = paid.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const balance = totalReceived - totalPaid;
+  const handedOver = Number(report.handed_over)||0;
+  const discrepancy = handedOver - balance;
+
+  const addedKeys = report.entries.filter(e=>e.key).map(e=>e.key);
+  const suggestions = computeFinanceSuggestions(activeFinanceGuideName()).filter(s=>!addedKeys.includes(s.key));
+  const suggestChip = (s)=> `<button class="btn btn-ghost btn-small no-print" data-role="finAddSuggestion" data-key="${s.key}" style="font-size:11px;">+ ${s.label} (${fmt(s.amount)} €)</button>`;
+
+  const rowHtml = (e)=>{
+    const idx = report.entries.indexOf(e);
+    const isPerDiem = e.label==='Добові';
+    return `<div class="fin-row">
+      <input type="text" class="fin-label-input" data-role="finLabel" data-idx="${idx}" value="${e.label}">
+      ${isPerDiem ? `<label style="display:flex; align-items:center; gap:4px; font-size:11.5px; color:var(--ink-soft); white-space:nowrap; flex-shrink:0;">
+          <input type="checkbox" data-role="finKpi" data-idx="${idx}" ${e.kpi?'checked':''}> KPI виконано
+        </label>` : ''}
+      <input type="number" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem?'disabled title="Змінюється чекбоксом KPI"':''}> €
+      <button class="row-del no-print" data-role="finDelete" data-idx="${idx}" title="Видалити пункт">✕</button>
+    </div>`;
+  };
+
+  block.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div>
+        <p class="report-title" style="margin:0;">Фінансовий звіт</p>
+        <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${report.guide_name}</p>
+      </div>
+      <button class="btn btn-ghost btn-small no-print" id="finPrintBtn">🖨 Друк</button>
+    </div>
+
+    ${suggestions.length ? `<div class="no-print" style="margin-top:12px; background:var(--whitewash-2); border-radius:8px; padding:8px 10px;">
+      <p style="font-size:11.5px; color:var(--ink-soft); margin:0 0 6px; text-transform:uppercase; letter-spacing:.03em;">Можна додати одним кліком:</p>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">${suggestions.map(suggestChip).join('')}</div>
+    </div>` : ''}
+
+    <p class="fin-section-title">Отримано</p>
+    ${received.map(rowHtml).join('')}
+    <div class="no-print" style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-small" data-role="finAddNamed" data-section="received" data-prefix="Партнер">+ Додати партнера</button>
+      <button class="btn btn-ghost btn-small" data-role="finAddNamed" data-section="received" data-prefix="Борг">+ Додати борг</button>
+      <button class="btn btn-ghost btn-small" data-role="finAddRow" data-section="received">+ Додати пункт</button>
+    </div>
+    <div class="fin-total-row"><span>Разом отримано</span><span>${fmt(totalReceived)} €</span></div>
+
+    <p class="fin-section-title">Сплачено</p>
+    ${paid.map(rowHtml).join('')}
+    <div class="no-print" style="margin-top:8px;"><button class="btn btn-ghost btn-small" data-role="finAddRow" data-section="paid">+ Додати пункт</button></div>
+    <div class="fin-total-row"><span>Разом сплачено</span><span>${fmt(totalPaid)} €</span></div>
+
+    <div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);">
+      <div class="fin-total-row"><span>Залишок (баланс)</span><span>${fmt(balance)} €</span></div>
+      <div class="fin-row" style="margin-top:8px;">
+        <span class="fin-label">Здано менеджеру</span>
+        <input type="number" class="fin-amount" id="finHandedOver" value="${report.handed_over}"> €
+      </div>
+      ${Math.abs(discrepancy) > 0.01
+        ? `<p class="profit-neg" style="font-size:13px; margin-top:6px;">⚠ Розбіжність: ${fmt(discrepancy)} € ${discrepancy>0?'(здано більше, ніж баланс)':'(здано менше, ніж баланс)'}</p>`
+        : `<p class="profit-pos" style="font-size:13px; margin-top:6px;">✓ Здано збігається з балансом</p>`
+      }
+    </div>
+  `;
+
+  block.querySelectorAll('[data-role="finAmount"]').forEach(el=> el.addEventListener('input', e=>{
+    const idx = Number(e.target.dataset.idx);
+    report.entries[idx].amount = Number(e.target.value)||0;
+    debouncedPersist('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    debouncedFinanceRerender(report);
+  }));
+  block.querySelectorAll('[data-role="finLabel"]').forEach(el=> el.addEventListener('input', e=>{
+    const idx = Number(e.target.dataset.idx);
+    report.entries[idx].label = e.target.value;
+    debouncedPersist('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+  }));
+  block.querySelectorAll('[data-role="finKpi"]').forEach(el=> el.addEventListener('change', e=>{
+    const idx = Number(e.target.dataset.idx);
+    report.entries[idx].kpi = e.target.checked;
+    report.entries[idx].amount = e.target.checked ? 600 : 500;
+    persistNow('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    renderFinanceReport(report);
+  }));
+  block.querySelectorAll('[data-role="finDelete"]').forEach(el=> el.addEventListener('click', e=>{
+    const idx = Number(e.target.dataset.idx);
+    report.entries.splice(idx,1);
+    persistNow('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    renderFinanceReport(report);
+  }));
+  block.querySelectorAll('[data-role="finAddRow"]').forEach(el=> el.addEventListener('click', e=>{
+    const section = e.target.dataset.section;
+    report.entries.push({ section, label:'Новий пункт', amount:0 });
+    persistNow('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    renderFinanceReport(report);
+  }));
+  block.querySelectorAll('[data-role="finAddNamed"]').forEach(el=> el.addEventListener('click', e=>{
+    const section = e.target.dataset.section;
+    const prefix = e.target.dataset.prefix;
+    report.entries.push({ section, label:`${prefix}: `, amount:0 });
+    persistNow('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    renderFinanceReport(report);
+  }));
+  block.querySelectorAll('[data-role="finAddSuggestion"]').forEach(el=> el.addEventListener('click', e=>{
+    const key = e.target.dataset.key;
+    const s = computeFinanceSuggestions(activeFinanceGuideName()).find(x=>x.key===key);
+    if(!s) return;
+    report.entries.push({ section:s.section, label:s.label, amount:s.amount, key:s.key });
+    persistNow('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    renderFinanceReport(report);
+  }));
+  document.getElementById('finHandedOver').addEventListener('input', e=>{
+    report.handed_over = Number(e.target.value)||0;
+    debouncedPersist('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    debouncedFinanceRerender(report);
+  });
+  document.getElementById('finPrintBtn').addEventListener('click', ()=> window.print());
+}
+
+async function renderFinanceSection(){
+  renderFinanceGuideFilterChips();
+  const guideName = activeFinanceGuideName();
+  const block = document.getElementById('financeReportBlock');
+  if(!guideName){ block.innerHTML = `<p class="report-note">Оберіть гіда вище.</p>`; return; }
+  if(!currentTripId){ block.innerHTML = `<p class="report-note">Оберіть заїзд.</p>`; return; }
+  const report = await loadFinanceReport(currentTripId, guideName);
+  renderFinanceReport(report);
+}
 
 /* ---------- Bootstrap ---------- */
 document.addEventListener('focus', function(e){
