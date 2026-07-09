@@ -1002,7 +1002,7 @@ function renderExcursions(){
             const amount = calc.settlementAmount;
             if(amount <= 0) return ''; // nothing to settle on this excursion — no point showing the box
             const verb = isOwn ? 'отримати від партнерів' : 'сплатити партнеру';
-            const canConfirm = currentProfile.role==='manager' || currentProfile.guide_name === assignedGuide;
+            const canConfirm = currentProfile.role==='manager' || (currentProfile.role==='guide' && tripGuideNames.includes(currentProfile.guide_name));
             // Breakdown: who makes up this amount — partner rows when it's our bus,
             // our own guides' rows when it's a partner's bus.
             const breakdownRows = calc.rowResults.filter(r => isOwn ? !r.isGuide : r.isGuide);
