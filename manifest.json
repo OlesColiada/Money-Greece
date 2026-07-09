@@ -1,0 +1,13 @@
+{
+  "name": "Прибутковість екскурсій — Rich Tour",
+  "short_name": "Rich Tour",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f8f6f0",
+  "theme_color": "#1c5a7a",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192_1.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512_1.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
