@@ -2025,17 +2025,12 @@ async function payTourist(touristId){
   openTouristId = null;
   await loadTourists();
   renderTouristSection();
-  const nextUnprocessed = touristData.tourists.find(t => !touristIsProcessed(t.id));
-  const target = nextUnprocessed
-    ? document.querySelector(`[data-tourist-row-id="${nextUnprocessed.id}"]`)
-    : document.getElementById('touristListBlock');
+  const target = document.querySelector(`[data-tourist-row-id="${touristId}"]`) || document.getElementById('touristListBlock');
   if(target){
     target.scrollIntoView({behavior:'smooth', block:'center'});
-    if(nextUnprocessed){
-      target.style.transition = 'box-shadow .3s ease';
-      target.style.boxShadow = '0 0 0 3px var(--ochre)';
-      setTimeout(()=>{ target.style.boxShadow = ''; }, 1600);
-    }
+    target.style.transition = 'box-shadow .3s ease';
+    target.style.boxShadow = '0 0 0 3px var(--good)';
+    setTimeout(()=>{ target.style.boxShadow = ''; }, 1600);
   }
 }
 async function cancelSelection(selId, reason){
