@@ -448,6 +448,7 @@
       </div>
       <div class="subgrid" style="margin-top:8px;">
         <div class="field-group"><span>Дата народження:</span><input type="date" id="newExtraTouristBirth"></div>
+        <div class="field-group"><span>Паспортні дані:</span><input type="text" id="newExtraTouristPassport" placeholder="серія/номер..." style="flex:1;"></div>
       </div>
       <div class="field-group" style="margin-top:8px;">
         <button class="btn btn-primary btn-small" id="addExtraTouristBtn">+ Додати</button>
@@ -2212,13 +2213,15 @@ document.getElementById('addExtraTouristBtn').addEventListener('click', async ()
   const first = document.getElementById('newExtraTouristFirst').value.trim();
   const last = document.getElementById('newExtraTouristLast').value.trim();
   const birth = document.getElementById('newExtraTouristBirth').value;
+  const passport = document.getElementById('newExtraTouristPassport').value.trim();
   const guideName = activeTouristGuideName();
   if(!first || !last || !guideName) return;
-  const { error } = await sb.from('tourists').insert({ trip_id: currentTripId, guide_name: guideName, first_name:first, last_name:last, birth_date: birth||null, added_by_guide:true });
+  const { error } = await sb.from('tourists').insert({ trip_id: currentTripId, guide_name: guideName, first_name:first, last_name:last, birth_date: birth||null, passport_data: passport, added_by_guide:true });
   if(error){ alert(friendlyErrorMessage(error)); return; }
   document.getElementById('newExtraTouristFirst').value='';
   document.getElementById('newExtraTouristLast').value='';
   document.getElementById('newExtraTouristBirth').value='';
+  document.getElementById('newExtraTouristPassport').value='';
   await loadTourists();
   renderTouristSection();
 });
@@ -2585,7 +2588,9 @@ async function renderFinanceSection(){
 const STORAGE_BUCKET = 'reports';
 
 async function uploadReportFile(file, pathPrefix){
-  const path = `${pathPrefix}/${uid()}-${file.name}`.replace(/\s+/g,'_');
+  const extMatch = file.name.match(/\.[^.\\/]+$/);
+  const ext = extMatch ? extMatch[0].toLowerCase() : '';
+  const path = `${pathPrefix}/${uid()}${ext}`;
   const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, file, { upsert:true });
   if(error){ alert('Не вдалося завантажити файл: ' + friendlyErrorMessage(error)); return null; }
   return path;
@@ -3081,16 +3086,23 @@ function exportSkiatosManifestToExcel(tripLabel, groups, drivers){
   XLSX.writeFile(wb, `Скіатос_маніфест_${tripLabel}.xlsx`);
 }
 
+function formatDateGreek(isoDate){
+  if(!isoDate) return '';
+  const m = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return isoDate;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
 function exportFerryManifestToExcel(tripLabel, groups, drivers){
   const rows = [['№ п/п', 'Name Surname', 'Date of birth', 'Passport']];
   let n = 1;
   Object.keys(groups).sort().forEach(g=>{
     groups[g].forEach(r=>{
-      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), r.birthDate||'', r.passport||'']);
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
     });
   });
   drivers.forEach(r=>{
-    rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), r.birthDate||'', r.passport||'']);
+    rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
