@@ -2645,6 +2645,9 @@ function newHotelGroup(def){
 async function loadManagerReport(tripId){
   const { data, error } = await sb.from('manager_reports').select('*').eq('trip_id', tripId).maybeSingle();
   if(error){ console.error(error); }
+  const tripData = getTripData(tripId);
+  const guideNames = tripData.guides.map(g=>g.name);
+
   if(data){
     let hotels = data.hotels;
     if(!hotels || !hotels.length){
@@ -2659,26 +2662,49 @@ async function loadManagerReport(tripId){
       }
     }
     let expenses = data.expenses||[];
+    let addedAny = false;
+
+    // Ensure every trip guide always has an "Автобус (guide)" and "Добові: guide" line —
+    // regardless of whether the guide has entered anything in their own finance report yet.
+    for(const g of guideNames){
+      const hasBus = expenses.some(e=>e.guide===g && e.sourceLabel==='Автобус');
+      if(!hasBus){
+        const amt = await pullGuideFinanceLine(tripId, g, 'Автобус');
+        expenses.push({ id: uid(), label:`Автобус (${g})`, amount: amt, guide: g, sourceLabel:'Автобус' });
+        addedAny = true;
+      }
+      const hasPerDiem = expenses.some(e=>e.guide===g && e.sourceLabel==='Добові');
+      if(!hasPerDiem){
+        const amt = await pullGuideFinanceLine(tripId, g, 'Добові');
+        expenses.push({ id: uid(), label:`Добові: ${g}`, amount: amt, guide: g, sourceLabel:'Добові' });
+        addedAny = true;
+      }
+    }
+
     // Ensure newly-added standard items (e.g. Інтеграція, a 2nd Інше) exist even in older reports.
     const requiredCounts = {};
     DEFAULT_MANAGER_EXPENSES.forEach(e=> requiredCounts[e.label] = (requiredCounts[e.label]||0) + 1);
-    let addedAny = false;
     Object.keys(requiredCounts).forEach(label=>{
       const have = expenses.filter(e=>e.label===label && !e.guide && !e.ownBus && !e.file_name).length;
       const need = requiredCounts[label] - have;
       const defEntry = DEFAULT_MANAGER_EXPENSES.find(e=>e.label===label);
       for(let i=0;i<need;i++){ expenses.push({ id: uid(), label, amount: defEntry.amount }); addedAny = true; }
     });
+
+    // Ensure the "our own bus" and both hotel expense lines exist too.
+    if(!expenses.some(e=>e.ownBus)){ expenses.push({ id: uid(), label:'Автобус (наш) — км', amount:0, ownBus:true, odoStart:0, odoEnd:0, rate:1.6 }); addedAny = true; }
+    if(!expenses.some(e=>e.label==='Готель Konstantin')){ expenses.push({ id: uid(), label:'Готель Konstantin', amount:0, file_path:'', file_name:'' }); addedAny = true; }
+    if(!expenses.some(e=>e.label==='Готель Great Aleksander')){ expenses.push({ id: uid(), label:'Готель Great Aleksander', amount:0, file_path:'', file_name:'' }); addedAny = true; }
+
     const reconciled = { trip_id: tripId, hotels, expenses, submitted: !!data.submitted };
     if(addedAny) await saveManagerReport(reconciled);
     return reconciled;
   }
-  const tripData = getTripData(tripId);
-  const guideNames = tripData.guides.map(g=>g.name);
+
   const busEntries = [];
   for(const g of guideNames){
     const amt = await pullGuideFinanceLine(tripId, g, 'Автобус');
-    if(amt) busEntries.push({ id: uid(), label:`Автобус (${g})`, amount: amt, guide: g, sourceLabel:'Автобус' });
+    busEntries.push({ id: uid(), label:`Автобус (${g})`, amount: amt, guide: g, sourceLabel:'Автобус' });
   }
   const perDiemEntries = [];
   for(const g of guideNames){
