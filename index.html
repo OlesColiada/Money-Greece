@@ -2610,12 +2610,15 @@ function newCorporate(){ return { id: uid(), name:'', amount:0, file_path:'', fi
 
 const DEFAULT_MANAGER_EXPENSES = [
   {label:'Телефон', amount:30},
+  {label:'Інтеграція', amount:0},
   {label:'Поселення гідів', amount:154},
   {label:'Реклама', amount:300},
-  {label:'Кордони', amount:0},
+  {label:'Кордон', amount:0},
   {label:'Страховки', amount:0},
-  {label:'Аніматор', amount:150},
   {label:'Торба', amount:0},
+  {label:'Аніматор', amount:150},
+  {label:'Інше', amount:0},
+  {label:'Інше', amount:0},
 ];
 
 async function computeOfficeTotalForTrip(tripId){
@@ -2655,7 +2658,20 @@ async function loadManagerReport(tripId){
         });
       }
     }
-    return { trip_id: tripId, hotels, expenses: data.expenses||[], submitted: !!data.submitted };
+    let expenses = data.expenses||[];
+    // Ensure newly-added standard items (e.g. Інтеграція, a 2nd Інше) exist even in older reports.
+    const requiredCounts = {};
+    DEFAULT_MANAGER_EXPENSES.forEach(e=> requiredCounts[e.label] = (requiredCounts[e.label]||0) + 1);
+    let addedAny = false;
+    Object.keys(requiredCounts).forEach(label=>{
+      const have = expenses.filter(e=>e.label===label && !e.guide && !e.ownBus && !e.file_name).length;
+      const need = requiredCounts[label] - have;
+      const defEntry = DEFAULT_MANAGER_EXPENSES.find(e=>e.label===label);
+      for(let i=0;i<need;i++){ expenses.push({ id: uid(), label, amount: defEntry.amount }); addedAny = true; }
+    });
+    const reconciled = { trip_id: tripId, hotels, expenses, submitted: !!data.submitted };
+    if(addedAny) await saveManagerReport(reconciled);
+    return reconciled;
   }
   const tripData = getTripData(tripId);
   const guideNames = tripData.guides.map(g=>g.name);
@@ -2786,7 +2802,11 @@ function renderManagerReport(report, officeTotal, missing){
         <p class="report-title" style="margin:0;">Звіт керівника</p>
         <p class="report-note" style="margin:2px 0 0;">Заїзд: ${def?def.label:''}</p>
       </div>
-      <button class="btn btn-ghost btn-small no-print" id="mrPrintBtn">🖨 Друк</button>
+      <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-small" id="mrExportExcelBtn">📥 Excel</button>
+        <button class="btn btn-ghost btn-small" id="mrExportWordBtn">📥 Word</button>
+        <button class="btn btn-ghost btn-small" id="mrPrintBtn">🖨 Друк / PDF</button>
+      </div>
     </div>
 
     <p class="fin-section-title">Отримав</p>
@@ -2960,6 +2980,71 @@ function renderManagerReport(report, officeTotal, missing){
     renderManagerReport(report, officeTotal);
   });
   document.getElementById('mrPrintBtn').addEventListener('click', ()=> window.print());
+  document.getElementById('mrExportExcelBtn').addEventListener('click', ()=>{
+    const rows = [];
+    rows.push(['Звіт керівника', def?def.label:'']);
+    rows.push([]);
+    rows.push(['ОТРИМАВ']);
+    report.hotels.forEach(h=>{
+      rows.push([h.label, h.crm_number||'']);
+      h.corporates.forEach(c=> rows.push(['  '+c.name, fmt(c.amount)+' €']));
+      rows.push(['  Готівка', fmt(h.cash)+' €']);
+      rows.push(['  р/р', fmt(h.bank)+' €']);
+      rows.push(['  ФОП', fmt(h.fop)+' €']);
+      rows.push(['  Підсумок', fmt(hotelSubtotal(h))+' €']);
+      rows.push([]);
+    });
+    rows.push(['Разом', fmt(receivedTotal)+' €']);
+    rows.push(['Разом з допами', fmt(receivedWithAddons)+' €']);
+    rows.push([]);
+    rows.push(['ЗАТРАТИ']);
+    report.expenses.forEach(e=> rows.push([e.label, fmt(e.amount)+' €']));
+    rows.push(['Разом оплачено', fmt(expensesTotal)+' €']);
+    rows.push([]);
+    rows.push(['РОЗРАХУНОК']);
+    rows.push(['Отримано − Оплачено', fmt(diff)+' €']);
+    rows.push(['Офіс здати (70%)', fmt(officeShare)+' €']);
+    rows.push(['Керівник заробіток (30%)', fmt(managerEarning)+' €']);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Звіт керівника');
+    XLSX.writeFile(wb, `Звіт_керівника_${def?def.label:report.trip_id}.xlsx`);
+  });
+  document.getElementById('mrExportWordBtn').addEventListener('click', ()=>{
+    const hotelsHtml = report.hotels.map(h=>`
+      <h3>${h.label} ${h.crm_number ? '(№ '+h.crm_number+')' : ''}</h3>
+      <table border="1" cellpadding="4" style="border-collapse:collapse; width:100%;">
+        ${h.corporates.map(c=>`<tr><td>${c.name}</td><td align="right">${fmt(c.amount)} €</td></tr>`).join('')}
+        <tr><td>Готівка</td><td align="right">${fmt(h.cash)} €</td></tr>
+        <tr><td>р/р</td><td align="right">${fmt(h.bank)} €</td></tr>
+        <tr><td>ФОП</td><td align="right">${fmt(h.fop)} €</td></tr>
+        <tr><td><b>Підсумок</b></td><td align="right"><b>${fmt(hotelSubtotal(h))} €</b></td></tr>
+      </table>`).join('');
+    const expensesHtml = report.expenses.map(e=>`<tr><td>${e.label}</td><td align="right">${fmt(e.amount)} €</td></tr>`).join('');
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"><title>Звіт керівника</title></head>
+      <body style="font-family:Calibri, Arial, sans-serif;">
+        <h1>Звіт керівника — ${def?def.label:''}</h1>
+        <h2>Отримав</h2>
+        ${hotelsHtml}
+        <p><b>Разом:</b> ${fmt(receivedTotal)} €</p>
+        <p><b>Разом з допами:</b> ${fmt(receivedWithAddons)} €</p>
+        <h2>Затрати</h2>
+        <table border="1" cellpadding="4" style="border-collapse:collapse; width:100%;">${expensesHtml}</table>
+        <p><b>Разом оплачено:</b> ${fmt(expensesTotal)} €</p>
+        <h2>Розрахунок</h2>
+        <p>Отримано − Оплачено: <b>${fmt(diff)} €</b></p>
+        <p>Офіс здати (70%): <b>${fmt(officeShare)} €</b></p>
+        <p>Керівник заробіток (30%): <b>${fmt(managerEarning)} €</b></p>
+      </body></html>`;
+    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Звіт_керівника_${def?def.label:report.trip_id}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
 }
 
 /* ============================================================
