@@ -439,6 +439,21 @@
       </details>
     </div>
 
+    <div class="step-block no-print guide-only" id="addExtraTouristBlock" style="display:none; margin-top:16px;">
+      <p class="step-title">Додати туриста поза групою</p>
+      <p class="report-note">Для людей, яких немає в основному списку (наприклад, приєдналися вже в турі). Позначається рожевим кольором у списку.</p>
+      <div class="subgrid">
+        <div class="field-group"><span>Ім'я:</span><input type="text" id="newExtraTouristFirst" style="flex:1;"></div>
+        <div class="field-group"><span>Прізвище:</span><input type="text" id="newExtraTouristLast" style="flex:1;"></div>
+      </div>
+      <div class="subgrid" style="margin-top:8px;">
+        <div class="field-group"><span>Дата народження:</span><input type="date" id="newExtraTouristBirth"></div>
+      </div>
+      <div class="field-group" style="margin-top:8px;">
+        <button class="btn btn-primary btn-small" id="addExtraTouristBtn">+ Додати</button>
+      </div>
+    </div>
+
     <div class="step-block" id="touristListBlock" style="margin-top:16px;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <p class="step-title" style="margin:0;">Туристи</p>
@@ -788,6 +803,13 @@ function calcTripByGuide(tripData){
 
 /* ---------- Rendering ---------- */
 function fmt(n){ return (Math.round((n+Number.EPSILON)*100)/100).toLocaleString('uk-UA',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+// Accepts "5120", "5120.50", "5120,50" — comma or period both work as decimal separator.
+function parseDecimalInput(str){
+  if(str===null || str===undefined || str==='') return 0;
+  const cleaned = String(str).trim().replace(',', '.').replace(/[^0-9.\-]/g,'');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+}
 
 function renderTripGrid(){
   const grid = document.getElementById('tripGrid');
@@ -1006,7 +1028,7 @@ function renderExcursions(){
           ${noGuideFee ? `<div class="field-group"><span class="muted">На Скіатосі супровід гіда не потрібен — лише спільний автобус, квитки кожен оплачує сам.</span></div>` : `
           <div class="field-group" style="flex-direction:column; align-items:flex-start; gap:6px;">
             <span>Екскурсовод, €${exc.guideFeeDefault ? ` (стандарт ${exc.guideFeeDefault})` : ''}:</span>
-            <input type="number" step="1" class="guidefee-input" data-role="guideFee" value="${exc.guideFee}">
+            <input type="text" inputmode="decimal" class="guidefee-input" data-role="guideFee" value="${exc.guideFee}">
             ${feeDiffers ? `<input type="text" class="reason-input" placeholder="Причина зміни стандартної ціни" value="${exc.guideFeeReason||''}" data-role="guideFeeReason">` : ''}
           </div>`}
           ${(()=>{
@@ -1079,9 +1101,9 @@ function renderExcursions(){
           ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" value="${r.customPartnerName||''}" data-role="customPartnerName" style="margin-top:4px; width:110px;" ${editable?'':'disabled'}>` : ''}
           ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" data-role="fillFromTourists" title="Заповнити чол/суму з даних гіда в списку туристів" style="display:block; margin-top:4px; font-size:11px;">📋 зі списку туристів</button>` : ''}
         </td>
-        <td><input type="number" class="num-input" data-role="chol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></td>
-        <td>${r.isGuide ? `<input type="number" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>
-        ${calc.ticketsApply ? `<td>${r.isGuide ? `<input type="number" class="num-input" data-role="quitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>` : ''}
+        <td><input type="text" inputmode="decimal" class="num-input" data-role="chol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></td>
+        <td>${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>
+        ${calc.ticketsApply ? `<td>${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input" data-role="quitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>` : ''}
         <td class="muted">${hasPerson ? fmt(r.totalCost) : '—'}</td>
         <td>${!hasPerson
             ? `<span class="muted">оберіть гіда/партнера</span>`
@@ -1121,11 +1143,11 @@ function renderExcursions(){
       });
       const cpEl = tr.querySelector('[data-role="customPartnerName"]');
       if(cpEl) cpEl.addEventListener('input', e=> updateRow(exc.id, r.id, {customPartnerName:e.target.value}, {debounceRender:true}));
-      tr.querySelector('[data-role="chol"]').addEventListener('input', e=> updateRow(exc.id, r.id, {chol:e.target.value}, {debounceRender:true}));
+      tr.querySelector('[data-role="chol"]').addEventListener('input', e=> updateRow(exc.id, r.id, {chol:parseDecimalInput(e.target.value)}, {debounceRender:true}));
       const zEl = tr.querySelector('[data-role="zibrano"]');
-      if(zEl) zEl.addEventListener('input', e=> updateRow(exc.id, r.id, {zibrano:e.target.value}, {debounceRender:true}));
+      if(zEl) zEl.addEventListener('input', e=> updateRow(exc.id, r.id, {zibrano:parseDecimalInput(e.target.value)}, {debounceRender:true}));
       const qEl = tr.querySelector('[data-role="quitky"]');
-      if(qEl) qEl.addEventListener('input', e=> updateRow(exc.id, r.id, {quitky:e.target.value}, {debounceRender:true}));
+      if(qEl) qEl.addEventListener('input', e=> updateRow(exc.id, r.id, {quitky:parseDecimalInput(e.target.value)}, {debounceRender:true}));
       const delBtn = tr.querySelector('[data-role="delRow"]');
       if(delBtn) delBtn.addEventListener('click', ()=> deleteRow(exc.id, r.id));
     });
@@ -1141,7 +1163,7 @@ function renderExcursions(){
     if(brEl) brEl.addEventListener('change', e=> updateExcursion(exc.id, {busRate:Number(e.target.value)}));
     card.querySelector('[data-role="km"]').addEventListener('input', e=> updateExcursion(exc.id, {km:e.target.value.replace(',','.')}, {debounceRender:true}));
     const gfEl = card.querySelector('[data-role="guideFee"]');
-    if(gfEl) gfEl.addEventListener('input', e=> updateExcursion(exc.id, {guideFee:e.target.value}, {debounceRender:true}));
+    if(gfEl) gfEl.addEventListener('input', e=> updateExcursion(exc.id, {guideFee:parseDecimalInput(e.target.value)}, {debounceRender:true}));
     const grEl = card.querySelector('[data-role="guideFeeReason"]');
     if(grEl) grEl.addEventListener('input', e=> updateExcursion(exc.id, {guideFeeReason:e.target.value}, {debounceRender:true}));
     const recEl = card.querySelector('[data-role="recipientGuide"]');
@@ -1781,6 +1803,7 @@ function renderTouristList(){
     row.className = 'tourist-row' + (processed ? ' processed' : '');
     row.dataset.touristRowId = t.id;
     row.style.cursor = 'pointer';
+    if(t.added_by_guide) row.style.background = '#fce8ee';
     row.innerHTML = `
       <span class="dot"></span>
       <span class="t-name" style="flex:1;">${(t.last_name+' '+t.first_name).toUpperCase()}</span>
@@ -1913,7 +1936,7 @@ function renderTouristDetail(){
             <button class="price-mode-btn ${s.price_mode==='free'?'active':''}" data-role="modeFree" data-sel="${s.id}" ${locked?'disabled':''}>Безкоштовно</button>
             <button class="price-mode-btn ${s.price_mode==='ticket'?'active':''}" data-role="modeTicket" data-sel="${s.id}" ${locked?'disabled':''}>Вартість квитка</button>
           </div>
-          <input type="number" class="price-display" data-role="price" data-sel="${s.id}" value="${s.price}" ${locked || s.price_mode==='free' ?'disabled':''}> €
+          <input type="text" inputmode="decimal" class="price-display" data-role="price" data-sel="${s.id}" value="${s.price}" ${locked || s.price_mode==='free' ?'disabled':''}> €
         </div>` : ''}
     </div>`;
   });
@@ -1988,7 +2011,7 @@ function renderTouristDetail(){
     updateSelectionLocal(t.id, e.target.dataset.sel, { price_mode:'ticket', price: ticketPriceForAge(age) });
   }));
   block.querySelectorAll('[data-role="price"]').forEach(el=> el.addEventListener('input', e=>{
-    updateSelectionLocal(t.id, e.target.dataset.sel, { price:e.target.value }, true);
+    updateSelectionLocal(t.id, e.target.dataset.sel, { price:parseDecimalInput(e.target.value) }, true);
   }));
   block.querySelectorAll('[data-role="cancelSel"]').forEach(el=> el.addEventListener('click', e=>{
     const reason = prompt("Причина скасування (не набралась група, хвороба тощо):", "");
@@ -2182,6 +2205,20 @@ document.getElementById('addTouristBtn').addEventListener('click', async ()=>{
   document.getElementById('newTouristLast').value='';
   document.getElementById('newTouristBirth').value='';
   document.getElementById('newTouristPassport').value='';
+  await loadTourists();
+  renderTouristSection();
+});
+document.getElementById('addExtraTouristBtn').addEventListener('click', async ()=>{
+  const first = document.getElementById('newExtraTouristFirst').value.trim();
+  const last = document.getElementById('newExtraTouristLast').value.trim();
+  const birth = document.getElementById('newExtraTouristBirth').value;
+  const guideName = activeTouristGuideName();
+  if(!first || !last || !guideName) return;
+  const { error } = await sb.from('tourists').insert({ trip_id: currentTripId, guide_name: guideName, first_name:first, last_name:last, birth_date: birth||null, added_by_guide:true });
+  if(error){ alert(friendlyErrorMessage(error)); return; }
+  document.getElementById('newExtraTouristFirst').value='';
+  document.getElementById('newExtraTouristLast').value='';
+  document.getElementById('newExtraTouristBirth').value='';
   await loadTourists();
   renderTouristSection();
 });
@@ -2418,7 +2455,7 @@ function renderFinanceReport(report){
           <option value="Great Aleksander 3*" ${e.hotel==='Great Aleksander 3*'?'selected':''}>Great Aleksander 3*</option>
         </select>` : ''}
       ${isPercent ? `<button class="edit-toggle-btn no-print" data-role="finRefreshPercent" data-idx="${idx}" title="Підтягнути суму комісії з прибутковості" style="font-size:11px; flex-shrink:0;">🔄</button>` : ''}
-      <input type="number" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem?'disabled title="Змінюється чекбоксом KPI"':''}> €
+      <input type="text" inputmode="decimal" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem?'disabled title="Змінюється чекбоксом KPI"':''}> €
       <button class="row-del no-print" data-role="finDelete" data-idx="${idx}" title="Видалити пункт">✕</button>
     </div>`;
   };
@@ -2455,7 +2492,7 @@ function renderFinanceReport(report){
       <div class="fin-total-row"><span>Залишок (баланс)</span><span>${fmt(balance)} €</span></div>
       <div class="fin-row" style="margin-top:8px;">
         <span class="fin-label">Здано менеджеру</span>
-        <input type="number" class="fin-amount" id="finHandedOver" value="${report.handed_over}"> €
+        <input type="text" inputmode="decimal" class="fin-amount" id="finHandedOver" value="${report.handed_over}"> €
       </div>
       ${handedOver === 0
         ? ''
@@ -2468,7 +2505,7 @@ function renderFinanceReport(report){
 
   block.querySelectorAll('[data-role="finAmount"]').forEach(el=> el.addEventListener('input', e=>{
     const idx = Number(e.target.dataset.idx);
-    report.entries[idx].amount = Number(e.target.value)||0;
+    report.entries[idx].amount = parseDecimalInput(e.target.value);
     debouncedPersist('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
     debouncedFinanceRerender(report);
   }));
@@ -2525,7 +2562,7 @@ function renderFinanceReport(report){
     renderFinanceReport(report);
   }));
   document.getElementById('finHandedOver').addEventListener('input', e=>{
-    report.handed_over = Number(e.target.value)||0;
+    report.handed_over = parseDecimalInput(e.target.value);
     debouncedPersist('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
     debouncedFinanceRerender(report);
   });
@@ -2589,21 +2626,43 @@ async function pullGuideFinanceLine(tripId, guideName, label){
   return entry ? (Number(entry.amount)||0) : 0;
 }
 
+const DEFAULT_HOTELS = [
+  { key:'konstantin', label:'Готель Konstantin' },
+  { key:'great_aleksander', label:'Готель Great Aleksander' },
+];
+function newHotelGroup(def){
+  return { key:def.key, label:def.label, crm_number:'', corporates:[], cash:0, bank:0, fop:0 };
+}
+
 async function loadManagerReport(tripId){
   const { data, error } = await sb.from('manager_reports').select('*').eq('trip_id', tripId).maybeSingle();
   if(error){ console.error(error); }
-  if(data) return data;
+  if(data){
+    let hotels = data.hotels;
+    if(!hotels || !hotels.length){
+      // Migrate any pre-existing flat data so nothing typed in earlier gets lost.
+      hotels = DEFAULT_HOTELS.map(newHotelGroup);
+      const hadOldData = (data.corporates && data.corporates.length) || data.cash_amount || data.bank_amount || data.fop_amount;
+      if(hadOldData){
+        hotels.push({
+          key:'unassigned', label:'Без прив\'язки до готелю', crm_number:'',
+          corporates: data.corporates||[], cash: data.cash_amount||0, bank: data.bank_amount||0, fop: data.fop_amount||0
+        });
+      }
+    }
+    return { trip_id: tripId, hotels, expenses: data.expenses||[], submitted: !!data.submitted };
+  }
   const tripData = getTripData(tripId);
   const guideNames = tripData.guides.map(g=>g.name);
   const busEntries = [];
   for(const g of guideNames){
     const amt = await pullGuideFinanceLine(tripId, g, 'Автобус');
-    if(amt) busEntries.push({ id: uid(), label:`Автобус (${g})`, amount: amt, guide: g });
+    if(amt) busEntries.push({ id: uid(), label:`Автобус (${g})`, amount: amt, guide: g, sourceLabel:'Автобус' });
   }
   const perDiemEntries = [];
   for(const g of guideNames){
     const amt = await pullGuideFinanceLine(tripId, g, 'Добові');
-    perDiemEntries.push({ id: uid(), label:`Добові: ${g}`, amount: amt, guide: g });
+    perDiemEntries.push({ id: uid(), label:`Добові: ${g}`, amount: amt, guide: g, sourceLabel:'Добові' });
   }
   const expenses = [
     ...busEntries,
@@ -2614,15 +2673,14 @@ async function loadManagerReport(tripId){
     ...DEFAULT_MANAGER_EXPENSES.map(e=>({ id: uid(), label:e.label, amount:e.amount })),
   ];
   return {
-    trip_id: tripId, corporates: [], cash_amount:0, bank_amount:0, fop_amount:0,
+    trip_id: tripId, hotels: DEFAULT_HOTELS.map(newHotelGroup),
     expenses, submitted:false
   };
 }
 
 async function saveManagerReport(report){
   const { error } = await sb.from('manager_reports').upsert({
-    trip_id: report.trip_id, corporates: report.corporates, cash_amount: Number(report.cash_amount)||0,
-    bank_amount: Number(report.bank_amount)||0, fop_amount: Number(report.fop_amount)||0,
+    trip_id: report.trip_id, hotels: report.hotels,
     expenses: report.expenses, submitted: !!report.submitted
   }, { onConflict: 'trip_id' });
   if(error){ console.error(error); alert('Не вдалося зберегти звіт: ' + friendlyErrorMessage(error)); }
@@ -2634,48 +2692,83 @@ function debouncedManagerReportRerender(report){
   managerReportRerenderTimer = setTimeout(()=> renderManagerReport(report), 700);
 }
 
+async function computeMissingPullSuggestions(tripId, report){
+  const tripData = getTripData(tripId);
+  const guideNames = tripData.guides.map(g=>g.name);
+  const suggestions = [];
+  for(const g of guideNames){
+    const busAmt = await pullGuideFinanceLine(tripId, g, 'Автобус');
+    const hasBus = report.expenses.some(e=>e.guide===g && e.sourceLabel==='Автобус');
+    if(busAmt && !hasBus) suggestions.push({ label:`Автобус (${g})`, amount:busAmt, guide:g, sourceLabel:'Автобус' });
+
+    const perDiemAmt = await pullGuideFinanceLine(tripId, g, 'Добові');
+    const hasPerDiem = report.expenses.some(e=>e.guide===g && e.sourceLabel==='Добові');
+    if(!hasPerDiem) suggestions.push({ label:`Добові: ${g}`, amount:perDiemAmt, guide:g, sourceLabel:'Добові' });
+  }
+  return suggestions;
+}
+
 async function renderManagerReportSection(){
   const block = document.getElementById('managerReportBlock');
   if(!currentTripId){ block.innerHTML = `<p class="report-note">Оберіть заїзд.</p>`; return; }
   block.innerHTML = `<p class="report-note">Завантаження…</p>`;
   const report = await loadManagerReport(currentTripId);
   const officeTotal = await computeOfficeTotalForTrip(currentTripId);
-  renderManagerReport(report, officeTotal);
+  const missing = await computeMissingPullSuggestions(currentTripId, report);
+  renderManagerReport(report, officeTotal, missing);
 }
 
-function renderManagerReport(report, officeTotal){
+function renderManagerReport(report, officeTotal, missing){
+  missing = missing || report._missing || [];
+  report._missing = missing;
   const block = document.getElementById('managerReportBlock');
   const def = TRIPS_DEF.find(d=>d.id===currentTripId);
   officeTotal = officeTotal !== undefined ? officeTotal : (report._officeTotal||0);
   report._officeTotal = officeTotal;
 
-  const corpTotal = report.corporates.reduce((s,c)=> s+(Number(c.amount)||0), 0);
-  const receivedTotal = corpTotal + (Number(report.cash_amount)||0) + (Number(report.bank_amount)||0) + (Number(report.fop_amount)||0);
+  const hotelSubtotal = (h)=> h.corporates.reduce((s,c)=>s+(Number(c.amount)||0),0) + (Number(h.cash)||0) + (Number(h.bank)||0) + (Number(h.fop)||0);
+  const receivedTotal = report.hotels.reduce((s,h)=> s + hotelSubtotal(h), 0);
   const receivedWithAddons = receivedTotal + officeTotal;
   const expensesTotal = report.expenses.reduce((s,e)=> s+(Number(e.amount)||0), 0);
   const diff = receivedWithAddons - expensesTotal;
   const officeShare = diff * 0.7;
   const managerEarning = diff * 0.3;
 
-  const corpRowHtml = (c)=> `<div class="fin-row">
-      <input type="text" class="fin-label-input" data-role="mrCorpName" data-id="${c.id}" value="${c.name}" placeholder="Назва корпорату">
-      <input type="number" class="fin-amount" data-role="mrCorpAmount" data-id="${c.id}" value="${c.amount}"> €
-      <input type="file" accept=".xlsx,.xls,.pdf" data-role="mrCorpFile" data-id="${c.id}" style="width:110px; font-size:11px;">
+  const corpRowHtml = (hotelKey, c)=> `<div class="fin-row">
+      <input type="text" class="fin-label-input" data-role="mrCorpName" data-hotel="${hotelKey}" data-id="${c.id}" value="${c.name}" placeholder="Назва корпорату">
+      <input type="text" inputmode="decimal" class="fin-amount" data-role="mrCorpAmount" data-hotel="${hotelKey}" data-id="${c.id}" value="${c.amount}"> €
+      <input type="file" accept=".xlsx,.xls,.pdf" data-role="mrCorpFile" data-hotel="${hotelKey}" data-id="${c.id}" style="width:110px; font-size:11px;">
       ${c.file_name ? `<button class="btn btn-ghost btn-small no-print" data-role="mrViewFile" data-path="${c.file_path}">📎 ${c.file_name.length>14?c.file_name.slice(0,12)+'…':c.file_name}</button>` : ''}
-      <button class="row-del no-print" data-role="mrCorpDelete" data-id="${c.id}" title="Видалити">✕</button>
+      <button class="row-del no-print" data-role="mrCorpDelete" data-hotel="${hotelKey}" data-id="${c.id}" title="Видалити">✕</button>
     </div>`;
+
+  const hotelGroupHtml = (h)=> `<div style="margin-bottom:16px; padding:10px; border:1px solid var(--line); border-radius:10px;">
+    <div class="fin-row" style="border-bottom:none; padding-bottom:4px;">
+      <span class="fin-label" style="font-weight:700;">${h.label}</span>
+      <input type="text" placeholder="№ процесу CRM (напр. #2565)" data-role="mrHotelCrm" data-hotel="${h.key}" value="${h.crm_number||''}" style="width:170px;">
+    </div>
+    <p class="report-note" style="margin:2px 0 8px;">Корпорати для цього готелю:</p>
+    <div data-hotel-corp-wrap="${h.key}">${h.corporates.map(c=>corpRowHtml(h.key,c)).join('')}</div>
+    <div class="no-print" style="margin:6px 0 10px;"><button class="btn btn-ghost btn-small" data-role="mrAddCorpBtn" data-hotel="${h.key}">+ Додати корпорат</button></div>
+    <div class="fin-row"><span class="fin-label">Готівка</span><input type="text" inputmode="decimal" class="fin-amount" data-role="mrHotelCash" data-hotel="${h.key}" value="${h.cash}"> €</div>
+    <div class="fin-row"><span class="fin-label">р/р</span><input type="text" inputmode="decimal" class="fin-amount" data-role="mrHotelBank" data-hotel="${h.key}" value="${h.bank}"> €</div>
+    <div class="fin-row"><span class="fin-label">ФОП</span><input type="text" inputmode="decimal" class="fin-amount" data-role="mrHotelFop" data-hotel="${h.key}" value="${h.fop}"> €</div>
+    <p class="muted" style="font-size:12px; margin-top:6px;">Підсумок по готелю: ${fmt(hotelSubtotal(h))} €</p>
+  </div>`;
 
   const expenseRowHtml = (e)=>{
     const isOwnBus = !!e.ownBus;
     const isHotel = e.label.startsWith('Готель');
+    const isPulled = !!e.guide && !!e.sourceLabel;
     return `<div class="fin-row" style="flex-wrap:wrap;">
       <span class="fin-label">${e.label}</span>
       ${isOwnBus ? `
-        <span class="muted" style="font-size:11px;">од. поч.:</span><input type="number" class="fin-amount" style="width:80px;" data-role="mrOdoStart" data-id="${e.id}" value="${e.odoStart||0}">
-        <span class="muted" style="font-size:11px;">од. кін.:</span><input type="number" class="fin-amount" style="width:80px;" data-role="mrOdoEnd" data-id="${e.id}" value="${e.odoEnd||0}">
-        <span class="muted" style="font-size:11px;">€/км:</span><input type="number" step="0.1" class="fin-amount" style="width:60px;" data-role="mrRate" data-id="${e.id}" value="${e.rate||1.6}">
+        <span class="muted" style="font-size:11px;">од. поч.:</span><input type="text" inputmode="decimal" class="fin-amount" style="width:80px;" data-role="mrOdoStart" data-id="${e.id}" value="${e.odoStart||0}">
+        <span class="muted" style="font-size:11px;">од. кін.:</span><input type="text" inputmode="decimal" class="fin-amount" style="width:80px;" data-role="mrOdoEnd" data-id="${e.id}" value="${e.odoEnd||0}">
+        <span class="muted" style="font-size:11px;">€/км:</span><input type="text" inputmode="decimal" step="0.1" class="fin-amount" style="width:60px;" data-role="mrRate" data-id="${e.id}" value="${e.rate||1.6}">
       ` : ''}
-      <input type="number" class="fin-amount" data-role="mrExpenseAmount" data-id="${e.id}" value="${e.amount}" ${isOwnBus?'disabled title="Рахується з одометра"':''}> €
+      ${isPulled ? `<button class="edit-toggle-btn no-print" data-role="mrRefreshPulled" data-id="${e.id}" title="Підтягнути актуальну суму з фінзвіту гіда (${e.sourceLabel})" style="font-size:12px;">🔄</button>` : ''}
+      <input type="text" inputmode="decimal" class="fin-amount" data-role="mrExpenseAmount" data-id="${e.id}" value="${e.amount}" ${isOwnBus?'disabled title="Рахується з одометра"':''}> €
       ${isHotel ? `<input type="file" accept=".xlsx,.xls,.pdf" data-role="mrExpenseFile" data-id="${e.id}" style="width:110px; font-size:11px;">
         ${e.file_name ? `<button class="btn btn-ghost btn-small no-print" data-role="mrViewFile" data-path="${e.file_path}">📎 ${e.file_name.length>14?e.file_name.slice(0,12)+'…':e.file_name}</button>` : ''}` : ''}
       <button class="row-del no-print" data-role="mrExpenseDelete" data-id="${e.id}" title="Видалити">✕</button>
@@ -2692,18 +2785,18 @@ function renderManagerReport(report, officeTotal){
     </div>
 
     <p class="fin-section-title">Отримав</p>
-    <p class="report-note">Корпорати (клієнти, що дають групу) — 0, 1 чи кілька:</p>
-    <div id="mrCorporatesWrap">${report.corporates.map(corpRowHtml).join('')}</div>
-    <div class="no-print" style="margin-top:6px;"><button class="btn btn-ghost btn-small" id="mrAddCorpBtn">+ Додати корпорат</button></div>
-
-    <div class="fin-row" style="margin-top:10px;"><span class="fin-label">Готівка</span><input type="number" class="fin-amount" id="mrCash" value="${report.cash_amount}"> €</div>
-    <div class="fin-row"><span class="fin-label">р/р</span><input type="number" class="fin-amount" id="mrBank" value="${report.bank_amount}"> €</div>
-    <div class="fin-row"><span class="fin-label">ФОП</span><input type="number" class="fin-amount" id="mrFop" value="${report.fop_amount}"> €</div>
+    ${report.hotels.map(hotelGroupHtml).join('')}
 
     <div class="fin-total-row"><span>Разом</span><span>${fmt(receivedTotal)} €</span></div>
     <div class="fin-total-row"><span>Разом з допами (+ офіс з екскурсій ${fmt(officeTotal)} €)</span><span>${fmt(receivedWithAddons)} €</span></div>
 
     <p class="fin-section-title">Затрати</p>
+    ${missing.length ? `<div class="no-print" style="margin-bottom:10px; background:var(--whitewash-2); border-radius:8px; padding:8px 10px;">
+      <p style="font-size:11.5px; color:var(--ink-soft); margin:0 0 6px; text-transform:uppercase;">Можна додати одним кліком:</p>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        ${missing.map(m=>`<button class="btn btn-ghost btn-small" data-role="mrAddMissing" data-guide="${m.guide}" data-source="${m.sourceLabel}" style="font-size:11px;">+ ${m.label} (${fmt(m.amount)} €)</button>`).join('')}
+      </div>
+    </div>` : ''}
     <div id="mrExpensesWrap">${report.expenses.map(expenseRowHtml).join('')}</div>
     <div class="no-print" style="margin-top:8px;"><button class="btn btn-ghost btn-small" id="mrAddExpenseBtn">+ Додати пункт</button></div>
     <div class="fin-total-row"><span>Разом оплачено</span><span>${fmt(expensesTotal)} €</span></div>
@@ -2720,60 +2813,87 @@ function renderManagerReport(report, officeTotal){
     </div>
   `;
 
-  // --- Corporates ---
+  function findHotel(key){ return report.hotels.find(h=>h.key===key); }
+
+  // --- Corporates (per hotel) ---
   block.querySelectorAll('[data-role="mrCorpName"]').forEach(el=> el.addEventListener('input', e=>{
-    const c = report.corporates.find(x=>x.id===e.target.dataset.id);
+    const h = findHotel(e.target.dataset.hotel);
+    const c = h.corporates.find(x=>x.id===e.target.dataset.id);
     c.name = e.target.value;
     debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
   }));
   block.querySelectorAll('[data-role="mrCorpAmount"]').forEach(el=> el.addEventListener('input', e=>{
-    const c = report.corporates.find(x=>x.id===e.target.dataset.id);
-    c.amount = Number(e.target.value)||0;
+    const h = findHotel(e.target.dataset.hotel);
+    const c = h.corporates.find(x=>x.id===e.target.dataset.id);
+    c.amount = parseDecimalInput(e.target.value);
     debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
     debouncedManagerReportRerender(report);
   }));
   block.querySelectorAll('[data-role="mrCorpFile"]').forEach(el=> el.addEventListener('change', async e=>{
-    const file = e.target.files[0]; if(!file) return;
-    const c = report.corporates.find(x=>x.id===e.target.dataset.id);
-    const path = await uploadReportFile(file, `${report.trip_id}/corporates`);
-    if(path){ if(c.file_path) await removeReportFile(c.file_path); c.file_path = path; c.file_name = file.name; }
-    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    renderManagerReport(report, officeTotal);
+    try{
+      const file = e.target.files[0]; if(!file) return;
+      const h = findHotel(e.target.dataset.hotel);
+      const c = h.corporates.find(x=>x.id===e.target.dataset.id);
+      if(!c){ alert('Внутрішня помилка: не знайдено запис корпорату. Онови сторінку і спробуй ще раз.'); return; }
+      const path = await uploadReportFile(file, `${report.trip_id}/corporates`);
+      if(path){
+        if(c.file_path) await removeReportFile(c.file_path);
+        c.file_path = path; c.file_name = file.name;
+        await saveManagerReport(report);
+        renderManagerReport(report, officeTotal);
+      }
+    } catch(err){
+      console.error(err);
+      alert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
+    }
   }));
   block.querySelectorAll('[data-role="mrCorpDelete"]').forEach(el=> el.addEventListener('click', async e=>{
-    const c = report.corporates.find(x=>x.id===e.target.dataset.id);
+    const h = findHotel(e.target.dataset.hotel);
+    const c = h.corporates.find(x=>x.id===e.target.dataset.id);
     if(c && c.file_path) await removeReportFile(c.file_path);
-    report.corporates = report.corporates.filter(x=>x.id!==e.target.dataset.id);
+    h.corporates = h.corporates.filter(x=>x.id!==e.target.dataset.id);
     persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
     renderManagerReport(report, officeTotal);
   }));
-  document.getElementById('mrAddCorpBtn').addEventListener('click', ()=>{
-    report.corporates.push(newCorporate());
+  block.querySelectorAll('[data-role="mrAddCorpBtn"]').forEach(el=> el.addEventListener('click', e=>{
+    const h = findHotel(e.target.dataset.hotel);
+    h.corporates.push(newCorporate());
     persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
     renderManagerReport(report, officeTotal);
-  });
+  }));
 
-  // --- Received fixed fields ---
-  ['mrCash','mrBank','mrFop'].forEach(id=>{
-    document.getElementById(id).addEventListener('input', e=>{
-      const key = id==='mrCash' ? 'cash_amount' : id==='mrBank' ? 'bank_amount' : 'fop_amount';
-      report[key] = Number(e.target.value)||0;
-      debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
-      debouncedManagerReportRerender(report);
-    });
-  });
+  // --- Per-hotel fixed fields ---
+  block.querySelectorAll('[data-role="mrHotelCrm"]').forEach(el=> el.addEventListener('input', e=>{
+    findHotel(e.target.dataset.hotel).crm_number = e.target.value;
+    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+  }));
+  block.querySelectorAll('[data-role="mrHotelCash"]').forEach(el=> el.addEventListener('input', e=>{
+    findHotel(e.target.dataset.hotel).cash = parseDecimalInput(e.target.value);
+    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+    debouncedManagerReportRerender(report);
+  }));
+  block.querySelectorAll('[data-role="mrHotelBank"]').forEach(el=> el.addEventListener('input', e=>{
+    findHotel(e.target.dataset.hotel).bank = parseDecimalInput(e.target.value);
+    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+    debouncedManagerReportRerender(report);
+  }));
+  block.querySelectorAll('[data-role="mrHotelFop"]').forEach(el=> el.addEventListener('input', e=>{
+    findHotel(e.target.dataset.hotel).fop = parseDecimalInput(e.target.value);
+    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+    debouncedManagerReportRerender(report);
+  }));
 
   // --- Expenses ---
   block.querySelectorAll('[data-role="mrExpenseAmount"]').forEach(el=> el.addEventListener('input', e=>{
     const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
-    ex.amount = Number(e.target.value)||0;
+    ex.amount = parseDecimalInput(e.target.value);
     debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
     debouncedManagerReportRerender(report);
   }));
   block.querySelectorAll('[data-role="mrOdoStart"], [data-role="mrOdoEnd"], [data-role="mrRate"]').forEach(el=> el.addEventListener('input', e=>{
     const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
     const role = e.target.dataset.role;
-    const val = Number(e.target.value)||0;
+    const val = parseDecimalInput(e.target.value);
     if(role==='mrOdoStart') ex.odoStart = val;
     if(role==='mrOdoEnd') ex.odoEnd = val;
     if(role==='mrRate') ex.rate = val;
@@ -2782,12 +2902,21 @@ function renderManagerReport(report, officeTotal){
     renderManagerReport(report, officeTotal);
   }));
   block.querySelectorAll('[data-role="mrExpenseFile"]').forEach(el=> el.addEventListener('change', async e=>{
-    const file = e.target.files[0]; if(!file) return;
-    const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
-    const path = await uploadReportFile(file, `${report.trip_id}/expenses`);
-    if(path){ if(ex.file_path) await removeReportFile(ex.file_path); ex.file_path = path; ex.file_name = file.name; }
-    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    renderManagerReport(report, officeTotal);
+    try{
+      const file = e.target.files[0]; if(!file) return;
+      const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
+      if(!ex){ alert('Внутрішня помилка: не знайдено пункт витрат. Онови сторінку і спробуй ще раз.'); return; }
+      const path = await uploadReportFile(file, `${report.trip_id}/expenses`);
+      if(path){
+        if(ex.file_path) await removeReportFile(ex.file_path);
+        ex.file_path = path; ex.file_name = file.name;
+        await saveManagerReport(report);
+        renderManagerReport(report, officeTotal);
+      }
+    } catch(err){
+      console.error(err);
+      alert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
+    }
   }));
   block.querySelectorAll('[data-role="mrExpenseDelete"]').forEach(el=> el.addEventListener('click', async e=>{
     const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
@@ -2801,6 +2930,22 @@ function renderManagerReport(report, officeTotal){
     persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
     renderManagerReport(report, officeTotal);
   });
+  block.querySelectorAll('[data-role="mrAddMissing"]').forEach(el=> el.addEventListener('click', e=>{
+    const guide = e.target.dataset.guide, source = e.target.dataset.source;
+    const m = missing.find(x=>x.guide===guide && x.sourceLabel===source);
+    if(!m) return;
+    report.expenses.push({ id: uid(), label:m.label, amount:m.amount, guide:m.guide, sourceLabel:m.sourceLabel });
+    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
+    renderManagerReportSection();
+  }));
+  block.querySelectorAll('[data-role="mrRefreshPulled"]').forEach(el=> el.addEventListener('click', async e=>{
+    const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
+    if(!ex) return;
+    const amt = await pullGuideFinanceLine(report.trip_id, ex.guide, ex.sourceLabel);
+    ex.amount = amt;
+    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
+    renderManagerReport(report, officeTotal);
+  }));
 
   block.querySelectorAll('[data-role="mrViewFile"]').forEach(el=> el.addEventListener('click', e=> openReportFile(e.target.dataset.path)));
 
@@ -2960,7 +3105,7 @@ async function renderSkiatosManifest(){
             <td style="text-align:left;">${r.name}${r.kind==='guide' ? ' <b>(guide)</b>' : ''}</td>
             <td>${r.kind==='guide' ? '—' : (r.age!==null && r.age!==undefined ? r.age+' р.' : '—')}</td>
             <td>${r.kind==='guide' ? '<b>guide</b>' : (r.kind==='extra' && canEditGroup
-                ? `<input type="number" class="fin-amount" style="width:70px;" data-role="manEditPrice" data-id="${r.extra.id}" value="${r.price}">`
+                ? `<input type="text" inputmode="decimal" class="fin-amount" style="width:70px;" data-role="manEditPrice" data-id="${r.extra.id}" value="${r.price}">`
                 : fmt(r.price)+' €')}</td>
             <td class="no-print">${r.kind==='extra' && canEditGroup ? `<button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button>` : ''}</td>
           </tr>`).join('') || `<tr><td colspan="4" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}
@@ -3018,7 +3163,7 @@ async function renderSkiatosManifest(){
   }));
   block.querySelectorAll('[data-role="manEditPrice"]').forEach(el=> el.addEventListener('input', e=>{
     const id = e.target.dataset.id;
-    const val = Number(e.target.value)||0;
+    const val = parseDecimalInput(e.target.value);
     clearTimeout(el._t);
     el._t = setTimeout(()=> updateManifestExtraPrice(id, val), 600);
   }));
@@ -3040,7 +3185,7 @@ async function renderSkiatosManifest(){
 
 /* ---------- Bootstrap ---------- */
 document.addEventListener('focus', function(e){
-  if(e.target.matches && e.target.matches('input[type="number"], input.km-input')){
+  if(e.target.matches && e.target.matches('input[inputmode="decimal"], input.km-input')){
     e.target.select();
   }
 }, true);
