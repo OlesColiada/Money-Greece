@@ -1446,7 +1446,7 @@ function runPersist(fn){
   p.finally(()=> inFlight.delete(p));
   return p;
 }
-function debouncedPersist(key, fn, delay=600){
+function debouncedPersist(key, fn, delay=1500){
   if(debounceTimers[key]) clearTimeout(debounceTimers[key].timeoutId);
   const timeoutId = setTimeout(()=>{ delete debounceTimers[key]; runPersist(fn); }, delay);
   debounceTimers[key] = { timeoutId, fn };
@@ -1471,7 +1471,7 @@ async function flushPendingPersists(){
 // We update the data model immediately (so calculations stay correct) but only
 // rebuild the DOM after the person pauses typing.
 let renderDebounceTimer;
-function debouncedRenderAll(delay=700){
+function debouncedRenderAll(delay=2500){
   clearTimeout(renderDebounceTimer);
   renderDebounceTimer = setTimeout(renderAll, delay);
 }
@@ -2419,9 +2419,11 @@ function renderFinanceGuideFilterChips(){
 }
 
 let financeRerenderTimer;
+let pendingFinanceReport;
 function debouncedFinanceRerender(report){
   clearTimeout(financeRerenderTimer);
-  financeRerenderTimer = setTimeout(()=> renderFinanceReport(report), 700);
+  pendingFinanceReport = report;
+  financeRerenderTimer = setTimeout(()=> renderFinanceReport(report), 2500);
 }
 
 function renderFinanceReport(report){
@@ -2734,9 +2736,11 @@ async function saveManagerReport(report){
 }
 
 let managerReportRerenderTimer;
+let pendingManagerReport;
 function debouncedManagerReportRerender(report){
   clearTimeout(managerReportRerenderTimer);
-  managerReportRerenderTimer = setTimeout(()=> renderManagerReport(report), 700);
+  pendingManagerReport = report;
+  managerReportRerenderTimer = setTimeout(()=> renderManagerReport(report), 2500);
 }
 
 async function computeMissingPullSuggestions(tripId, report){
@@ -2759,6 +2763,7 @@ async function renderManagerReportSection(){
   const block = document.getElementById('managerReportBlock');
   if(!currentTripId){ block.innerHTML = `<p class="report-note">Оберіть заїзд.</p>`; return; }
   block.innerHTML = `<p class="report-note">Завантаження…</p>`;
+  if(!state.trips[currentTripId]) await loadTripData(currentTripId);
   const report = await loadManagerReport(currentTripId);
   const officeTotal = await computeOfficeTotalForTrip(currentTripId);
   const missing = await computeMissingPullSuggestions(currentTripId, report);
@@ -2808,7 +2813,7 @@ function renderManagerReport(report, officeTotal, missing){
     const isHotel = e.label.startsWith('Готель');
     const isPulled = !!e.guide && !!e.sourceLabel;
     return `<div class="fin-row" style="flex-wrap:wrap;">
-      <span class="fin-label">${e.label}</span>
+      <input type="text" class="fin-label-input" data-role="mrExpenseLabel" data-id="${e.id}" value="${e.label}">
       ${isOwnBus ? `
         <span class="muted" style="font-size:11px;">од. поч.:</span><input type="text" inputmode="decimal" class="fin-amount" style="width:80px;" data-role="mrOdoStart" data-id="${e.id}" value="${e.odoStart||0}">
         <span class="muted" style="font-size:11px;">од. кін.:</span><input type="text" inputmode="decimal" class="fin-amount" style="width:80px;" data-role="mrOdoEnd" data-id="${e.id}" value="${e.odoEnd||0}">
@@ -2832,6 +2837,8 @@ function renderManagerReport(report, officeTotal, missing){
         <button class="btn btn-ghost btn-small" id="mrExportExcelBtn">📥 Excel</button>
         <button class="btn btn-ghost btn-small" id="mrExportWordBtn">📥 Word</button>
         <button class="btn btn-ghost btn-small" id="mrPrintBtn">🖨 Друк / PDF</button>
+        <button class="btn btn-primary btn-small" id="mrSaveToStorageBtn">💾 Зберегти в сховище</button>
+        <button class="btn btn-ghost btn-small" id="mrDownloadSavedBtn">⬇ Завантажити збережений</button>
       </div>
     </div>
 
@@ -2935,6 +2942,11 @@ function renderManagerReport(report, officeTotal, missing){
   }));
 
   // --- Expenses ---
+  block.querySelectorAll('[data-role="mrExpenseLabel"]').forEach(el=> el.addEventListener('input', e=>{
+    const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
+    ex.label = e.target.value;
+    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+  }));
   block.querySelectorAll('[data-role="mrExpenseAmount"]').forEach(el=> el.addEventListener('input', e=>{
     const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
     ex.amount = parseDecimalInput(e.target.value);
@@ -3006,7 +3018,34 @@ function renderManagerReport(report, officeTotal, missing){
     renderManagerReport(report, officeTotal);
   });
   document.getElementById('mrPrintBtn').addEventListener('click', ()=> window.print());
-  document.getElementById('mrExportExcelBtn').addEventListener('click', ()=>{
+  document.getElementById('mrSaveToStorageBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('mrSaveToStorageBtn');
+    btn.disabled = true; btn.textContent = 'Зберігаю…';
+    try{
+      const rows = buildManagerReportRows();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Звіт керівника');
+      const wbBinary = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+      const blob = new Blob([wbBinary], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const path = `${report.trip_id}/manager-report/report.xlsx`;
+      const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, blob, { upsert:true });
+      if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); }
+      else { alert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити збережений" — з будь-якого пристрою.'); }
+    } catch(err){
+      console.error(err);
+      alert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
+    } finally {
+      btn.disabled = false; btn.textContent = '💾 Зберегти в сховище';
+    }
+  });
+  document.getElementById('mrDownloadSavedBtn').addEventListener('click', async ()=>{
+    const path = `${report.trip_id}/manager-report/report.xlsx`;
+    const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+    if(error){ alert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти в сховище").'); return; }
+    window.open(data.signedUrl, '_blank');
+  });
+  function buildManagerReportRows(){
     const rows = [];
     rows.push(['Звіт керівника', def?def.label:'']);
     rows.push([]);
@@ -3031,6 +3070,11 @@ function renderManagerReport(report, officeTotal, missing){
     rows.push(['Отримано − Оплачено', fmt(diff)+' €']);
     rows.push(['Офіс здати (70%)', fmt(officeShare)+' €']);
     rows.push(['Керівник заробіток (30%)', fmt(managerEarning)+' €']);
+    return rows;
+  }
+
+  document.getElementById('mrExportExcelBtn').addEventListener('click', ()=>{
+    const rows = buildManagerReportRows();
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Звіт керівника');
@@ -3341,6 +3385,13 @@ async function renderSkiatosManifest(){
 document.addEventListener('focus', function(e){
   if(e.target.matches && e.target.matches('input[inputmode="decimal"], input.km-input')){
     e.target.select();
+  }
+}, true);
+document.addEventListener('blur', function(e){
+  if(e.target.matches && e.target.matches('input[inputmode="decimal"], input.km-input')){
+    if(renderDebounceTimer){ clearTimeout(renderDebounceTimer); renderDebounceTimer=null; renderAll(); }
+    if(financeRerenderTimer && pendingFinanceReport){ clearTimeout(financeRerenderTimer); financeRerenderTimer=null; renderFinanceReport(pendingFinanceReport); }
+    if(managerReportRerenderTimer && pendingManagerReport){ clearTimeout(managerReportRerenderTimer); managerReportRerenderTimer=null; renderManagerReport(pendingManagerReport); }
   }
 }, true);
 (async function bootstrap(){
