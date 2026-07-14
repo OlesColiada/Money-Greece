@@ -278,6 +278,40 @@
 
     .login-card{padding:24px 18px;}
   }
+
+  /* ---------- Ported from the standalone hotel booking tool ---------- */
+  .hb-room {
+    transition: all 0.2s;
+    min-width: 0;
+    position: relative;
+  }
+  .hb-room.free { background-color: #10b981; color: white; }
+  .hb-room.booked { background-color: #ef4444; color: white; }
+  .hb-room.shared { background-color: #6366f1; color: white; }
+  .hb-room.multiroom { background-color: #f97316; color: white; }
+  .hb-room.seeking { background-color: #f59e0b; color: #1f2937; animation: hbPulseSeek 1.4s infinite; }
+  @keyframes hbPulseSeek {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.7); }
+    50% { box-shadow: 0 0 0 10px rgba(245,158,11,0); }
+  }
+  .hb-occupancy-badge {
+    position: absolute; bottom: 4px; right: 4px;
+    background: rgba(255,255,255,.95); color: #111827;
+    font-weight: 700; border-radius: 9999px;
+    padding: 1px 6px; box-shadow: 0 1px 4px rgba(0,0,0,.3);
+  }
+  .hb-room:hover { transform: scale(1.05); }
+  .hb-floor-header {
+    background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+    color: white;
+  }
+  .hb-link-hover {
+    transform: scale(1.1);
+    z-index: 20;
+    box-shadow: 0 0 0 4px #a855f7, 0 10px 24px rgba(0,0,0,.35) !important;
+  }
+  .hb-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:400; padding:12px; }
+  .hb-modal-card{ background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:520px; width:100%; padding:20px; max-height:92vh; overflow-y:auto; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -340,6 +374,7 @@
 <main class="app-hidden" id="appMain">
 
   <div class="section-tabs no-print">
+    <button class="btn btn-ghost section-tab manager-only" id="sectionTripPrepBtn">Документи до туру</button>
     <button class="btn btn-ghost section-tab active-tab" id="sectionTouristsBtn">Список збору коштів</button>
     <button class="btn btn-ghost section-tab" id="sectionProfitBtn">Прибутковість</button>
     <button class="btn btn-ghost section-tab" id="sectionFinanceBtn">Фінансовий звіт</button>
@@ -500,8 +535,159 @@
     <div class="step-block" id="managerReportBlock"></div>
   </div>
 
+  <div id="tripPrepSection" style="display:none;">
+    <div class="step-block" id="tripPrepBlock"></div>
+  </div>
+
 </main>
 
+<!-- ---------- Ported hotel-booking modals (namespaced hb*) ---------- -->
+<div id="hbBookingModal" class="hb-modal-overlay app-hidden">
+  <div class="hb-modal-card">
+    <h2 style="font-size:20px; font-weight:700; margin-bottom:4px;">Бронювання: <span id="hbModalRoomNumber" style="color:var(--aegean-deep);"></span></h2>
+    <p id="hbModalCapacityInfo" style="font-size:14px; font-weight:600; color:#374151; margin-bottom:16px;"></p>
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div>
+        <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">Номер заявки (4-5 цифр)</label>
+        <input id="hbRequestNum" type="text" maxlength="5" style="width:100%; padding:12px; border:2px solid var(--line); border-radius:10px; font-size:16px; font-weight:600;">
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+        <div><label style="display:block; font-size:11px; font-weight:600; margin-bottom:2px;">12+</label><input id="hbAdults" type="number" min="1" value="2" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:10px; text-align:center;"></div>
+        <div><label style="display:block; font-size:11px; font-weight:600; margin-bottom:2px;">6-12</label><input id="hbKids612" type="number" min="0" value="0" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:10px; text-align:center;"></div>
+        <div><label style="display:block; font-size:11px; font-weight:600; margin-bottom:2px;">0-5</label><input id="hbKidsUnder6" type="number" min="0" value="0" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:10px; text-align:center;"></div>
+      </div>
+      <label style="display:flex; align-items:center; gap:8px; padding:10px; border:2px solid #fcd34d; background:#fffbeb; border-radius:10px; cursor:pointer;">
+        <input id="hbExtraBedCheckbox" type="checkbox" style="width:18px; height:18px;">
+        <span style="font-size:13px; font-weight:600; color:#92400e;">🛏️ Додати екстраліжко (+1 місце в кімнаті)</span>
+      </label>
+      <label id="hbSeekingWrap" style="display:flex; align-items:center; gap:8px; padding:10px; border:2px solid #fdba74; background:#fff7ed; border-radius:10px; cursor:pointer;">
+        <input id="hbSeekingCheckbox" type="checkbox" style="width:18px; height:18px;">
+        <span style="font-size:13px; font-weight:600; color:#9a3412;">🔄 Підселення — лишити місце й шукати сусіда в цей номер</span>
+      </label>
+      <div>
+        <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">📝 Нотатки (необов'язково)</label>
+        <textarea id="hbShareNotes" rows="3" placeholder="Додаткова інформація про туристів у цій кімнаті…" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:10px; font-size:13px;"></textarea>
+      </div>
+    </div>
+    <div style="margin-top:20px; display:flex; gap:10px;">
+      <button onclick="hbConfirmBooking()" class="btn btn-primary" style="flex:1;">Підтвердити</button>
+      <button onclick="hbCloseModal()" class="btn btn-ghost" style="flex:1;">Скасувати</button>
+    </div>
+  </div>
+</div>
+
+<div id="hbRoomActionsModal" class="hb-modal-overlay app-hidden" style="z-index:410;">
+  <div class="hb-modal-card">
+    <h2 style="font-size:20px; font-weight:700; margin-bottom:4px;"><span id="hbRaRoomNumber" style="color:var(--aegean-deep);"></span></h2>
+    <p id="hbRaCapacityLine" style="font-size:13px; color:#6b7280; margin-bottom:14px;"></p>
+    <div id="hbRaSharesList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:14px;"></div>
+    <div id="hbRaAddSharerWrap" style="margin-bottom:10px;"></div>
+    <button onclick="hbCloseRoomActionsModal()" class="btn btn-ghost" style="width:100%;">Закрити</button>
+  </div>
+</div>
+
+<div id="hbMoveRoomModal" class="hb-modal-overlay app-hidden" style="z-index:420;">
+  <div class="hb-modal-card">
+    <h2 style="font-size:18px; font-weight:700; margin-bottom:14px;">Перенести <span id="hbMoveFromRoom" style="color:var(--aegean-deep);"></span> в:</h2>
+    <select id="hbMoveTargetRoom" style="width:100%; padding:12px; border:2px solid var(--line); border-radius:10px; font-size:15px; margin-bottom:14px;"></select>
+    <div style="display:flex; gap:10px;">
+      <button onclick="hbConfirmMove()" class="btn btn-primary" style="flex:1;">Підтвердити перенесення</button>
+      <button onclick="hbCloseMoveModal()" class="btn btn-ghost" style="flex:1;">Скасувати</button>
+    </div>
+  </div>
+</div>
+
+<div id="hbAddRoomModal" class="hb-modal-overlay app-hidden" style="z-index:420;">
+  <div class="hb-modal-card">
+    <h2 style="font-size:18px; font-weight:700; margin-bottom:10px;">Додати додаткове місце (овербукінг)</h2>
+    <p style="font-size:13px; color:#6b7280; margin-bottom:14px;">Це не контрактна кімната з номером — просто додаткове місце на певну кількість осіб.</p>
+    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">Кількість людей</label>
+    <input id="hbExtraRoomCapacity" type="number" min="1" value="2" style="width:100%; padding:12px; border:2px solid var(--line); border-radius:10px; font-size:15px; font-weight:600; margin-bottom:14px;">
+    <div style="display:flex; gap:10px;">
+      <button onclick="hbConfirmAddExtraRoom()" class="btn btn-primary" style="flex:1;">Додати</button>
+      <button onclick="hbCloseAddRoomModal()" class="btn btn-ghost" style="flex:1;">Скасувати</button>
+    </div>
+  </div>
+</div>
+
+<div id="hbLinkModal" class="hb-modal-overlay app-hidden" style="z-index:420;">
+  <div class="hb-modal-card">
+    <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">Пов'язати заявку №<span id="hbLinkFromRequest" style="color:#7c3aed;"></span></h2>
+    <p style="font-size:13px; color:#6b7280; margin-bottom:12px;">Позначте заявки, які належать до тієї самої компанії — при наведенні на кімнату всі пов'язані кімнати підсвітяться.</p>
+    <input id="hbLinkSearchInput" type="text" placeholder="🔍 Пошук за номером заявки…" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:10px; font-size:14px; margin-bottom:10px;">
+    <div id="hbLinkOptionsList" style="display:flex; flex-direction:column; gap:6px; max-height:240px; overflow-y:auto; margin-bottom:14px;"></div>
+    <div style="display:flex; gap:10px;">
+      <button onclick="hbSaveLinkSelection()" class="btn btn-primary" style="flex:1; background:#7c3aed;">Зберегти зв'язок</button>
+      <button onclick="hbCloseLinkModal()" class="btn btn-ghost" style="flex:1;">Закрити</button>
+    </div>
+  </div>
+</div>
+
+<div id="hbYesNoModal" class="hb-modal-overlay app-hidden" style="z-index:450;">
+  <div class="hb-modal-card">
+    <p id="hbYesNoMessage" style="font-size:15px; margin-bottom:20px;"></p>
+    <div style="display:flex; gap:10px;">
+      <button id="hbYesNoYesBtn" class="btn btn-primary" style="flex:1;">Так</button>
+      <button id="hbYesNoNoBtn" class="btn btn-ghost" style="flex:1;">Ні</button>
+    </div>
+  </div>
+</div>
+
+<div id="hbPlannerModal" class="hb-modal-overlay app-hidden" style="z-index:420;">
+  <div class="hb-modal-card" style="max-width:640px;">
+    <h2 style="font-size:20px; font-weight:700; margin-bottom:4px;">🧩 Підказчик розселення</h2>
+    <p style="font-size:13px; color:#6b7280; margin-bottom:8px;">Введіть заявки, які ще треба розселити. Підказчик спочатку спробує заповнити кімнати, що вже шукають сусіда, а потім підбере найменшу підходящу вільну кімнату для решти.</p>
+    <p style="font-size:12px; background:#eff6ff; border:1px solid #93c5fd; border-radius:8px; padding:8px 10px; margin-bottom:14px;">🌊 <b>SV (море, Konstantin)</b> — тільки номери 104, 105, 204, 205, 304, 305 (3-місні, +30€ до заявки). Напиши "море" чи "SV" у полі побажань, щоб підказчик рекомендував саме ці номери.</p>
+    <div id="hbPlannerSeekingInfo" style="margin-bottom:14px;"></div>
+    <div style="font-weight:600; font-size:14px; margin-bottom:8px;">Нові заявки для розселення:</div>
+    <div id="hbPlannerDemandRows" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+      <button onclick="hbAddDemandRow()" class="btn btn-ghost btn-small">➕ Додати заявку</button>
+      <button onclick="hbLoadDemandsFromBaseList()" class="btn btn-ghost btn-small">📋 Завантажити з базового списку (ще не поселені)</button>
+    </div>
+    <button onclick="hbComputePlanSuggestions()" class="btn btn-primary" style="width:100%; margin-bottom:14px;">🔍 Порахувати варіант</button>
+    <p style="font-size:11px; color:#9ca3af; margin-bottom:10px;">⚠️ Підказчик враховує лише загальну кількість людей у заявці.</p>
+    <div id="hbPlannerResults" style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;"></div>
+    <button onclick="hbClosePlannerModal()" class="btn btn-ghost" style="width:100%;">Закрити</button>
+  </div>
+</div>
+
+<div id="hbWizardModal" class="hb-modal-overlay app-hidden" style="z-index:420;">
+  <div class="hb-modal-card" style="max-width:760px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <h2 style="font-size:19px; font-weight:700; margin:0;">👥 Розселити по черзі</h2>
+      <span id="hbWizardProgress" class="muted" style="font-size:13px;"></span>
+    </div>
+    <div id="hbWizardGroupCard" style="margin-bottom:12px;"></div>
+
+    <div style="display:flex; gap:6px; margin-bottom:10px;">
+      <button id="hbWizardTabHotelBtn" onclick="hbWizardSwitchTab('hotel')" class="btn btn-small" style="flex:1;">🏨 Структура готелю</button>
+      <button id="hbWizardTabGroupBtn" onclick="hbWizardSwitchTab('group')" class="btn btn-small" style="flex:1;">👥 Список групи</button>
+    </div>
+
+    <div id="hbWizardTabHotel">
+      <div id="hbWizardHotelSelectorWrap" style="margin-bottom:8px;">
+        <label style="font-weight:600; font-size:13px;">🏨 Готель:
+          <select id="hbWizardHotelSelect" onchange="hbWizardHotelChanged()" style="margin-left:6px; padding:6px 8px; border:2px solid var(--line); border-radius:8px;">
+            <option value="konstantin">Hotel Konstantin 3*</option>
+            <option value="greataleksander">Great Aleksander 3*</option>
+          </select>
+        </label>
+      </div>
+      <div id="hbWizardRoomsGrid" style="display:flex; flex-direction:column; gap:12px; max-height:360px; overflow-y:auto; padding-right:4px;"></div>
+      <div id="hbWizardSelectionPanel" style="margin-top:12px;"></div>
+    </div>
+
+    <div id="hbWizardTabGroup" style="display:none;">
+      <div id="hbWizardGroupTable"></div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button onclick="hbWizardSkip()" class="btn btn-ghost" style="flex:1;">⏭ Пропустити (розселю пізніше)</button>
+      <button onclick="hbCloseWizard()" class="btn btn-ghost" style="flex:1;">✕ Закрити</button>
+    </div>
+  </div>
+</div>
 
 <footer class="savebar no-print app-hidden" id="appFooter">
   <span class="save-status" id="saveStatus">—</span>
@@ -832,6 +1018,7 @@ function renderTripGrid(){
       if(currentSection==='tourists'){ await loadTourists(); renderTouristSection(); }
       if(currentSection==='finance'){ await renderFinanceSection(); }
       if(currentSection==='managerReport'){ await renderManagerReportSection(); }
+      if(currentSection==='tripPrep'){ await renderTripPrepSection(); }
     });
     grid.appendChild(chip);
   });
@@ -1734,10 +1921,12 @@ function renderSectionTabs(){
   document.getElementById('sectionTouristsBtn').classList.toggle('active-tab', currentSection==='tourists');
   document.getElementById('sectionFinanceBtn').classList.toggle('active-tab', currentSection==='finance');
   document.getElementById('sectionManagerReportBtn').classList.toggle('active-tab', currentSection==='managerReport');
+  document.getElementById('sectionTripPrepBtn').classList.toggle('active-tab', currentSection==='tripPrep');
   document.getElementById('profitSection').style.display = currentSection==='profit' ? 'block' : 'none';
   document.getElementById('touristSection').style.display = currentSection==='tourists' ? 'block' : 'none';
   document.getElementById('financeSection').style.display = currentSection==='finance' ? 'block' : 'none';
   document.getElementById('managerReportSection').style.display = currentSection==='managerReport' ? 'block' : 'none';
+  document.getElementById('tripPrepSection').style.display = currentSection==='tripPrep' ? 'block' : 'none';
 }
 document.getElementById('sectionProfitBtn').addEventListener('click', ()=>{ currentSection='profit'; renderSectionTabs(); });
 document.getElementById('sectionTouristsBtn').addEventListener('click', async ()=>{
@@ -1760,6 +1949,10 @@ document.getElementById('sectionFinanceBtn').addEventListener('click', async ()=
 document.getElementById('sectionManagerReportBtn').addEventListener('click', async ()=>{
   currentSection='managerReport'; renderSectionTabs();
   await renderManagerReportSection();
+});
+document.getElementById('sectionTripPrepBtn').addEventListener('click', async ()=>{
+  currentSection='tripPrep'; renderSectionTabs();
+  await renderTripPrepSection();
 });
 
 function renderGuideFilterChips(){
@@ -3379,6 +3572,2689 @@ async function renderSkiatosManifest(){
     await addDriverToManifest(currentTripId, first, last);
     renderSkiatosManifest();
   });
+}
+
+/* ============================================================
+   TRIP PREP DOCUMENTS MODULE (manager-only)
+   Import the base tourist/agency ledger, allocate unbreakable groups
+   into hotel rooms and buses (system suggests, manager confirms),
+   then export the finished documents.
+   ============================================================ */
+let tripPrepData = { tourists: [], rooms: [] };
+let tripPrepView = 'overview';
+let tripPrepRoomHotelFilter = '';
+const TRIP_PREP_HOTELS = ['Hotel Konstantin 3*', 'Hotel Great Aleksander 3*'];
+const DEFAULT_HOTEL_STRUCTURE = [{"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "101", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "102", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "103", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "104", "capacity": 3, "notes": "двоспальне односпальне (море)"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "105", "capacity": 3, "notes": "односпальне односпальне односпальне (море)"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "106", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "107", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "108", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "109", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "110", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "111", "capacity": 3, "notes": "односпальне односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "112", "capacity": 3, "notes": "двоспальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "113", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 1", "room_number": "114", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "201", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "202", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "203", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "204", "capacity": 3, "notes": "односпальне односпальне односпальне (море)"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "205", "capacity": 3, "notes": "односпальне односпальне односпальне (море)"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "206", "capacity": 3, "notes": "односпальне односпальне + extra bed"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "207", "capacity": 3, "notes": "односпальне односпальне + extra bed"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "208", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "209", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "210", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "211", "capacity": 3, "notes": "двоспальне односпальне + extra bed"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "212", "capacity": 3, "notes": "двоспальне односпальне + extra bed"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "213", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 2", "room_number": "214", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "301", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "302", "capacity": 3, "notes": "односпальне односпальне + extra bed"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "303", "capacity": 3, "notes": "односпальне односпальне + extra bed"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "304", "capacity": 3, "notes": "двоспальне односпальне (море)"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "305", "capacity": 3, "notes": "односпальне односпальне односпальне (море)"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "306", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "307", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "308", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "309", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "310", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "311", "capacity": 3, "notes": "двоспальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "312", "capacity": 3, "notes": "двоспальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "313", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Konstantin 3*", "floor": "Поверх 3", "room_number": "314", "capacity": 3, "notes": "двоспальне (без спинки) + extra bed"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "101", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "102", "capacity": 3, "notes": "односпальне односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "103", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "104", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "105", "capacity": 3, "notes": "односпальне односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "106", "capacity": 3, "notes": "односпальне односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "107", "capacity": 3, "notes": "односпальне односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "108", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "109", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "110", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 1", "room_number": "111", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "201", "capacity": 5, "notes": "family"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "202", "capacity": 3, "notes": "односпальне односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "203", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "204", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "205", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "206", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "207", "capacity": 2, "notes": "односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "208", "capacity": 3, "notes": "односпальне односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "209", "capacity": 3, "notes": "односпальне односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "210", "capacity": 3, "notes": "односпальне односпальне односпальне"}, {"hotel": "Hotel Great Aleksander 3*", "floor": "Поверх 2", "room_number": "211", "capacity": 2, "notes": "односпальне односпальне"}];
+
+function normalizeHeaderText(h){
+  return String(h||'').trim().toLowerCase().replace(/['"ʼ’]/g,'').replace(/\s+/g,' ');
+}
+function findHeaderKey(headers, candidates){
+  for(const cand of candidates){
+    const nc = normalizeHeaderText(cand);
+    const found = headers.find(h => normalizeHeaderText(h) === nc);
+    if(found) return found;
+  }
+  return null;
+}
+
+async function loadTripPrepData(tripId){
+  const { data: tourists, error:e1 } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', tripId).order('row_order');
+  const { data: rooms, error:e2 } = await sb.from('trip_prep_rooms').select('*').eq('trip_id', tripId);
+  if(e1) console.error(e1);
+  if(e2) console.error(e2);
+  return { tourists: tourists||[], rooms: rooms||[] };
+}
+
+function tripPrepGroups(){
+  const groups = {};
+  tripPrepData.tourists.forEach(t=>{
+    const key = t.link_group || t.id;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+  return groups;
+}
+
+async function importTripPrepFile(file, tripId, targetHotel){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, {defval:'', raw:true});
+  if(!rows.length){ alert('Файл порожній.'); return false; }
+  const headers = Object.keys(rows[0]);
+  const sheetMerges = sheet['!merges'] || []; // merged cell ranges — used to auto-detect "same company" groupings
+
+  const keyBooking = findHeaderKey(headers, ['Номер заявки','№ заявки','Заявка']);
+  const keyName = findHeaderKey(headers, ["Прізвище та ім'я","Прізвище ім'я","ПІБ"]);
+  const keyBirth = findHeaderKey(headers, ['Дата народження','ДН']);
+  const keyPassport = findHeaderKey(headers, ['Паспорт']);
+  const keyAgency = findHeaderKey(headers, ['Агенція']);
+  const keyInsurance = findHeaderKey(headers, ['Страхівка']);
+  const keyTariff = findHeaderKey(headers, ['Тариф']);
+  const keyTourFee = findHeaderKey(headers, ['Тур.збір','Тур збір']);
+  const keyCommission = findHeaderKey(headers, ['Комісія']);
+  const keyAmountDue = findHeaderKey(headers, ['До сплати']);
+  const keyPaid = findHeaderKey(headers, ['Сплачено']);
+  const keyRemaining = findHeaderKey(headers, ['Залишок до сплати','Залишок']);
+  const keyComment = findHeaderKey(headers, ['Коментар']);
+  const keyCity = findHeaderKey(headers, ['Місце посадки','Місто посадки','Посадка']);
+  const keyPhone = findHeaderKey(headers, ['Телефон']);
+  const keyLinkedBooking = findHeaderKey(headers, ["Пов'язана заявка", "Пов'язані заявки", 'Компанія', 'Одна компанія']);
+  const keyConnected = findHeaderKey(headers, ['Connected', "З'єднано", 'Група']);
+
+  if(!keyName){ alert('Не знайшов колонку з ПІБ (очікую заголовок типу "Прізвище та ім\'я"). Перевір файл.'); return false; }
+
+  let lastBooking = '';
+  let lastConnected = '';
+  const parsed = rows.map((r, idx)=>{
+    let booking = keyBooking ? String(r[keyBooking]||'').trim() : '';
+    if(booking) lastBooking = booking; else booking = lastBooking;
+    let connected = keyConnected ? String(r[keyConnected]||'').trim() : '';
+    if(connected) lastConnected = connected; else connected = lastConnected;
+    return {
+      row_order: idx,
+      booking_number: booking,
+      connected_group: connected,
+      full_name: keyName ? String(r[keyName]||'').trim() : '',
+      birth_date: keyBirth ? normalizeDateValue(r[keyBirth]) : null,
+      passport: keyPassport ? String(r[keyPassport]||'').trim() : '',
+      agency: keyAgency ? String(r[keyAgency]||'').trim() : '',
+      insurance: keyInsurance ? parseDecimalInput(r[keyInsurance]) : 0,
+      tariff: keyTariff ? parseDecimalInput(r[keyTariff]) : 0,
+      tour_fee: keyTourFee ? parseDecimalInput(r[keyTourFee]) : 0,
+      commission: keyCommission ? parseDecimalInput(r[keyCommission]) : 0,
+      amount_due: keyAmountDue ? parseDecimalInput(r[keyAmountDue]) : 0,
+      paid: keyPaid ? parseDecimalInput(r[keyPaid]) : 0,
+      remaining: keyRemaining ? parseDecimalInput(r[keyRemaining]) : 0,
+      comment: keyComment ? String(r[keyComment]||'').trim() : '',
+      pickup_city: keyCity ? String(r[keyCity]||'').trim() : '',
+      phone: keyPhone ? String(r[keyPhone]||'').trim() : '',
+      linked_booking_raw: keyLinkedBooking ? String(r[keyLinkedBooking]||'').trim() : '',
+      target_hotel: targetHotel || '',
+    };
+  }).filter(r=>r.full_name);
+
+  // Union-find: merge booking numbers that are mentioned together in a comment
+  // (e.g. "Разом #7617 #7621 #7623") so linked applications never get split apart.
+  const parent = {};
+  function find(x){ while(parent[x] && parent[x]!==x) x=parent[x]; return x; }
+  function union(a,b){ const ra=find(a), rb=find(b); if(ra!==rb) parent[ra]=rb; }
+  parsed.forEach(r=>{ if(r.booking_number && !(r.booking_number in parent)) parent[r.booking_number]=r.booking_number; });
+  parsed.forEach(r=>{
+    const matches = (r.comment.match(/#\d+/g)||[]).map(s=>s.slice(1));
+    if(matches.length && r.booking_number){
+      matches.forEach(m=>{ if(!(m in parent)) parent[m]=m; union(r.booking_number, m); });
+    }
+    if(r.linked_booking_raw && r.booking_number){
+      const linkedNums = (r.linked_booking_raw.match(/\d+/g)||[]);
+      linkedNums.forEach(m=>{ if(!(m in parent)) parent[m]=m; union(r.booking_number, m); });
+    }
+  });
+  // Group by the explicit "Connected" column value (e.g. "к1", "к2"), if present.
+  if(keyConnected){
+    const byConnected = {};
+    parsed.forEach(r=>{
+      if(!r.connected_group || !r.booking_number) return;
+      if(!byConnected[r.connected_group]) byConnected[r.connected_group] = [];
+      byConnected[r.connected_group].push(r.booking_number);
+    });
+    Object.values(byConnected).forEach(nums=>{
+      const uniq = [...new Set(nums)];
+      uniq.forEach(n=>{ if(!(n in parent)) parent[n]=n; });
+      for(let i=1;i<uniq.length;i++) union(uniq[0], uniq[i]);
+    });
+  }
+  // Auto-detect "same company, different applications" from merged cells in the source
+  // file (the colored bar spanning several rows) — no manual work needed for these.
+  sheetMerges.forEach(m=>{
+    if(m.e.r <= m.s.r) return; // only ranges spanning multiple rows matter here
+    const startDataIdx = m.s.r - 1; // row 0 in the sheet is the header
+    const endDataIdx = m.e.r - 1;
+    const spanned = new Set();
+    for(let i=startDataIdx; i<=endDataIdx; i++){
+      if(parsed[i] && parsed[i].booking_number) spanned.add(parsed[i].booking_number);
+    }
+    if(spanned.size > 1){
+      const arr = [...spanned];
+      arr.forEach(b=>{ if(!(b in parent)) parent[b]=b; });
+      for(let i=1;i<arr.length;i++) union(arr[0], arr[i]);
+    }
+  });
+  parsed.forEach((r,idx)=>{ r.link_group = r.booking_number ? find(r.booking_number) : ('row-'+idx); });
+
+  let delQuery = sb.from('trip_prep_tourists').delete().eq('trip_id', tripId);
+  delQuery = targetHotel ? delQuery.eq('target_hotel', targetHotel) : delQuery.eq('target_hotel', '');
+  const { error: delErr } = await delQuery;
+  if(delErr){ alert('Помилка при очищенні старих даних: '+friendlyErrorMessage(delErr)); return false; }
+  const chunkSize = 200;
+  for(let i=0;i<parsed.length;i+=chunkSize){
+    const chunk = parsed.slice(i,i+chunkSize).map(r=>({ trip_id: tripId, ...r }));
+    const { error } = await sb.from('trip_prep_tourists').insert(chunk);
+    if(error){ alert('Помилка імпорту: '+friendlyErrorMessage(error)); return false; }
+  }
+  const groupCount = new Set(parsed.map(r=>r.link_group)).size;
+  alert(`Імпортовано ${parsed.length} туристів, ${groupCount} непорушних груп.`);
+  return true;
+}
+
+async function assignGroupToRoom(groupKey, roomId, hotelName){
+  const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey).map(t=>t.id);
+  const { error } = await sb.from('trip_prep_tourists').update({ assigned_room_id: roomId, assigned_hotel: hotelName }).in('id', ids);
+  if(error) alert('Не вдалося призначити: '+friendlyErrorMessage(error));
+}
+async function unassignGroupFromRoom(groupKey){
+  const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey).map(t=>t.id);
+  const { error } = await sb.from('trip_prep_tourists').update({ assigned_room_id: null, assigned_hotel: '' }).in('id', ids);
+  if(error) alert('Не вдалося скасувати: '+friendlyErrorMessage(error));
+}
+async function assignGroupToBus(groupKey, busName){
+  const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey).map(t=>t.id);
+  const { error } = await sb.from('trip_prep_tourists').update({ assigned_bus: busName }).in('id', ids);
+  if(error) alert('Не вдалося призначити: '+friendlyErrorMessage(error));
+}
+async function unassignGroupFromBus(groupKey){
+  const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey).map(t=>t.id);
+  const { error } = await sb.from('trip_prep_tourists').update({ assigned_bus: '' }).in('id', ids);
+  if(error) alert('Не вдалося скасувати: '+friendlyErrorMessage(error));
+}
+
+async function renderTripPrepSection(){
+  const block = document.getElementById('tripPrepBlock');
+  let def = currentTripId ? TRIPS_DEF.find(d=>d.id===currentTripId) : null;
+  if(!def || new Date() >= def.start){
+    const nextUpcoming = TRIPS_DEF.find(d=> new Date() < d.start);
+    if(!nextUpcoming){
+      block.innerHTML = `<p class="report-note">Немає запланованих майбутніх заїздів.</p>`;
+      return;
+    }
+    currentTripId = nextUpcoming.id;
+    def = nextUpcoming;
+    renderAll();
+  }
+  block.innerHTML = `<p class="report-note">Завантаження…</p>`;
+  if(!state.trips[currentTripId]) await loadTripData(currentTripId);
+  tripPrepData = await loadTripPrepData(currentTripId);
+  renderTripPrepView();
+}
+
+function renderTripPrepView(){
+  const block = document.getElementById('tripPrepBlock');
+  const navHtml = `<div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">
+    <button class="btn btn-ghost btn-small ${tripPrepView==='overview'?'active-tab':''}" data-tpview="overview">Огляд і імпорт</button>
+    <button class="btn btn-ghost btn-small ${tripPrepView==='rooms'?'active-tab':''}" data-tpview="rooms">Готель</button>
+    <button class="btn btn-ghost btn-small ${tripPrepView==='buses'?'active-tab':''}" data-tpview="buses">Автобуси</button>
+    <button class="btn btn-ghost btn-small ${tripPrepView==='docs'?'active-tab':''}" data-tpview="docs">Документи</button>
+  </div>
+  <div id="tripPrepContent"></div>`;
+  block.innerHTML = navHtml;
+  block.querySelectorAll('[data-tpview]').forEach(el=> el.addEventListener('click', ()=>{ tripPrepView = el.dataset.tpview; renderTripPrepView(); }));
+  if(tripPrepView==='overview') renderTripPrepOverview();
+  else if(tripPrepView==='rooms') renderTripPrepRooms();
+  else if(tripPrepView==='buses') renderTripPrepBuses();
+  else if(tripPrepView==='docs') renderTripPrepDocs();
+}
+
+function renderTripPrepOverview(){
+  const content = document.getElementById('tripPrepContent');
+  const groups = tripPrepGroups();
+  const groupKeys = Object.keys(groups);
+
+  const buildRowHtml = (gk)=>{
+    const members = groups[gk];
+    const names = members.map(m=>m.full_name).join(', ');
+    const agencies = [...new Set(members.map(m=>m.agency).filter(Boolean))].join(', ');
+    const cities = [...new Set(members.map(m=>m.pickup_city).filter(Boolean))].join(', ');
+    const debt = members.reduce((s,m)=>s+(Number(m.remaining)||0),0);
+    const distinctBookings = members.map(m=>m.booking_number).filter((v,i,a)=>a.indexOf(v)===i && v);
+    const bookingHtml = distinctBookings.length > 1
+      ? distinctBookings.map(b=>`<span style="display:inline-flex; align-items:center; gap:4px; background:var(--whitewash-2); border-radius:6px; padding:2px 6px; margin:1px;">${b}<button class="no-print" data-role="tpUnmergeBooking" data-group="${gk}" data-booking="${b}" title="Роз'єднати цю заявку з групи" style="border:none; background:none; color:#b45309; cursor:pointer; font-weight:700;">✕</button></span>`).join('')
+      : (distinctBookings[0] || '—');
+    return `<tr>
+      <td class="no-print"><input type="checkbox" class="tp-group-cb" data-group="${gk}"></td>
+      <td style="text-align:left;">${bookingHtml}</td>
+      <td style="text-align:left;">${names}</td>
+      <td>${members.length}</td>
+      <td style="text-align:left;">${agencies||'—'}</td>
+      <td style="text-align:left;">${cities||'—'}</td>
+      <td>${members[0].assigned_bus||'—'}</td>
+      <td>${debt>0 ? `<span class="profit-neg">${fmt(debt)} €</span>` : `<span class="profit-pos">0 €</span>`}</td>
+    </tr>`;
+  };
+
+  const buildTableHtml = (title, keys)=>{
+    const touristCount = keys.reduce((s,gk)=>s+groups[gk].length,0);
+    return `
+      <p class="report-title">${title} — груп: ${keys.length}, туристів: ${touristCount}</p>
+      <div class="table-scroll">
+        <table class="report-table" style="font-size:12px; margin-bottom:20px;">
+          <thead><tr><th class="no-print"></th><th style="text-align:left;">Заявка</th><th style="text-align:left;">ПІБ</th><th>К-ть</th><th style="text-align:left;">Агенція</th><th style="text-align:left;">Місто</th><th>Автобус</th><th>Борг</th></tr></thead>
+          <tbody>${keys.map(buildRowHtml).join('') || '<tr><td colspan="8" class="muted">Ще нічого не завантажено.</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  };
+
+  const konstantinKeys = groupKeys.filter(gk=>groups[gk][0].target_hotel==='konstantin');
+  const greatKeys = groupKeys.filter(gk=>groups[gk][0].target_hotel==='greataleksander');
+  const otherKeys = groupKeys.filter(gk=>!['konstantin','greataleksander'].includes(groups[gk][0].target_hotel));
+
+  content.innerHTML = `
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <p class="step-title">Завантажити базові файли (окремо по готелях)</p>
+      <p class="report-note">Excel зі списком туристів (Номер заявки, ПІБ, Дата народження, Паспорт, Агенція, оплата, коментар, і за бажанням — Місце посадки, Телефон, Пов'язана заявка). Кожен файл перезаписує список саме того готелю, не чіпаючи другий.</p>
+      <p class="report-note">Система сама розпізнає, які заявки — одна компанія: за колонкою <b>"Connected"</b> (код групи типу "к1", "к2"), за об'єднаними клітинками у файлі, за згадками "#номер" у коментарі, або за колонкою "Пов'язана заявка". Якщо десь помилилась — постав галочки й об'єднай вручну, або натисни ✕ біля номера заявки в таблиці, щоб роз'єднати.</p>
+      <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:8px;">
+        <div>
+          <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">🏨 Hotel Konstantin 3*</label>
+          <input type="file" accept=".xlsx,.xls" id="tripPrepFileInputKonstantin">
+        </div>
+        <div>
+          <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">🏨 Great Aleksander 3*</label>
+          <input type="file" accept=".xlsx,.xls" id="tripPrepFileInputGreat">
+        </div>
+      </div>
+      <div id="tripPrepImportStatus" class="report-note" style="margin-top:6px;"></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+        <button class="btn btn-danger-ghost btn-small" id="tpClearKonstantinBtn">🗑️ Очистити список Konstantin</button>
+        <button class="btn btn-danger-ghost btn-small" id="tpClearGreatBtn">🗑️ Очистити список Great Aleksander</button>
+        <button class="btn btn-danger-ghost btn-small" id="tpClearTouristsBtn">🗑️ Очистити обидва</button>
+      </div>
+    </div>
+    <p class="report-note">Якщо дві чи більше заявок насправді одна компанія (у файлі позначено кольором/смугою, а не текстом у коментарі) — постав галочки навпроти них (в одній з таблиць нижче) і натисни "Об'єднати".</p>
+    <div class="no-print" style="margin-bottom:8px;"><button class="btn btn-ghost btn-small" id="tpMergeGroupsBtn">🔗 Об'єднати вибрані групи</button></div>
+    ${buildTableHtml('🏨 Hotel Konstantin 3*', konstantinKeys)}
+    ${buildTableHtml('🏨 Great Aleksander 3*', greatKeys)}
+    ${otherKeys.length ? buildTableHtml('❓ Без прив\'язки до готелю (старі дані)', otherKeys) : ''}
+  `;
+  document.getElementById('tripPrepFileInputKonstantin').addEventListener('change', async e=>{
+    const file = e.target.files[0]; if(!file) return;
+    const statusEl = document.getElementById('tripPrepImportStatus');
+    statusEl.textContent = 'Імпортую (Konstantin)…';
+    const ok = await importTripPrepFile(file, currentTripId, 'konstantin');
+    if(ok){ tripPrepData = await loadTripPrepData(currentTripId); renderTripPrepView(); }
+    else statusEl.textContent = '';
+  });
+  document.getElementById('tripPrepFileInputGreat').addEventListener('change', async e=>{
+    const file = e.target.files[0]; if(!file) return;
+    const statusEl = document.getElementById('tripPrepImportStatus');
+    statusEl.textContent = 'Імпортую (Great Aleksander)…';
+    const ok = await importTripPrepFile(file, currentTripId, 'greataleksander');
+    if(ok){ tripPrepData = await loadTripPrepData(currentTripId); renderTripPrepView(); }
+    else statusEl.textContent = '';
+  });
+  document.getElementById('tpClearTouristsBtn').addEventListener('click', async ()=>{
+    if(!confirm('Точно видалити весь список учасників цього заїзду (обидва готелі)? Це не можна скасувати.')) return;
+    const { error } = await sb.from('trip_prep_tourists').delete().eq('trip_id', currentTripId);
+    if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepView();
+  });
+  document.getElementById('tpClearKonstantinBtn').addEventListener('click', async ()=>{
+    if(!confirm('Точно видалити список учасників для Konstantin? Great Aleksander не постраждає.')) return;
+    const { error } = await sb.from('trip_prep_tourists').delete().eq('trip_id', currentTripId).eq('target_hotel', 'konstantin');
+    if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepView();
+  });
+  document.getElementById('tpClearGreatBtn').addEventListener('click', async ()=>{
+    if(!confirm('Точно видалити список учасників для Great Aleksander? Konstantin не постраждає.')) return;
+    const { error } = await sb.from('trip_prep_tourists').delete().eq('trip_id', currentTripId).eq('target_hotel', 'greataleksander');
+    if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepView();
+  });
+  document.getElementById('tpMergeGroupsBtn').addEventListener('click', async ()=>{
+    const checked = Array.from(content.querySelectorAll('.tp-group-cb:checked')).map(cb=>cb.dataset.group);
+    if(checked.length < 2){ alert('Постав галочки щонайменше на двох групах, які треба об\'єднати.'); return; }
+    const newKey = checked[0];
+    const idsToUpdate = [];
+    checked.forEach(gk=>{
+      (groups[gk]||[]).forEach(m=> idsToUpdate.push(m.id));
+    });
+    const { error } = await sb.from('trip_prep_tourists').update({ link_group: newKey }).in('id', idsToUpdate);
+    if(error){ alert('Не вдалося об\'єднати: ' + friendlyErrorMessage(error)); return; }
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepView();
+  });
+  content.querySelectorAll('[data-role="tpUnmergeBooking"]').forEach(el=> el.addEventListener('click', async e=>{
+    e.stopPropagation();
+    const booking = e.target.dataset.booking;
+    if(!confirm(`Роз'єднати заявку №${booking} з цієї групи?`)) return;
+    const ids = tripPrepData.tourists.filter(t=>t.booking_number===booking).map(t=>t.id);
+    const { error } = await sb.from('trip_prep_tourists').update({ link_group: booking }).in('id', ids);
+    if(error){ alert('Не вдалося роз\'єднати: ' + friendlyErrorMessage(error)); return; }
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepView();
+  }));
+}
+
+function renderTripPrepRooms(){
+  hbRenderRoomsView();
+}
+
+async function renderTripPrepBuses(){
+  const content = document.getElementById('tripPrepContent');
+  const groups = tripPrepGroups();
+  const groupKeys = Object.keys(groups);
+  const tripData = getTripData(currentTripId);
+  const busNames = tripData.guides.map(g=>g.name);
+
+  if(!busNames.length){
+    content.innerHTML = `<p class="report-note">Спочатку признач гідів цього заїзду у вкладці "Прибутковість".</p>`;
+    return;
+  }
+  await loadBusSeatData(currentTripId);
+
+  const busCount = {}; const busCities = {};
+  busNames.forEach(b=>{ busCount[b]=0; busCities[b]=new Set(); });
+  groupKeys.forEach(gk=>{
+    const m = groups[gk][0];
+    if(m.assigned_bus && busCount.hasOwnProperty(m.assigned_bus)){
+      busCount[m.assigned_bus] += groups[gk].length;
+      if(m.pickup_city) busCities[m.assigned_bus].add(m.pickup_city);
+    }
+  });
+
+  const unassigned = groupKeys.filter(gk=> !groups[gk][0].assigned_bus);
+  const assigned = groupKeys.filter(gk=> groups[gk][0].assigned_bus);
+
+  const suggestBusForGroup = (city)=>{
+    if(city){
+      const withCity = busNames.filter(b=> busCities[b].has(city));
+      if(withCity.length) return withCity.sort((a,b)=>busCount[a]-busCount[b])[0];
+    }
+    return busNames.slice().sort((a,b)=>busCount[a]-busCount[b])[0];
+  };
+
+  const unassignedHtml = unassigned.map(gk=>{
+    const members = groups[gk];
+    const city = members[0].pickup_city;
+    const suggestion = suggestBusForGroup(city);
+    return `<div class="fin-row" style="flex-wrap:wrap;">
+      <span class="fin-label" style="min-width:220px;">${members.map(m=>m.full_name).join(', ')} <span class="muted">(${members.length} ос.${city ? ', '+city : ''})</span></span>
+      <select data-role="tpBusSelect" data-group="${gk}">
+        ${busNames.map(b=>`<option value="${b}" ${suggestion===b?'selected':''}>${b} (зараз ${busCount[b]} ос.)</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-small no-print" data-role="tpAssignBus" data-group="${gk}">Погодити: ${suggestion}</button>
+    </div>`;
+  }).join('') || `<p class="report-note">Усі групи вже розподілені по автобусах.</p>`;
+
+  const assignedHtml = busNames.map(b=>{
+    const rows = assigned.filter(gk=>groups[gk][0].assigned_bus===b);
+    return `<div style="margin-bottom:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <p style="font-weight:700; margin:0;">${b} — ${busCount[b]} ос.</p>
+        <button class="btn btn-ghost btn-small no-print" data-role="tpOpenSeatChart" data-bus="${b}">🪑 Розсадка</button>
+      </div>
+      ${rows.map(gk=>`<div class="fin-row"><span class="fin-label">${groups[gk].map(m=>m.full_name).join(', ')}</span><button class="btn btn-danger-ghost btn-small no-print" data-role="tpUnassignBus" data-group="${gk}">Скасувати</button></div>`).join('') || '<p class="muted" style="font-size:12px;">Порожньо.</p>'}
+    </div>`;
+  }).join('');
+
+  if(tripPrepBusSeatView && busNames.includes(tripPrepBusSeatView)){
+    renderBusSeatChart(tripPrepBusSeatView);
+    return;
+  }
+
+  const allLayoutNames = [...Object.keys(BUS_LAYOUTS), ...Object.keys(tripPrepBusSeatData.customLayouts||{})];
+  const configPanelHtml = `
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <p class="step-title">Конфігурація автобусів цього заїзду</p>
+      <p class="report-note">Барбі і Жовтий їдуть завжди; Миросик і Окатий — по черзі. Признач GR-слот, фізичний автобус, кордон і часовий слот для кожного гіда.</p>
+      ${busNames.map(b=>{
+        const cfg = tripPrepBusSeatData.fullConfigs[b] || {};
+        return `<div style="display:flex; flex-direction:column; gap:6px; padding:10px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <b style="min-width:90px;">${b}</b>
+            <select data-role="tpBusGrSlot" data-bus="${b}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px;">
+              <option value="">GR-слот</option>
+              ${['GR-1','GR-2','GR-3'].map(g=>`<option value="${g}" ${cfg.gr_slot===g?'selected':''}>${g}</option>`).join('')}
+            </select>
+            <select data-role="tpBusPhysical" data-bus="${b}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px;">
+              <option value="">Фізичний автобус — загальна</option>
+              ${allLayoutNames.map(l=>`<option value="${l}" ${cfg.layout_name===l?'selected':''}>${l}</option>`).join('')}
+            </select>
+            <select data-role="tpBusBorder" data-bus="${b}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px;">
+              <option value="">Кордон</option>
+              ${BORDER_POINTS.map(p=>`<option value="${p}" ${cfg.border_point===p?'selected':''}>${p}</option>`).join('')}
+            </select>
+            <input type="text" data-role="tpBusTimeSlot" data-bus="${b}" placeholder="Часовий слот (10-11)" value="${cfg.time_slot||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:130px;">
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <input type="text" data-role="tpBusGuidePhone" data-bus="${b}" placeholder="Телефон гіда (+380...)" value="${cfg.guide_phone||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:170px;">
+            <input type="text" data-role="tpBusMeetingPoint" data-bus="${b}" placeholder="Місце знаходження автобуса" value="${cfg.meeting_point||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; flex:1; min-width:220px;">
+            <input type="text" data-role="tpBusGatherTime" data-bus="${b}" placeholder="Час збору (05:30)" value="${cfg.gather_time||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:130px;">
+            <input type="text" data-role="tpBusDepartTime" data-bus="${b}" placeholder="Час відправлення (05:45)" value="${cfg.departure_time||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:150px;">
+          </div>
+          <textarea data-role="tpBusPickupText" data-bus="${b}" placeholder="Можливість приєднатись до автобуса (напр.: Стрий - орієнтовно 06:30, заправка ОККО, вул. Болехівська, 49)" rows="3" style="padding:6px; border:2px solid var(--line); border-radius:6px; width:100%; font-family:inherit; font-size:13px;">${cfg.pickup_points_text||''}</textarea>
+          <button class="btn btn-ghost btn-small" data-role="tpSaveBusConfig" data-bus="${b}" style="align-self:flex-start;">Зберегти</button>
+        </div>`;
+      }).join('')}
+      <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <label style="font-size:13px; font-weight:600;">➕ Завантажити схему автобуса-заміни:</label>
+        <input type="text" id="tpCustomBusName" placeholder="Назва автобуса" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:140px;">
+        <input type="file" accept=".xlsx,.xls" id="tpCustomBusUpload">
+      </div>
+    </div>
+  `;
+
+  content.innerHTML = `
+    ${configPanelHtml}
+    <p class="fin-section-title">Ще не розподілені (${unassigned.length})</p>
+    ${unassignedHtml}
+    <p class="fin-section-title">Розподілені по автобусах</p>
+    ${assignedHtml}
+  `;
+
+  content.querySelectorAll('[data-role="tpSaveBusConfig"]').forEach(el=> el.addEventListener('click', async e=>{
+    const b = e.target.dataset.bus;
+    const grSlot = content.querySelector(`[data-role="tpBusGrSlot"][data-bus="${b}"]`).value;
+    const physical = content.querySelector(`[data-role="tpBusPhysical"][data-bus="${b}"]`).value;
+    const border = content.querySelector(`[data-role="tpBusBorder"][data-bus="${b}"]`).value;
+    const timeSlot = content.querySelector(`[data-role="tpBusTimeSlot"][data-bus="${b}"]`).value;
+    const guidePhone = content.querySelector(`[data-role="tpBusGuidePhone"][data-bus="${b}"]`).value;
+    const meetingPoint = content.querySelector(`[data-role="tpBusMeetingPoint"][data-bus="${b}"]`).value;
+    const gatherTime = content.querySelector(`[data-role="tpBusGatherTime"][data-bus="${b}"]`).value;
+    const departTime = content.querySelector(`[data-role="tpBusDepartTime"][data-bus="${b}"]`).value;
+    const pickupText = content.querySelector(`[data-role="tpBusPickupText"][data-bus="${b}"]`).value;
+    const layoutRows = physical ? (BUS_LAYOUTS[physical] || (tripPrepBusSeatData.customLayouts[physical]||{}).rows) : null;
+    const seatCount = layoutRows ? Math.max(...layoutRows.flatMap(r=>r.filter(c=>'seat' in c).map(c=>c.seat))) : (tripPrepBusSeatData.configs[b] || 50);
+    const { error } = await sb.from('bus_seat_configs').upsert({
+      trip_id: currentTripId, bus_name: b, gr_slot: grSlot, layout_name: physical, border_point: border, time_slot: timeSlot, seat_count: seatCount,
+      guide_phone: guidePhone, meeting_point: meetingPoint, gather_time: gatherTime, departure_time: departTime, pickup_points_text: pickupText
+    });
+    if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+    hbShowToast(`✅ Конфігурацію для ${b} збережено`);
+    await loadBusSeatData(currentTripId);
+    renderTripPrepBuses();
+  }));
+  const customUploadEl = document.getElementById('tpCustomBusUpload');
+  if(customUploadEl) customUploadEl.addEventListener('change', async e=>{
+    const file = e.target.files[0]; if(!file) return;
+    const name = document.getElementById('tpCustomBusName').value.trim();
+    if(!name){ alert('Спочатку впиши назву автобуса-заміни.'); return; }
+    const rows = await parseCustomBusLayoutFile(file);
+    if(!rows.length){ alert('Не вдалося прочитати схему з файлу — перевір формат.'); return; }
+    const seatNums = rows.flatMap(r=>r.filter(c=>'seat' in c).map(c=>c.seat));
+    const seatCount = seatNums.length ? Math.max(...seatNums) : 50;
+    const { error } = await sb.from('custom_bus_layouts').insert({ trip_id: currentTripId, name, layout_json: rows, seat_count: seatCount });
+    if(error){ alert('Не вдалося зберегти схему: ' + friendlyErrorMessage(error)); return; }
+    hbShowToast(`✅ Схему "${name}" додано — тепер доступна у списку "Фізичний автобус"`);
+    await loadBusSeatData(currentTripId);
+    renderTripPrepBuses();
+  });
+
+  content.querySelectorAll('[data-role="tpOpenSeatChart"]').forEach(el=> el.addEventListener('click', async e=>{
+    tripPrepBusSeatView = e.target.dataset.bus;
+    await loadBusSeatData(currentTripId);
+    renderTripPrepBuses();
+  }));
+
+  content.querySelectorAll('[data-role="tpAssignBus"]').forEach(el=> el.addEventListener('click', async e=>{
+    const gk = e.target.dataset.group;
+    const sel = content.querySelector(`[data-role="tpBusSelect"][data-group="${gk}"]`);
+    await assignGroupToBus(gk, sel.value);
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepBuses();
+  }));
+  content.querySelectorAll('[data-role="tpUnassignBus"]').forEach(el=> el.addEventListener('click', async e=>{
+    await unassignGroupFromBus(e.target.dataset.group);
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepBuses();
+  }));
+}
+
+/* ---------- Bus seating charts ---------- */
+let tripPrepBusSeatView = null;
+let tripPrepBusSeatData = { assignments: [], configs: {} };
+const BUS_GROUP_COLORS = ['#8b5cf6','#0ea5e9','#ec4899','#22c55e','#f97316','#14b8a6','#eab308','#f43f5e','#6366f1','#84cc16'];
+const BUS_LAYOUTS = {"Барбі": [[{"col": "A", "label": "водій"}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 1}, {"col": "B", "label": "серв"}, {"col": "C", "seat": 2}, {"col": "D", "label": "серв"}, {"col": "G", "seat": 3}, {"col": "H", "label": "серв"}, {"col": "I", "seat": 4}, {"col": "J", "label": "серв"}], [{"col": "A", "seat": 5}, {"col": "C", "seat": 6}, {"col": "G", "seat": 7}, {"col": "I", "seat": 8}], [{"col": "A", "seat": 9}, {"col": "C", "seat": 10}, {"col": "G", "seat": 11}, {"col": "I", "seat": 12}], [{"col": "A", "seat": 13}, {"col": "C", "seat": 14}, {"col": "G", "seat": 15}, {"col": "I", "seat": 16}], [{"col": "A", "seat": 17}, {"col": "C", "seat": 18}, {"col": "G", "seat": 19}, {"col": "I", "seat": 20}], [{"col": "A", "seat": 21}, {"col": "C", "seat": 22}, {"col": "G", "seat": 23}, {"col": "I", "seat": 24}], [{"col": "A", "seat": 25}, {"col": "C", "seat": 26}], [{"col": "A", "seat": 29}, {"col": "C", "seat": 30}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 31}, {"col": "C", "seat": 32}, {"col": "G", "seat": 33}, {"col": "I", "seat": 34}], [{"col": "A", "seat": 35}, {"col": "C", "seat": 36}, {"col": "G", "seat": 37}, {"col": "I", "seat": 38}], [{"col": "A", "seat": 39}, {"col": "C", "seat": 40}, {"col": "G", "seat": 41}, {"col": "I", "seat": 42}], [{"col": "A", "seat": 43}, {"col": "C", "seat": 44}, {"col": "G", "seat": 45}, {"col": "I", "seat": 46}], [{"col": "A", "seat": 47}, {"col": "C", "seat": 48}, {"col": "G", "seat": 49}, {"col": "I", "seat": 50}], [{"col": "A", "seat": 51}, {"col": "C", "seat": 52}, {"col": "G", "seat": 53}, {"col": "I", "seat": 54}], [{"col": "A", "seat": 55}, {"col": "C", "seat": 56}, {"col": "E", "seat": 57}, {"col": "G", "seat": 58}, {"col": "I", "seat": 59}]], "Жовтий": [[{"col": "A", "label": "водій"}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 1}, {"col": "B", "label": "серв"}, {"col": "C", "seat": 2}, {"col": "D", "label": "серв"}, {"col": "G", "seat": 3}, {"col": "H", "label": "серв"}, {"col": "I", "seat": 4}, {"col": "J", "label": "серв"}], [{"col": "A", "seat": 5}, {"col": "C", "seat": 6}, {"col": "G", "seat": 7}, {"col": "I", "seat": 8}], [{"col": "A", "seat": 9}, {"col": "C", "seat": 10}, {"col": "G", "seat": 11}, {"col": "I", "seat": 12}], [{"col": "A", "seat": 13}, {"col": "C", "seat": 14}, {"col": "G", "seat": 15}, {"col": "I", "seat": 16}], [{"col": "A", "seat": 17}, {"col": "C", "seat": 18}, {"col": "G", "seat": 19}, {"col": "I", "seat": 20}], [{"col": "A", "seat": 21}, {"col": "C", "seat": 22}, {"col": "G", "seat": 23}, {"col": "I", "seat": 24}], [{"col": "A", "seat": 25}, {"col": "C", "seat": 26}, {"col": "G", "seat": 27}, {"col": "I", "seat": 28}], [{"col": "A", "seat": 29}, {"col": "C", "seat": 30}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 31}, {"col": "C", "seat": 32}, {"col": "G", "seat": 33}, {"col": "I", "seat": 34}], [{"col": "A", "seat": 35}, {"col": "C", "seat": 36}, {"col": "G", "seat": 37}, {"col": "I", "seat": 38}], [{"col": "A", "seat": 39}, {"col": "C", "seat": 40}, {"col": "G", "seat": 41}, {"col": "I", "seat": 42}], [{"col": "A", "seat": 43}, {"col": "C", "seat": 44}, {"col": "G", "seat": 45}, {"col": "I", "seat": 46}], [{"col": "A", "seat": 47}, {"col": "C", "seat": 48}, {"col": "G", "seat": 49}, {"col": "I", "seat": 50}], [{"col": "A", "seat": 51}, {"col": "C", "seat": 52}, {"col": "G", "seat": 53}, {"col": "I", "seat": 54}], [{"col": "A", "seat": 55}, {"col": "C", "seat": 56}, {"col": "E", "seat": 57}, {"col": "G", "seat": 58}, {"col": "I", "seat": 59}]], "Окатий": [[{"col": "A", "seat": 2}, {"col": "C", "seat": 1}, {"col": "F", "seat": 3}, {"col": "G", "label": "сервіс"}, {"col": "H", "seat": 4}, {"col": "I", "label": "сервіс"}], [{"col": "A", "seat": 6}, {"col": "C", "seat": 5}], [{"col": "A", "seat": 10}, {"col": "C", "seat": 9}, {"col": "F", "seat": 7}, {"col": "H", "seat": 8}], [{"col": "A", "seat": 14}, {"col": "C", "seat": 13}, {"col": "F", "seat": 11}, {"col": "H", "seat": 12}], [{"col": "A", "seat": 18}, {"col": "C", "seat": 17}, {"col": "F", "seat": 15}, {"col": "H", "seat": 16}], [{"col": "A", "seat": 22}, {"col": "C", "seat": 21}, {"col": "F", "seat": 19}, {"col": "H", "seat": 20}], [{"col": "A", "seat": 26}, {"col": "C", "seat": 25}, {"col": "F", "seat": 23}, {"col": "H", "seat": 24}], [{"col": "A", "seat": 30}, {"col": "C", "seat": 29}, {"col": "F", "seat": 27}, {"col": "H", "seat": 28}], [{"col": "A", "seat": 32}, {"col": "C", "seat": 31}], [{"col": "A", "seat": 34}, {"col": "C", "seat": 33}], [{"col": "A", "seat": 38}, {"col": "C", "seat": 37}, {"col": "F", "seat": 35}, {"col": "H", "seat": 36}], [{"col": "A", "seat": 42}, {"col": "C", "seat": 41}, {"col": "F", "seat": 39}, {"col": "H", "seat": 40}], [{"col": "A", "seat": 46}, {"col": "C", "seat": 45}, {"col": "F", "seat": 43}, {"col": "H", "seat": 44}], [{"col": "A", "seat": 50}, {"col": "C", "seat": 49}, {"col": "F", "seat": 57}, {"col": "H", "seat": 48}], [{"col": "A", "seat": 54}, {"col": "C", "seat": 53}, {"col": "F", "seat": 51}, {"col": "H", "seat": 52}], [{"col": "A", "seat": 58}, {"col": "C", "seat": 57}, {"col": "F", "seat": 55}, {"col": "H", "seat": 56}]], "Миросик": [[{"col": "A", "label": "водії"}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 3}, {"col": "B", "label": "серв"}, {"col": "C", "seat": 4}, {"col": "D", "label": "серв"}, {"col": "G", "seat": 1}, {"col": "H", "label": "серв"}, {"col": "I", "seat": 2}, {"col": "J", "label": "серв"}], [{"col": "A", "seat": 7}, {"col": "C", "seat": 8}, {"col": "G", "seat": 5}, {"col": "I", "seat": 6}], [{"col": "A", "seat": 11}, {"col": "C", "seat": 12}, {"col": "G", "seat": 9}, {"col": "I", "seat": 10}], [{"col": "A", "seat": 15}, {"col": "C", "seat": 16}, {"col": "G", "seat": 13}, {"col": "I", "seat": 14}], [{"col": "A", "seat": 19}, {"col": "C", "seat": 20}, {"col": "G", "seat": 17}, {"col": "I", "seat": 18}], [{"col": "A", "seat": 23}, {"col": "C", "seat": 24}, {"col": "G", "seat": 21}, {"col": "I", "seat": 22}], [{"col": "A", "seat": 27}, {"col": "C", "seat": 28}, {"col": "G", "seat": 25}, {"col": "I", "seat": 26}], [{"col": "A", "seat": 29}, {"col": "C", "seat": 30}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 31}, {"col": "C", "seat": 32}], [{"col": "A", "seat": 35}, {"col": "C", "seat": 36}, {"col": "G", "seat": 33}, {"col": "I", "seat": 34}], [{"col": "A", "seat": 39}, {"col": "C", "seat": 40}, {"col": "G", "seat": 37}, {"col": "I", "seat": 38}], [{"col": "A", "seat": 43}, {"col": "C", "seat": 44}, {"col": "G", "seat": 41}, {"col": "I", "seat": 42}], [{"col": "A", "seat": 47}, {"col": "C", "seat": 48}, {"col": "G", "seat": 45}, {"col": "I", "seat": 46}], [{"col": "A", "seat": 51}, {"col": "C", "seat": 52}, {"col": "G", "seat": 49}, {"col": "I", "seat": 50}], [{"col": "A", "seat": 55}, {"col": "C", "seat": 56}, {"col": "G", "seat": 53}, {"col": "I", "seat": 54}], [{"col": "A", "seat": 59}, {"col": "C", "seat": 60}, {"col": "G", "seat": 57}, {"col": "I", "seat": 58}], [{"col": "A", "seat": 61}, {"col": "C", "seat": 62}, {"col": "E", "seat": 63}, {"col": "G", "seat": 64}, {"col": "I", "seat": 65}]]};
+const CORRIDOR_A_CITIES = ['Стрий','Мукачево','Ужгород'];
+const BORDER_POINTS = ['Чоп (Угорщина)','Берегово (Угорщина)','Дяково (Румунія)','Порубне (Румунія)','Красноільськ (Румунія)','Дяківці (Румунія)'];
+
+async function parseCustomBusLayoutFile(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  if(!sheet['!ref']) return [];
+  const range = XLSX.utils.decode_range(sheet['!ref']);
+  const cols = ['A','B','C','D','E','F','G','H','I','J'];
+  const rows = [];
+  for(let r = range.s.r; r <= Math.min(range.e.r, 30); r++){
+    const rowCells = [];
+    cols.forEach(colLetter=>{
+      const addr = colLetter + (r+1);
+      const cell = sheet[addr];
+      if(cell && cell.v !== undefined && cell.v !== null && cell.v !== ''){
+        if(typeof cell.v === 'number') rowCells.push({ col: colLetter, seat: cell.v });
+        else rowCells.push({ col: colLetter, label: String(cell.v) });
+      }
+    });
+    if(rowCells.length){
+      if(rowCells.length===1 && rowCells[0].label && /місць/i.test(rowCells[0].label)) continue;
+      rows.push(rowCells);
+    }
+  }
+  return rows;
+}
+
+const CORRIDOR_B_CITIES = ['Івано-Франківськ','Чернівці'];
+
+function colorForGroupKey(key){
+  let hash=0; for(let i=0;i<String(key).length;i++) hash = (hash*31 + key.charCodeAt(i)) >>> 0;
+  return BUS_GROUP_COLORS[hash % BUS_GROUP_COLORS.length];
+}
+function classifyCorridor(cities){
+  const hasB = cities.some(c=>CORRIDOR_B_CITIES.includes(c));
+  const hasA = cities.some(c=>CORRIDOR_A_CITIES.includes(c));
+  if(hasB) return 'Б (ІФ–Чернівці)'; // Чернівці overrides Львів within the same booking
+  if(hasA) return 'А (Стрий–Мукачево–Ужгород)';
+  return 'не визначено';
+}
+
+async function loadBusSeatData(tripId){
+  const { data: assignments } = await sb.from('bus_seat_assignments').select('*').eq('trip_id', tripId);
+  const { data: configs } = await sb.from('bus_seat_configs').select('*').eq('trip_id', tripId);
+  const { data: customLayouts } = await sb.from('custom_bus_layouts').select('*').eq('trip_id', tripId);
+  const configMap = {}; const layoutMap = {}; const fullConfigMap = {};
+  (configs||[]).forEach(c=>{
+    configMap[c.bus_name] = c.seat_count;
+    layoutMap[c.bus_name] = c.layout_name||'';
+    fullConfigMap[c.bus_name] = {
+      gr_slot: c.gr_slot||'', border_point: c.border_point||'', time_slot: c.time_slot||'', layout_name: c.layout_name||'', seat_count: c.seat_count,
+      guide_phone: c.guide_phone||'', meeting_point: c.meeting_point||'', gather_time: c.gather_time||'', departure_time: c.departure_time||'', pickup_points_text: c.pickup_points_text||''
+    };
+  });
+  const customLayoutMap = {};
+  (customLayouts||[]).forEach(c=> customLayoutMap[c.name] = { rows: c.layout_json, seat_count: c.seat_count, id: c.id });
+  tripPrepBusSeatData = { assignments: assignments||[], configs: configMap, layouts: layoutMap, fullConfigs: fullConfigMap, customLayouts: customLayoutMap };
+}
+
+function renderBusSeatChart(busName){
+  const content = document.getElementById('tripPrepContent');
+  const seatCount = tripPrepBusSeatData.configs[busName] || 50;
+  const layoutName = tripPrepBusSeatData.layouts[busName] || '';
+  const assignmentsByseat = {};
+  tripPrepBusSeatData.assignments.filter(a=>a.bus_name===busName).forEach(a=> assignmentsByseat[a.seat_number] = a);
+
+  const groups = tripPrepGroups();
+  const groupKeys = Object.keys(groups);
+  const inThisBus = groupKeys.filter(gk=>groups[gk][0].assigned_bus===busName);
+  const seatedNames = new Set(Object.values(assignmentsByseat).map(a=>a.full_name));
+  const notYetSeated = inThisBus.flatMap(gk=>groups[gk].map(m=>({ ...m, __gk:gk }))).filter(m=>!seatedNames.has(m.full_name));
+
+  // Sort the "not yet seated" list by corridor priority, respecting the "Чернівці overrides Львів" rule per booking.
+  const corridorByGroup = {};
+  inThisBus.forEach(gk=>{
+    const cities = groups[gk].map(m=>m.pickup_city).filter(Boolean);
+    corridorByGroup[gk] = classifyCorridor(cities);
+  });
+  notYetSeated.sort((a,b)=> (corridorByGroup[a.__gk]||'').localeCompare(corridorByGroup[b.__gk]||''));
+
+  const renderSeatTile = (seatNum)=>{
+    const a = assignmentsByseat[seatNum];
+    const gkForSeat = a ? groupKeys.find(gk=>groups[gk].some(m=>m.full_name===a.full_name)) : null;
+    const color = a ? (gkForSeat ? colorForGroupKey(gkForSeat) : '#9ca3af') : '#e5e7eb';
+    const textColor = a ? '#fff' : '#374151';
+    return `<div onclick="hbBusSeatClick('${busName}',${seatNum})" title="${a?a.full_name:'Вільне місце '+seatNum}" style="width:50px; height:50px; border-radius:8px; background:${color}; color:${textColor}; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:9px; cursor:pointer; text-align:center; padding:2px; position:relative;">
+      ${a && a.paid_seat ? '<span style="position:absolute; top:-4px; right:-4px; background:#facc15; color:#000; font-size:9px; border-radius:9999px; padding:0 3px; font-weight:700;">💰</span>' : ''}
+      <div style="font-weight:700;">${seatNum}</div>
+      ${a ? `<div style="font-size:8px; line-height:1.1;">${a.full_name.split(' ')[0]}</div>` : ''}
+    </div>`;
+  };
+  const renderLabelTile = (label)=>`<div style="width:50px; height:50px; border-radius:8px; background:var(--whitewash-2); color:#9ca3af; display:flex; align-items:center; justify-content:center; font-size:9px; text-align:center; padding:2px;">${label}</div>`;
+
+  let seatsHtml = '';
+  const resolvedLayoutRows = layoutName ? (BUS_LAYOUTS[layoutName] || (tripPrepBusSeatData.customLayouts[layoutName]||{}).rows) : null;
+  if(resolvedLayoutRows){
+    // Exact real layout: render using the file's own column positions.
+    const rows = resolvedLayoutRows;
+    const allCols = [...new Set(rows.flatMap(r=>r.map(c=>c.col)))].sort();
+    seatsHtml = rows.map(row=>{
+      const byCol = {}; row.forEach(c=> byCol[c.col]=c);
+      return `<div style="display:flex; gap:6px; margin-bottom:6px;">` +
+        allCols.map(col=>{
+          const c = byCol[col];
+          if(!c) return `<div style="width:14px;"></div>`;
+          if('seat' in c) return renderSeatTile(c.seat);
+          return renderLabelTile(c.label);
+        }).join('') + `</div>`;
+    }).join('');
+  } else {
+    for(let row=1; row<=Math.ceil(seatCount/4); row++){
+      seatsHtml += `<div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">        <span class="muted" style="width:22px; font-size:11px;">${row}</span>`;
+      for(let col=0; col<4; col++){
+        const seatNum = (row-1)*4 + col + 1;
+        if(seatNum > seatCount){ seatsHtml += `<div style="width:50px;"></div>`; continue; }
+        seatsHtml += renderSeatTile(seatNum);
+        if(col===1) seatsHtml += `<div style="width:14px;"></div>`;
+      }
+      seatsHtml += `</div>`;
+    }
+  }
+
+  const notSeatedHtml = notYetSeated.map(m=>
+    `<div style="font-size:12px; padding:4px 8px; border-radius:6px; background:${colorForGroupKey(m.__gk)}22; border:2px solid ${colorForGroupKey(m.__gk)}; display:inline-block; margin:2px;">${m.full_name} <span class="muted">(${m.pickup_city||'?'})</span></div>`
+  ).join('') || '<span class="muted" style="font-size:12px;">Усі вже розсаджені.</span>';
+
+  content.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <p class="report-title" style="margin:0;">🪑 Розсадка: ${busName}</p>
+      <button class="btn btn-ghost btn-small no-print" id="tpBackToBusesBtn">← Назад до автобусів</button>
+    </div>
+    <div class="no-print" style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
+      <label style="font-size:13px;">Реальна схема:
+        <select id="tpBusLayoutSelect" style="margin-left:4px; padding:4px 6px; border:2px solid var(--line); border-radius:6px;">
+          <option value="">— загальна (без конкретної схеми) —</option>
+          ${Object.keys(BUS_LAYOUTS).map(l=>`<option value="${l}" ${layoutName===l?'selected':''}>${l}</option>`).join('')}
+          ${Object.keys(tripPrepBusSeatData.customLayouts||{}).map(l=>`<option value="${l}" ${layoutName===l?'selected':''}>${l} (завантажена)</option>`).join('')}
+        </select>
+      </label>
+      ${!layoutName ? `<label style="font-size:13px;">Кількість місць: <input type="number" id="tpBusSeatCountInput" value="${seatCount}" style="width:70px; padding:4px 6px; border:2px solid var(--line); border-radius:6px;"></label>` : ''}
+      <button class="btn btn-ghost btn-small" id="tpSaveSeatCountBtn">Зберегти</button>
+      <button class="btn btn-danger-ghost btn-small" id="tpClearSeatChartBtn">🗑️ Очистити розсадку цього автобуса</button>
+    </div>
+    <p class="report-note">Ще не розсаджені (${notYetSeated.length}), відсортовано за коридором (А: Стрий–Мукачево–Ужгород, Б: ІФ–Чернівці; якщо в заявці є і Львів, і Чернівці — вся заявка йде як "Б"):</p>
+    <div style="margin-bottom:14px;">${notSeatedHtml}</div>
+    <div>${seatsHtml}</div>
+  `;
+
+  document.getElementById('tpBackToBusesBtn').addEventListener('click', ()=>{ tripPrepBusSeatView = null; renderTripPrepBuses(); });
+  document.getElementById('tpSaveSeatCountBtn').addEventListener('click', async ()=>{
+    const newLayout = document.getElementById('tpBusLayoutSelect').value;
+    const countInput = document.getElementById('tpBusSeatCountInput');
+    const newLayoutRows = newLayout ? (BUS_LAYOUTS[newLayout] || (tripPrepBusSeatData.customLayouts[newLayout]||{}).rows) : null;
+    const newCount = newLayoutRows
+      ? (newLayoutRows.flatMap(r=>r.filter(c=>'seat' in c)).length ? Math.max(...newLayoutRows.flatMap(r=>r.filter(c=>'seat' in c).map(c=>c.seat))) : 50)
+      : (countInput ? Number(countInput.value)||50 : seatCount);
+    const { error } = await sb.from('bus_seat_configs').upsert({ trip_id: currentTripId, bus_name: busName, seat_count: newCount, layout_name: newLayout });
+    if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+    await loadBusSeatData(currentTripId);
+    renderBusSeatChart(busName);
+  });
+  document.getElementById('tpClearSeatChartBtn').addEventListener('click', async ()=>{
+    if(!confirm(`Точно очистити всю розсадку для "${busName}"? Розподіл груп по автобусах не зміниться, тільки конкретні місця.`)) return;
+    const { error } = await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName);
+    if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
+    await loadBusSeatData(currentTripId);
+    renderBusSeatChart(busName);
+  });
+}
+
+async function hbBusSeatClick(busName, seatNum){
+  const existing = tripPrepBusSeatData.assignments.find(a=>a.bus_name===busName && a.seat_number===seatNum);
+  if(existing){
+    const wantsClear = confirm(`Місце ${seatNum}: ${existing.full_name}.\nOK — звільнити це місце.\nСкасувати — нічого не робити.`);
+    if(wantsClear){
+      await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName).eq('seat_number', seatNum);
+      await loadBusSeatData(currentTripId);
+      renderBusSeatChart(busName);
+    }
+    return;
+  }
+  const name = prompt(`Кого посадити на місце ${seatNum}? (Ім'я Прізвище)`);
+  if(!name || !name.trim()) return;
+  const paidSeat = confirm('Це платне місце? OK — так, Скасувати — ні.');
+  const groups = tripPrepGroups();
+  const matchGk = Object.keys(groups).find(gk=>groups[gk].some(m=>m.full_name.trim().toLowerCase()===name.trim().toLowerCase()));
+  const matchMember = matchGk ? groups[matchGk].find(m=>m.full_name.trim().toLowerCase()===name.trim().toLowerCase()) : null;
+  const { error } = await sb.from('bus_seat_assignments').upsert({
+    trip_id: currentTripId, bus_name: busName, seat_number: seatNum,
+    full_name: name.trim(), booking_number: matchMember ? matchMember.booking_number : '',
+    link_group: matchGk || '', paid_seat: !!paidSeat
+  }, { onConflict: 'trip_id,bus_name,seat_number' });
+  if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+  await loadBusSeatData(currentTripId);
+  renderBusSeatChart(busName);
+}
+
+/* ---------- Reusable document export helpers (Excel / Word / PDF-via-print) ---------- */
+const RICHTOUR_LETTERHEAD = `ПП Агенція подорожей «Річ-Тур»<br>м.Львів вул. Антоновича 120<br>тел.: +380 (050) 370 41 12<br>E-mail: richtourfamily@gmail.com`;
+
+function docExportExcel(headers, rows, sheetName, filename){
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
+}
+
+function docBuildTableHtml(headers, rows){
+  return `<table style="width:100%; border-collapse:collapse;">
+    <thead><tr>${headers.map(h=>`<th style="border:1px solid #333; padding:4px 8px; background:#eee; font-size:12px; text-align:left;">${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td style="border:1px solid #333; padding:4px 8px; font-size:12px;">${c ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function docExportWord(title, bodyHtml, filename){
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"><title>${title}</title></head>
+    <body style="font-family:Calibri, Arial, sans-serif;">${bodyHtml}</body></html>`;
+  const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function docOpenPrintWindow(title, bodyHtml){
+  const win = window.open('', '_blank');
+  if(!win){ alert('Браузер заблокував нове вікно — дозволь спливаючі вікна для друку/PDF.'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+    <style>
+      body{ font-family: Arial, sans-serif; padding: 24px; color:#111; }
+      table{ width:100%; border-collapse:collapse; margin-top:10px; }
+      th,td{ border:1px solid #333; padding:5px 8px; font-size:12px; text-align:left; }
+      th{ background:#eee; }
+      h1{ font-size:18px; margin-bottom:4px; }
+      h2{ font-size:14px; margin:14px 0 6px; }
+      .no-print{ margin-bottom:16px; }
+      @media print { .no-print{ display:none; } }
+    </style>
+  </head><body>
+    <div class="no-print"><button onclick="window.print()" style="padding:10px 18px; font-size:14px; cursor:pointer;">🖨 Друк / Зберегти як PDF</button></div>
+    ${bodyHtml}
+  </body></html>`);
+  win.document.close();
+}
+
+async function renderTripPrepDocs(){
+  const content = document.getElementById('tripPrepContent');
+  content.innerHTML = `<p class="report-note">Завантаження…</p>`;
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const tripLabel = def ? def.label : currentTripId;
+  const period = tripLabel;
+  await loadBusSeatData(currentTripId);
+  const savedHotel = hbCurrentHotel, savedPeriod = hbCurrentPeriod;
+  hbCurrentPeriod = period;
+  await hbLoadBookings();
+  await hbLoadExtraRooms();
+  hbCurrentHotel = savedHotel; hbCurrentPeriod = savedPeriod;
+
+  content.innerHTML = `
+    <p class="report-note">Документи будуються з поточного стану розселення (готель) й розподілу по автобусах.</p>
+    <div style="display:flex; flex-direction:column; gap:10px; align-items:flex-start; margin-top:10px;">
+      <div><b>Рум-лист:</b>
+        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="konstantin" data-fmt="excel">📥 Konstantin — Excel</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="konstantin" data-fmt="word">Word</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="konstantin" data-fmt="pdf">PDF</button>
+      </div>
+      <div>
+        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="greataleksander" data-fmt="excel">📥 Great Aleksander — Excel</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="greataleksander" data-fmt="word">Word</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="greataleksander" data-fmt="pdf">PDF</button>
+      </div>
+      <div><b>Список на кордон (по автобусах):</b>
+        <button class="btn btn-ghost btn-small" data-role="tpDocBorder" data-fmt="excel">📥 Excel</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocBorder" data-fmt="word">Word</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocBorder" data-fmt="pdf">PDF</button>
+      </div>
+      <div><b>Страховки (весь заїзд):</b>
+        <button class="btn btn-ghost btn-small" data-role="tpDocInsurance" data-fmt="excel">📥 Excel</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocInsurance" data-fmt="word">Word</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocInsurance" data-fmt="pdf">PDF</button>
+      </div>
+      <div><b>Список на збір коштів (екскурсії):</b>
+        <button class="btn btn-ghost btn-small" data-role="tpDocExcursionSheet" data-fmt="excel">📥 Excel</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocExcursionSheet" data-fmt="word">Word</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocExcursionSheet" data-fmt="pdf">PDF</button>
+      </div>
+      <div><b>Список по містах посадки (з контактами):</b>
+        <button class="btn btn-ghost btn-small" data-role="tpDocCity" data-fmt="excel">📥 Excel</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocCity" data-fmt="word">Word</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocCity" data-fmt="pdf">PDF</button>
+      </div>
+      <div style="width:100%;"><b>Список боржників (по заявках, з відповідальним гідом і нотатками):</b>
+        <div id="tpDebtorsTableWrap" style="margin:8px 0;"></div>
+        <button class="btn btn-ghost btn-small" data-role="tpDocDebtors" data-fmt="excel">📥 Excel</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocDebtors" data-fmt="word">Word</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocDebtors" data-fmt="pdf">PDF</button>
+      </div>
+      <div><b>Інфолист (по автобусах):</b>
+        <button class="btn btn-ghost btn-small" data-role="tpDocInfoSheet" data-fmt="word">📥 Word</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocInfoSheet" data-fmt="pdf">PDF</button>
+      </div>
+    </div>
+  `;
+
+  // ---------- Rooming list (per hotel, from real room bookings) ----------
+  function buildRoomingRows(hotelKey){
+    const hotelDb = (hbDatabase[hotelKey] && hbDatabase[hotelKey][period]) || [];
+    const allRooms = hbGetAllRoomsForHotel(hotelKey).sort((a,b)=>a.number-b.number);
+    const rows = []; let n = 1;
+    allRooms.forEach(room=>{
+      const entry = hotelDb.find(e=>e.number===room.number);
+      if(!entry || !entry.shares.length) return;
+      entry.shares.forEach(sh=>{
+        const matched = (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===String(sh.requestNum));
+        if(matched.length){
+          matched.forEach((t,idx)=>{
+            const age = t.birth_date && def ? calcAgeAtTrip(t.birth_date, def.start) : '';
+            rows.push([n++, t.full_name, formatDateGreek(t.birth_date)||t.birth_date||'', t.passport||'', age, idx===0?room.number:'']);
+          });
+        } else {
+          rows.push([n++, `Заявка №${sh.requestNum||'?'} (${sh.total} чол)`, '', '', '', room.number]);
+        }
+      });
+    });
+    return rows;
+  }
+
+  content.querySelectorAll('[data-role="tpDocRooming"]').forEach(el=> el.addEventListener('click', e=>{
+    const hotelKey = e.target.dataset.hotel;
+    const docFmt = e.target.dataset.fmt;
+    const hotelLabel = HB_HOTEL_STRUCTURE[hotelKey].name;
+    const rows = buildRoomingRows(hotelKey);
+    const headers = ['№','Name Surname','Date of birth','Passport','Вік','№ кімнати'];
+    const fname = `Rooming_${hotelKey==='konstantin'?'Konstantin':'Great_Aleksander'}_${tripLabel}`;
+    if(docFmt==='excel') docExportExcel(headers, rows, 'Rooming', fname+'.xlsx');
+    else if(docFmt==='word') docExportWord('Rooming', `<h2>${hotelLabel} — ${tripLabel}</h2>${docBuildTableHtml(headers, rows)}`, fname+'.doc');
+    else docOpenPrintWindow('Rooming', `<h1>${hotelLabel}</h1><p>Заїзд: ${tripLabel}</p>${docBuildTableHtml(headers, rows)}`);
+  }));
+
+  // ---------- Border list (per bus/GR) ----------
+  function buildBorderSections(){
+    const tripData = getTripData(currentTripId);
+    return tripData.guides.map(g=>g.name).map(bus=>{
+      const cfg = tripPrepBusSeatData.fullConfigs[bus] || {};
+      const members = (tripPrepData.tourists||[]).filter(t=>t.assigned_bus===bus);
+      let n = 1;
+      const rows = members.map(t=> [n++, t.full_name, t.birth_date ? formatDateDots(t.birth_date) : '', t.passport||'']);
+      return { bus, grSlot: cfg.gr_slot||bus, rows };
+    });
+  }
+  function formatDateDots(iso){ const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : iso; }
+
+  content.querySelectorAll('[data-role="tpDocBorder"]').forEach(el=> el.addEventListener('click', e=>{
+    const docFmt = e.target.dataset.fmt;
+    const sections = buildBorderSections();
+    const headers = ['№ п.п.','Name Surname','Date of birth','Passport'];
+    if(docFmt==='excel'){
+      const wb = XLSX.utils.book_new();
+      sections.forEach(s=>{
+        const ws = XLSX.utils.aoa_to_sheet([[RICHTOUR_LETTERHEAD.replace(/<br>/g,' ')],[],headers, ...s.rows]);
+        XLSX.utils.book_append_sheet(wb, ws, s.grSlot.replace(/[^\w-]/g,'').slice(0,28)||s.bus);
+      });
+      XLSX.writeFile(wb, `Список_на_кордон_${tripLabel}.xlsx`);
+    } else if(docFmt==='word'){
+      const body = sections.map(s=>`<p>${RICHTOUR_LETTERHEAD}</p><h2>${s.grSlot} — ${s.bus}</h2>${docBuildTableHtml(headers, s.rows)}<br>`).join('');
+      docExportWord('Кордон', body, `Список_на_кордон_${tripLabel}.doc`);
+    } else {
+      const body = sections.map(s=>`<p>${RICHTOUR_LETTERHEAD}</p><h1>${s.grSlot} — ${s.bus}</h1>${docBuildTableHtml(headers, s.rows)}<div style="page-break-after:always;"></div>`).join('');
+      docOpenPrintWindow('Кордон', body);
+    }
+  }));
+
+  // ---------- Insurance list (whole trip) ----------
+  content.querySelectorAll('[data-role="tpDocInsurance"]').forEach(el=> el.addEventListener('click', e=>{
+    const docFmt = e.target.dataset.fmt;
+    const headers = ['№','ПІ','Дата народження','Паспорт'];
+    let n=1;
+    const rows = (tripPrepData.tourists||[]).map(t=> [n++, t.full_name, t.birth_date?formatDateDots(t.birth_date):'', t.passport||'']);
+    if(docFmt==='excel') docExportExcel(headers, rows, 'Страховки', `Страховки_${tripLabel}.xlsx`);
+    else if(docFmt==='word') docExportWord('Страховки', `<h2>Страховки — ${tripLabel}</h2>${docBuildTableHtml(headers, rows)}`, `Страховки_${tripLabel}.doc`);
+    else docOpenPrintWindow('Страховки', `<h1>Страховки — ${tripLabel}</h1>${docBuildTableHtml(headers, rows)}`);
+  }));
+
+  // ---------- Excursion collection sheet ----------
+  content.querySelectorAll('[data-role="tpDocExcursionSheet"]').forEach(el=> el.addEventListener('click', e=>{
+    const docFmt = e.target.dataset.fmt;
+    const headers = ['№','Name Surname','Халкідіки 40/25','Скіатос 60/45','Метеори 40/35','Салоніки 30/25','ТрансСалон 25/20','Транс. грязі 15/10','Едесса 40/30','Олімп 35/25'];
+    let n=1;
+    const rows = (tripPrepData.tourists||[]).map(t=> [n++, t.full_name, '','','','','','','','']);
+    const note = 'діти – 3-12 років, дорослі 12 і більше років; діти до 3 років безкоштовно';
+    if(docFmt==='excel'){
+      const ws = XLSX.utils.aoa_to_sheet([['Список на збір коштів'],[note],[],headers, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Збір коштів');
+      XLSX.writeFile(wb, `Список_збору_коштів_${tripLabel}.xlsx`);
+    } else if(docFmt==='word'){
+      docExportWord('Збір коштів', `<h2>Список на збір коштів — ${tripLabel}</h2><p>${note}</p>${docBuildTableHtml(headers, rows)}`, `Список_збору_коштів_${tripLabel}.doc`);
+    } else {
+      docOpenPrintWindow('Збір коштів', `<h1>Список на збір коштів</h1><p>${tripLabel}<br>${note}</p>${docBuildTableHtml(headers, rows)}`);
+    }
+  }));
+
+  // ---------- Pickup city list ----------
+  content.querySelectorAll('[data-role="tpDocCity"]').forEach(el=> el.addEventListener('click', e=>{
+    const docFmt = e.target.dataset.fmt;
+    const headers = ['Місто посадки','ПІБ','Телефон','Автобус'];
+    const byCity = {};
+    (tripPrepData.tourists||[]).forEach(t=>{ const city=t.pickup_city||'Не вказано'; if(!byCity[city]) byCity[city]=[]; byCity[city].push(t); });
+    const rows = [];
+    Object.keys(byCity).sort().forEach(city=> byCity[city].forEach(t=> rows.push([city, t.full_name, t.phone, t.assigned_bus||''])));
+    if(docFmt==='excel') docExportExcel(headers, rows, 'Посадка', `Список_по_містах_${tripLabel}.xlsx`);
+    else if(docFmt==='word') docExportWord('Посадка', `<h2>Список по містах посадки — ${tripLabel}</h2>${docBuildTableHtml(headers, rows)}`, `Список_по_містах_${tripLabel}.doc`);
+    else docOpenPrintWindow('Посадка', `<h1>Список по містах посадки — ${tripLabel}</h1>${docBuildTableHtml(headers, rows)}`);
+  }));
+
+  // ---------- Debtors list (grouped by booking, with responsible guide + editable notes) ----------
+  const { data: debtNotesRows } = await sb.from('trip_debt_notes').select('*').eq('trip_id', currentTripId);
+  const debtNotesMap = {}; (debtNotesRows||[]).forEach(r=> debtNotesMap[r.link_group] = r.note);
+
+  function buildDebtorGroups(){
+    const groups = tripPrepGroups();
+    return Object.keys(groups).map(gk=>{
+      const members = groups[gk];
+      const debt = members.reduce((s,m)=>s+(Number(m.remaining)||0),0);
+      if(debt<=0) return null;
+      const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean).map(b=>b.replace(/^#/,'')))];
+      const responsible = members[0].assigned_bus || '';
+      return { gk, bookingNumbers, names: members.map(m=>m.full_name), debt, responsible, note: debtNotesMap[gk]||'' };
+    }).filter(Boolean);
+  }
+
+  function renderDebtorsTable(){
+    const wrap = document.getElementById('tpDebtorsTableWrap');
+    if(!wrap) return;
+    const groupsList = buildDebtorGroups();
+    if(!groupsList.length){ wrap.innerHTML = '<p class="report-note">Боржників немає.</p>'; return; }
+    wrap.innerHTML = `<table class="report-table" style="font-size:12.5px;">
+      <thead><tr><th style="text-align:left;">Заявка</th><th style="text-align:left;">ПІБ</th><th>Борг (€)</th><th style="text-align:left;">Відповідальний (гід)</th><th style="text-align:left;">Нотатки</th></tr></thead>
+      <tbody>${groupsList.map(g=>`<tr>
+        <td style="text-align:left;">${g.bookingNumbers.join(', ')}</td>
+        <td style="text-align:left;">${g.names.join(', ')}</td>
+        <td>${fmt(g.debt)}</td>
+        <td style="text-align:left;">${g.responsible||'—'}</td>
+        <td style="text-align:left;"><input type="text" class="tp-debt-note-input" data-gk="${g.gk}" value="${g.note}" placeholder="нотатка…" style="width:100%; padding:4px 6px; border:1px solid var(--line); border-radius:6px;"></td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+    wrap.querySelectorAll('.tp-debt-note-input').forEach(el=> el.addEventListener('change', async e=>{
+      const gk = e.target.dataset.gk;
+      const note = e.target.value;
+      debtNotesMap[gk] = note;
+      const { error } = await sb.from('trip_debt_notes').upsert({ trip_id: currentTripId, link_group: gk, note });
+      if(error) alert('Не вдалося зберегти нотатку: ' + friendlyErrorMessage(error));
+    }));
+  }
+  renderDebtorsTable();
+
+  content.querySelectorAll('[data-role="tpDocDebtors"]').forEach(el=> el.addEventListener('click', e=>{
+    const docFmt = e.target.dataset.fmt;
+    const headers = ['Номер заявки','ПІБ','Борг (€)','Відповідальний (гід)','Нотатки'];
+    const groupsList = buildDebtorGroups();
+    const rows = groupsList.map(g=>[g.bookingNumbers.join(', '), g.names.join(', '), docFmt==='excel'?g.debt:fmt(g.debt), g.responsible||'', debtNotesMap[g.gk]||'']);
+    if(!rows.length) rows.push(['Боржників немає','','','','']);
+    if(docFmt==='excel') docExportExcel(headers, rows, 'Боржники', `Список_боржників_${tripLabel}.xlsx`);
+    else if(docFmt==='word') docExportWord('Боржники', `<h2>Список боржників — ${tripLabel}</h2>${docBuildTableHtml(headers, rows)}`, `Список_боржників_${tripLabel}.doc`);
+    else docOpenPrintWindow('Боржники', `<h1>Список боржників — ${tripLabel}</h1>${docBuildTableHtml(headers, rows)}`);
+  }));
+
+  // ---------- Info sheet (per bus) — full template matching the real Rich Tour document ----------
+  const INFOLIST_BOILERPLATE = `
+    <p><b>Корисні поради:</b></p>
+    <p># Не залишайте без нагляду гроші, цінні речі та документи.<br>
+    # Будьте уважні під час подорожі, оскільки великі міста та туристичні центри у всьому світі притягують велику кількість кишенькових злодіїв та шахраїв. Гроші та документи необхідно зберігати так, щоб вони не стали для них наживою.</p>
+    <p><b>Автобус:</b><br>
+    # У разі пошкодження туристом майна автобуса (сидінь, столиків, обладнання, оздоблення салону тощо) він несе повну матеріальну відповідальність та зобов'язаний відшкодувати завдані збитки в розмірі, визначеному перевізником або власником транспортного засобу.<br>
+    # У разі виявлення пошкоджень майна автобуса до початку поїздки просимо негайно повідомити про це керівника групи або водія для його фіксації.<br>
+    # В цілях особистої безпеки строго забороняється пересуватися по салону під час руху автобуса (в Європі за це передбачено штраф).<br>
+    # Просимо не смітити в салоні автобуса, викидати за собою сміття на санітарних зупинках.<br>
+    # Оскільки Ваша подорож здійснюється автобусом, дорога може ввести деякі непередбачувані корективи: корки, ремонтні роботи, проходження кордонів. Все це може змінити графік програми, тому просимо проявити терпіння у подібних ситуаціях.<br>
+    # Користування туалетом в автобусі заборонено. Кожні 3,5–4 години будуть санітарні зупинки, на яких ви зможете скористатися санітарною зоною (вона може бути платною).<br>
+    # Зупинки автобуса здійснюються лише в передбачених для цього місцях (окрім екстрених випадків).<br>
+    # Регулювання температури у автобусі здійснюється через керівника групи.<br>
+    # Під час переїзду в автобусі дотримуйтеся загальновстановлених правил поведінки в громадських місцях.<br>
+    # Категорично заборонено зловживати алкогольними напоями. Порушення цього пункту може призвести до одностороннього розірвання угоди та виключення порушників зі складу групи під час подорожі.<br>
+    # Зберігайте тишу в автобусі після 22:00.<br>
+    # Даний тур здійснюється за правилами міжнародної угоди «Інтербус», підписаної між Україною та Європейським Союзом. Відповідно до Правил міжнародної угоди «Інтербус» заборонено самовільно покидати склад групи під час туру.</p>
+    <p><b>Митні правила:</b><br>
+    Для перетину кордону потрібно мати: закордонний біометричний паспорт; свідоцтво про народження дитини та нотаріально завірений дозвіл на виїзд за кордон (для дітей до 16р); страховий поліс.<br>
+    При перетині кордону слід притримуватися таких правил: не курити, не фотографувати, не виходити з автобуса без дозволу прикордонників або водіїв автобусів. Паспорти тримати напоготові, обкладинки зняти.<br>
+    При перетині українського кордону дозволено вивіз: лікеро-горілчаних виробів — 1 літр; вина — 2 літри; пива — 5 літрів; тютюнових виробів — 40 сигарет (2 пачки) або 40 грамів тютюну.<br>
+    Ввіз/вивіз валюти за умови усного декларування — 10 000 євро (або еквівалент в іншій валюті). При письмовому декларуванні обмежень немає.</p>
+    <p><b>Страхування:</b> наявність страхового полісу — обов'язкова умова для виїзду за кордон. Страховий поліс не включено у вартість туру, за винятком випадків, коли його було замовлено як додаткову послугу.</p>
+    <p>ЯКЩО ВИ ЇДЕТЕ З НЕПОВНОЛІТНЬОЮ ДИТИНОЮ (до 16 р.) ПОТРІБНО МАТИ ОРИГІНАЛ СВІДОЦТВА ПРО НАРОДЖЕННЯ ДИТИНИ.<br>
+    ЯКЩО НЕПОВНОЛІТНЯ ДИТИНА (до 16 р.) ЇДЕ БЕЗ СУПРОВОДУ ОБОХ БАТЬКІВ: ОБОВ'ЯЗКОВО ПОТРІБНО МАТИ ПРИ СОБІ ОРИГІНАЛ СВІДОЦТВА ПРО НАРОДЖЕННЯ ДИТИНИ ТА НОТАРІАЛЬНИЙ ДОЗВІЛ НА ВИЇЗД ЗА КОРДОН ВИДАНИЙ ПІД КОНКРЕТНУ ПОЇЗДКУ ВІД ОБОХ БАТЬКІВ.<br>
+    ТУРИСТИЧНИЙ ОПЕРАТОР НЕ НЕСЕ ВІДПОВІДАЛЬНОСТІ ЗА ЧЕРГИ НА КОРДОНАХ ТА РОБОТУ МИТНИХ ТА ПРИКОРДОННИХ СЛУЖБ!</p>
+    <p><b>ГОТЕЛІ</b><br>
+    # Поселення — після 15:00, виселення — до 09:30.<br>
+    # Дотримуйтесь тиші після 22:00. Заборонено проводити в готелях шумні заходи після 22:00.<br>
+    # Туристи, що подорожують наодинці, можуть бути розміщені в двох або тримісних номерах за умови попереднього погодження — з додатковим ліжком або диваном.<br>
+    # У вартість туру включені сніданки та вечері згідно програми.<br>
+    # Забороняється виносити їжу зі шведського столу.<br>
+    # Туристи несуть фінансову відповідальність за пошкодження інвентарю готелю. Якщо під час поселення в готель туристи зауважили певні поломки в номері, потрібно одразу повідомити про це гіда для їх усунення.<br>
+    # Прибирання в готелі проводиться з 10:30 до 15:30. Якщо в даний день прибирання вам не потрібне, прохання повісити на ручку дверей табличку «Don't disturb / не турбувати».</p>
+    <p><b>РЕЧІ ТА ПІДГОТОВКА ДО ДОРОГИ</b><br>
+    Візьміть з собою: зручне взуття, одяг по сезону, засоби гігієни, вологі серветки, подушку для сну в автобусі, плед, аптечку (лейкопластир, антисептик, ліки, які регулярно приймаєте), маски. Речі для автобуса — окремо від основної валізи. Не беріть із собою їжу, що швидко псується.<br>
+    → Заборонено перевозити: м'ясні, ковбасні, молочні вироби (всі продукти тваринного походження).<br>
+    → Рекомендується: печиво, сухарики, горіхи, яблука, банани, хліб.<br>
+    → Для пиття — краще обирати негазовану воду, обмежити газовані солодкі напої та соки.</p>
+    <p><b>ЕКСКУРСІЇ</b><br>
+    На екскурсії — зручне взуття та одяг. Відлучатись за сувенірами або фотографуватись — лише після дозволу гіда. Після здійснення оплати за додаткові екскурсії сплачені кошти не підлягають поверненню за ініціативою туриста з особистих причин (окрім документально підтверджених виняткових випадків та скасування екскурсії організатором).</p>
+    <p><b>СУПРОВОДЖУЮЧИЙ ГРУПИ</b> — офіційний представник туроператора, який координує маршрут, забезпечує виконання програми, організовує розселення, інформує туристів, взаємодіє з водіями/гідами/приймаючою стороною, контролює дисципліну. Супроводжуючий не зобов'язаний організовувати зупинки у супермаркетах, якщо це не передбачено програмою.</p>
+    <p><b>ВАЖЛИВО</b><br>
+    Компанія залишає за собою право вносити зміни в програму туру без зменшення загальної кількості послуг. Компанія не несе відповідальність за роботу митних і прикордонних служб, погодні умови, корки і ремонти на дорогах, а також за зміни умов перетину кордону, прийняті урядом країн перебування та транзиту.</p>
+    <p><b>Програма туру</b><br>
+    1 день: Ранковий збір групи, виїзд, транзит в Грецію.<br>
+    2 день: Прибуття на Олімпійську Рів'єру, поселення на курорті (не раніше 15:00), відпочинок, вечеря, ночівля.<br>
+    3 день: Сніданок, відпочинок на узбережжі Егейського моря, вечеря, ночівля.<br>
+    4-8 день: Сніданок, відпочинок на узбережжі, вечеря, ночівля.<br>
+    9 день: Сніданок, відпочинок, виселення до 9:30, збір і виїзд з курорту орієнтовно о 16:00, виїзд до України.<br>
+    10 день: Дорога додому, прибуття до Львова у вечірній час (залежно від проходження кордону).</p>
+    <p><b>Екскурсії (за додаткову плату; діти до 3 років безкоштовно, 3-12 років — оплата зменшена, 12+ — повна):</b><br>
+    Метеори (40/35€, вхідний квиток 5€, діти до 12 безкоштовно) — комплекс монастирів, одне з чудес світу.<br>
+    Салоніки, вечірня екскурсія (30/25€, трансфер без екскурсії 25/20€) — північна столиця Греції.<br>
+    Едесса – Позар (40/30€ + вхід у термальні басейни 3-5€) — термальні джерела і водоспади.<br>
+    Халкідіки (40/25€) — півострів, бухта Ормос Панагіас.<br>
+    Скіатос (60/45€, корабель у вартості) — острів, подорож катером.<br>
+    Трансфер до лікувальних грязей Підна (15/10€) — заповідник Alykes Kitrous.<br>
+    Порядок екскурсій визначається представником компанії (супроводжуючим гідом).</p>
+  `;
+
+  content.querySelectorAll('[data-role="tpDocInfoSheet"]').forEach(el=> el.addEventListener('click', e=>{
+    const docFmt = e.target.dataset.fmt;
+    const tripData = getTripData(currentTripId);
+    const busSections = tripData.guides.map(g=>{
+      const cfg = tripPrepBusSeatData.fullConfigs[g.name] || {};
+      return `
+        <div style="background:linear-gradient(90deg,#f97316,#ef4444); color:#fff; padding:14px 18px; border-radius:8px; margin-bottom:14px;">
+          <div style="font-size:20px; font-weight:bold;">Rich Tour</div>
+          <div style="font-size:12px;">Тури, багаті емоціями · (050) 370 41 12 · (067) 533 11 89 · rich-tour.com · м. Львів, вул. Антоновича, 120, офіс 101</div>
+        </div>
+        <h1 style="text-align:center;">ІНФОЛИСТ</h1>
+        <h2 style="text-align:center;">Море Греції</h2>
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+          <tr><td style="border:1px solid #333; padding:6px; font-weight:bold; width:35%;">Дата туру</td><td style="border:1px solid #333; padding:6px;">${tripLabel}</td></tr>
+          <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Номер рейсу/групи</td><td style="border:1px solid #333; padding:6px;">${cfg.gr_slot||'—'}</td></tr>
+          <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Керівник групи</td><td style="border:1px solid #333; padding:6px;">${g.name}${cfg.guide_phone?' '+cfg.guide_phone:''}<br><i>(телефон активний в день виїзду)</i></td></tr>
+          <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Місце знаходження автобуса</td><td style="border:1px solid #333; padding:6px;">${cfg.meeting_point||'—'}</td></tr>
+          <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Час збору групи</td><td style="border:1px solid #333; padding:6px;">${cfg.gather_time||'—'}</td></tr>
+          <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Час відправлення автобуса</td><td style="border:1px solid #333; padding:6px;">${cfg.departure_time||'—'}</td></tr>
+          <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Можливість приєднатись до автобуса</td><td style="border:1px solid #333; padding:6px; white-space:pre-line;">${cfg.pickup_points_text||'—'}</td></tr>
+          <tr><td colspan="2" style="border:1px solid #333; padding:6px; font-weight:bold; text-align:center;">Проживання: готель 3* (згідно заявки)<br>Konstantin 3* або Great Aleksander 3*</td></tr>
+          <tr><td colspan="2" style="border:1px solid #333; padding:6px; font-weight:bold; text-align:center;">Харчування: сніданки і вечері</td></tr>
+        </table>
+        ${INFOLIST_BOILERPLATE}`;
+    }).join('<div style="page-break-after:always;"></div>');
+    if(docFmt==='word') docExportWord('Інфолист', busSections, `Інфолист_${tripLabel}.doc`);
+    else docOpenPrintWindow('Інфолист', busSections);
+  }));
+}
+
+/* ============================================================
+   PORTED HOTEL BOOKING TOOL (namespaced hb*)
+   Same logic as the standalone tool, now using the app's Supabase client
+   and synced to whichever trip is selected in the header.
+   ============================================================ */
+const HB_HOTEL_STRUCTURE = {
+  konstantin: {
+    name: "Hotel Konstantin 3*",
+    floors: {
+      1: [
+        {number: 101, type: "односпальне односпальне", maxGuests: 2},
+        {number: 102, type: "односпальне односпальне", maxGuests: 2},
+        {number: 103, type: "односпальне односпальне", maxGuests: 2},
+        {number: 104, type: "двоспальне односпальне", sea: true, maxGuests: 3},
+        {number: 105, type: "односпальне односпальне односпальне", sea: true, maxGuests: 3},
+        {number: 106, type: "односпальне односпальне", maxGuests: 2},
+        {number: 107, type: "односпальне односпальне", maxGuests: 2},
+        {number: 108, type: "односпальне односпальне", maxGuests: 2},
+        {number: 109, type: "односпальне односпальне", maxGuests: 2},
+        {number: 110, type: "односпальне односпальне", maxGuests: 2},
+        {number: 111, type: "односпальне односпальне односпальне", maxGuests: 3},
+        {number: 112, type: "двоспальне односпальне", maxGuests: 3},
+        {number: 113, type: "односпальне односпальне", maxGuests: 2},
+        {number: 114, type: "односпальне односпальне", maxGuests: 2}
+      ],
+      2: [
+        {number: 201, type: "односпальне односпальне", maxGuests: 2},
+        {number: 202, type: "односпальне односпальне", maxGuests: 2},
+        {number: 203, type: "односпальне односпальне", maxGuests: 2},
+        {number: 204, type: "односпальне односпальне односпальне", sea: true, maxGuests: 3},
+        {number: 205, type: "односпальне односпальне односпальне", sea: true, maxGuests: 3},
+        {number: 206, type: "односпальне односпальне + extra bed", maxGuests: 3},
+        {number: 207, type: "односпальне односпальне + extra bed", maxGuests: 3},
+        {number: 208, type: "односпальне односпальне", maxGuests: 2},
+        {number: 209, type: "односпальне односпальне", maxGuests: 2},
+        {number: 210, type: "односпальне односпальне", maxGuests: 2},
+        {number: 211, type: "двоспальне односпальне + extra bed", maxGuests: 3},
+        {number: 212, type: "двоспальне односпальне + extra bed", maxGuests: 3},
+        {number: 213, type: "односпальне односпальне", maxGuests: 2},
+        {number: 214, type: "односпальне односпальне", maxGuests: 2}
+      ],
+      3: [
+        {number: 301, type: "односпальне односпальне", maxGuests: 2},
+        {number: 302, type: "односпальне односпальне + extra bed", maxGuests: 3},
+        {number: 303, type: "односпальне односпальне + extra bed", maxGuests: 3},
+        {number: 304, type: "двоспальне односпальне", sea: true, maxGuests: 3},
+        {number: 305, type: "односпальне односпальне односпальне", sea: true, maxGuests: 3},
+        {number: 306, type: "односпальне односпальне", maxGuests: 2},
+        {number: 307, type: "односпальне односпальне", maxGuests: 2},
+        {number: 308, type: "односпальне односпальне", maxGuests: 2},
+        {number: 309, type: "односпальне односпальне", maxGuests: 2},
+        {number: 310, type: "односпальне односпальне", maxGuests: 2},
+        {number: 311, type: "двоспальне односпальне", maxGuests: 3},
+        {number: 312, type: "двоспальне односпальне", maxGuests: 3},
+        {number: 313, type: "односпальне односпальне", maxGuests: 2},
+        {number: 314, type: "двоспальне (без спинки) + extra bed", maxGuests: 3}
+      ]
+    }
+  },
+  greataleksander: {
+    name: "Great Aleksander 3*",
+    floors: {
+      1: [
+        {number: 101, type: "односпальне односпальне", maxGuests: 2},
+        {number: 102, type: "односпальне односпальне односпальне", maxGuests: 3},
+        {number: 103, type: "односпальне односпальне", maxGuests: 2},
+        {number: 104, type: "односпальне односпальне", maxGuests: 2},
+        {number: 105, type: "односпальне односпальне односпальне", maxGuests: 3},
+        {number: 106, type: "односпальне односпальне односпальне", maxGuests: 3},
+        {number: 107, type: "односпальне односпальне односпальне", maxGuests: 3},
+        {number: 108, type: "односпальне односпальне", maxGuests: 2},
+        {number: 109, type: "односпальне односпальне", maxGuests: 2},
+        {number: 110, type: "односпальне односпальне", maxGuests: 2},
+        {number: 111, type: "односпальне односпальне", maxGuests: 2}
+      ],
+      2: [
+        {number: 201, type: "family", maxGuests: 5},
+        {number: 202, type: "односпальне односпальне односпальне", maxGuests: 3},
+        {number: 203, type: "односпальне односпальне", maxGuests: 2},
+        {number: 204, type: "односпальне односпальне", maxGuests: 2},
+        {number: 205, type: "односпальне односпальне", maxGuests: 2},
+        {number: 206, type: "односпальне односпальне", maxGuests: 2},
+        {number: 207, type: "односпальне односпальне", maxGuests: 2},
+        {number: 208, type: "односпальне односпальне односпальне", maxGuests: 3},
+        {number: 209, type: "односпальне односпальне односпальне", maxGuests: 3},
+        {number: 210, type: "односпальне односпальне односпальне", maxGuests: 3},
+        {number: 211, type: "односпальне односпальне", maxGuests: 2}
+      ]
+    }
+  }
+};
+
+let hbDatabase = {};
+let hbExtraRooms = {};
+let hbLinkGroups = {};
+let hbCurrentHotel = 'konstantin';
+let hbCurrentPeriod = '';
+let hbActiveRoomNum = null;
+let hbActiveShareReq = null;
+let hbModalRoomNum = null;
+let hbModalMode = 'new';
+let hbPlannerDemandIdSeq = 0;
+let hbPlannerSuggestions = [];
+
+function hbGetAllRoomsForHotel(hotel){
+  const floors = HB_HOTEL_STRUCTURE[hotel].floors;
+  let all = [];
+  Object.keys(floors).forEach(f => all = all.concat(floors[f].map(r=>({ ...r, floor: parseInt(f) }))));
+  return all;
+}
+
+// Parses free-text wishes from a comment (SV/sea view, side view, street, floor number)
+function hbParseWish(comment){
+  const wish = {};
+  if(!comment) return wish;
+  const c = comment.toLowerCase();
+  if(/\bsv\b/.test(c) || (c.includes('море') && !c.includes('бік'))) wish.seaView = true;
+  if(c.includes('бік')) wish.side = true;
+  if(c.includes('вулиц')) wish.street = true;
+  if(c.includes('перш')) wish.floor = 1;
+  else if(c.includes('друг')) wish.floor = 2;
+  else if(c.includes('трет')) wish.floor = 3;
+  else if(c.includes('четверт')) wish.floor = 4;
+  else { const m = c.match(/(\d)\s*поверх/); if(m) wish.floor = parseInt(m[1]); }
+  return wish;
+}
+function hbWishLabel(wish){
+  const parts = [];
+  if(wish.seaView) parts.push('🌊 SV (море)');
+  if(wish.side) parts.push('бік');
+  if(wish.street) parts.push('вулиця');
+  if(wish.floor) parts.push(`${wish.floor} поверх`);
+  return parts.join(', ');
+}
+
+function hbShowToast(message){
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:500; background:#16a34a; color:#fff; font-weight:600; padding:12px 20px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.3); font-size:14px;';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(()=> toast.remove(), 1400);
+}
+
+function hbAskYesNo(message){
+  return new Promise(resolve=>{
+    document.getElementById('hbYesNoMessage').textContent = message;
+    document.getElementById('hbYesNoModal').classList.remove('app-hidden');
+    const yesBtn = document.getElementById('hbYesNoYesBtn');
+    const noBtn = document.getElementById('hbYesNoNoBtn');
+    function cleanup(result){
+      document.getElementById('hbYesNoModal').classList.add('app-hidden');
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+      resolve(result);
+    }
+    function onYes(){ cleanup(true); }
+    function onNo(){ cleanup(false); }
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+  });
+}
+
+function hbIsPeriodLocked(period){
+  const def = TRIPS_DEF.find(d=>d.label===period);
+  if(!def) return false;
+  return new Date() >= def.start;
+}
+
+async function hbLoadBookings(){
+  const { data, error } = await sb.from('room_bookings').select('*');
+  if(error){ console.error(error); return; }
+  hbDatabase = {};
+  (data||[]).forEach(r=>{
+    if(!hbDatabase[r.hotel]) hbDatabase[r.hotel] = {};
+    if(!hbDatabase[r.hotel][r.period]) hbDatabase[r.hotel][r.period] = [];
+    let entry = hbDatabase[r.hotel][r.period].find(e=>e.number===r.room_number);
+    if(!entry){ entry = { number:r.room_number, shares:[] }; hbDatabase[r.hotel][r.period].push(entry); }
+    entry.shares.push({
+      requestNum: r.request_id, adults:r.adults, kids612:r.kids_612, kidsUnder6:r.kids_under6,
+      total:r.total, extraBed: !!r.extra_bed, seeking: !!r.seeking_roommate, notes: r.notes||''
+    });
+  });
+}
+
+async function hbSaveShare(hotel, period, roomNum, share){
+  if(!share.requestNum){
+    console.error('hbSaveShare: rejected save without a request number', {hotel, period, roomNum, share});
+    alert('⚠️ Внутрішня помилка: спроба зберегти бронювання без номера заявки. Збереження скасовано.');
+    return;
+  }
+  await hbDeleteShare(hotel, period, roomNum, share.requestNum, true);
+  const { error } = await sb.from('room_bookings').insert({
+    hotel, period, room_number: roomNum, request_id: share.requestNum,
+    adults: share.adults||0, kids_612: share.kids612||0, kids_under6: share.kidsUnder6||0,
+    total: share.total||0, extra_bed: !!share.extraBed, seeking_roommate: !!share.seeking, notes: share.notes||''
+  });
+  if(error){ alert('⚠️ Не вдалося зберегти в хмару. Перевірте інтернет.'); }
+}
+
+async function hbDeleteShare(hotel, period, roomNum, requestNum, silent){
+  let q = sb.from('room_bookings').delete().eq('hotel',hotel).eq('period',period).eq('room_number',roomNum);
+  q = (requestNum===null||requestNum===undefined||requestNum==='') ? q.is('request_id', null) : q.eq('request_id', requestNum);
+  const { error } = await q;
+  if(error && !silent){ alert('⚠️ Не вдалося зберегти скасування в хмару. Перевірте інтернет.'); }
+}
+
+function hbGetRoomEntry(hotel, period, roomNum){
+  const list = (hbDatabase[hotel] && hbDatabase[hotel][period]) || [];
+  return list.find(e=>e.number===roomNum) || null;
+}
+function hbRoomOccupancy(entry){ return entry ? entry.shares.reduce((s,sh)=>s+(sh.total||0),0) : 0; }
+function hbRoomHasExtraBed(entry){ return entry ? entry.shares.some(sh=>sh.extraBed) : false; }
+function hbRoomBaseCapacity(hotel, roomNum){
+  const def = hbGetAllRoomsForHotel(hotel).find(r=>r.number===roomNum);
+  return def ? (def.maxGuests||4) : 4;
+}
+function hbRoomEffectiveCapacity(hotel, roomNum, entry){
+  return hbRoomBaseCapacity(hotel, roomNum) + (hbRoomHasExtraBed(entry) ? 1 : 0);
+}
+function hbRoomDisplay(hotel, roomNum){
+  const extra = (hbExtraRooms[hotel]||[]).find(r=>r.number===roomNum);
+  if(extra) return `${extra.label} (${extra.maxGuests} чол)`;
+  return String(roomNum);
+}
+
+async function hbLoadExtraRooms(){
+  const { data, error } = await sb.from('extra_rooms').select('*');
+  if(error) return;
+  hbExtraRooms = {};
+  (data||[]).forEach(r=>{
+    if(!hbExtraRooms[r.hotel]) hbExtraRooms[r.hotel] = [];
+    hbExtraRooms[r.hotel].push({ number:r.room_number, type:r.type_label||'Додаткове місце', maxGuests:r.max_guests, label:r.label||`Місце ${hbExtraRooms[r.hotel].length+1}` });
+  });
+}
+async function hbSaveExtraRoom(hotel, roomNum, typeLabel, maxGuests, label){
+  const { error } = await sb.from('extra_rooms').upsert({ hotel, room_number:roomNum, type_label:typeLabel, max_guests:maxGuests, label }, { onConflict:'hotel,room_number' });
+  if(error){ alert('⚠️ Не вдалося зберегти нове місце в хмару.'); return false; }
+  return true;
+}
+
+async function hbLoadLinkedRequests(){
+  const { data, error } = await sb.from('linked_requests').select('*');
+  if(error) return;
+  hbLinkGroups = {};
+  (data||[]).forEach(r=>{
+    if(!hbLinkGroups[r.hotel]) hbLinkGroups[r.hotel] = {};
+    if(!hbLinkGroups[r.hotel][r.period]) hbLinkGroups[r.hotel][r.period] = {};
+    hbLinkGroups[r.hotel][r.period][r.request_id] = r.link_group;
+  });
+}
+async function hbLinkRequestsFn(hotel, period, requestNums){
+  let groupId = null;
+  requestNums.forEach(req=>{
+    const existing = hbLinkGroups[hotel] && hbLinkGroups[hotel][period] && hbLinkGroups[hotel][period][req];
+    if(existing && !groupId) groupId = existing;
+  });
+  if(!groupId) groupId = 'grp-' + Date.now();
+  const rows = requestNums.map(req=>({ hotel, period, request_id:req, link_group:groupId }));
+  const { error } = await sb.from('linked_requests').upsert(rows, { onConflict:'hotel,period,request_id' });
+  if(error) alert("⚠️ Не вдалося зберегти зв'язок заявок у хмару.");
+  if(!hbLinkGroups[hotel]) hbLinkGroups[hotel] = {};
+  if(!hbLinkGroups[hotel][period]) hbLinkGroups[hotel][period] = {};
+  requestNums.forEach(req=> hbLinkGroups[hotel][period][req] = groupId);
+}
+async function hbUnlinkRequest(hotel, period, requestNum){
+  if(requestNum===null||requestNum===undefined||requestNum==='') return;
+  await sb.from('linked_requests').delete().eq('hotel',hotel).eq('period',period).eq('request_id',requestNum);
+  if(hbLinkGroups[hotel] && hbLinkGroups[hotel][period]) delete hbLinkGroups[hotel][period][requestNum];
+}
+
+function hbSearchByRequest(){
+  const query = document.getElementById('hbSearchRequestInput').value.trim().toLowerCase();
+  const resultsEl = document.getElementById('hbSearchResults');
+  if(!query){ resultsEl.innerHTML = ''; return; }
+  const matches = [];
+  Object.keys(hbDatabase).forEach(hotel=>{
+    Object.keys(hbDatabase[hotel]||{}).forEach(period=>{
+      (hbDatabase[hotel][period]||[]).forEach(entry=>{
+        entry.shares.forEach(share=>{
+          if(share.requestNum && String(share.requestNum).toLowerCase().includes(query)){
+            matches.push({ hotel, period, roomNum: entry.number, share });
+          }
+        });
+      });
+    });
+  });
+  if(!matches.length){ resultsEl.innerHTML = '<p class="muted" style="font-size:13px;">Нічого не знайдено.</p>'; return; }
+  resultsEl.innerHTML = matches.map(m=>{
+    const hotelName = HB_HOTEL_STRUCTURE[m.hotel].name;
+    const label = hbRoomDisplay(m.hotel, m.roomNum);
+    return `<div style="padding:10px; background:#f0fdf4; border:2px solid #86efac; border-radius:10px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
+      <div style="font-size:13px;"><strong>Заявка №${m.share.requestNum}</strong> · ${hotelName} · Заїзд ${m.period}${m.share.extraBed ? ' · 🛏️ з екстраліжком' : ''}${m.share.seeking ? ' · 🔄 шукає сусіда' : ''}</div>
+      <div style="font-weight:700; color:#15803d; font-size:13px;">${label} — ${m.share.total} чол</div>
+    </div>`;
+  }).join('');
+}
+
+async function hbRenderRoomsView(){
+  const content = document.getElementById('tripPrepContent');
+  content.innerHTML = `<p class="report-note">Завантаження…</p>`;
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  hbCurrentPeriod = def ? def.label : '';
+  await hbLoadBookings();
+  await hbLoadExtraRooms();
+  await hbLoadLinkedRequests();
+  hbRenderShell();
+}
+
+function hbRenderShell(){
+  const content = document.getElementById('tripPrepContent');
+  content.innerHTML = `
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <label style="font-weight:600; font-size:13px;">🔍 Швидкий пошук за номером заявки</label>
+      <input id="hbSearchRequestInput" type="text" oninput="hbSearchByRequest()" placeholder="Введіть номер заявки…" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:10px; font-size:15px; margin-top:4px;">
+      <div id="hbSearchResults" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;"></div>
+    </div>
+
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+      <label style="font-weight:600; font-size:13px;">🏨 Готель:
+        <select id="hbHotelSelect" onchange="hbHotelChanged()" style="margin-left:6px; padding:8px 10px; border:2px solid var(--line); border-radius:8px;">
+          <option value="konstantin" ${hbCurrentHotel==='konstantin'?'selected':''}>Hotel Konstantin 3*</option>
+          <option value="greataleksander" ${hbCurrentHotel==='greataleksander'?'selected':''}>Great Aleksander 3*</option>
+        </select>
+      </label>
+      <button class="btn btn-ghost btn-small no-print" onclick="hbManualRefresh()">🔄 Оновити з хмари</button>
+      <button class="btn btn-danger-ghost btn-small no-print" onclick="hbClearHotelBookings()">🗑️ Обнулити цей готель (цей заїзд)</button>
+      <button class="btn btn-primary btn-small no-print" onclick="hbOpenWizard()">👥 Розселити по черзі</button>
+      <button class="btn btn-ghost btn-small no-print" onclick="hbOpenPlannerModal()">🧩 Порадити все одразу (список)</button>
+    </div>
+
+    <p class="report-note">Заїзд: ${hbCurrentPeriod || '—'}</p>
+    <div id="hbRoomsGrid" style="display:flex; flex-direction:column; gap:16px; margin-top:10px;"></div>
+    <div id="hbHotelSummary" class="report-note" style="margin-top:14px; font-weight:600;"></div>
+    <div id="hbGroupsSummary" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;"></div>
+    <div id="hbSharingSummary" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;"></div>
+    <div id="hbNotesSummary" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;"></div>
+  `;
+  hbLoadRoomsGrid();
+}
+
+function hbHotelChanged(){
+  hbCurrentHotel = document.getElementById('hbHotelSelect').value;
+  hbLoadRoomsGrid();
+}
+
+async function hbManualRefresh(){
+  await hbLoadBookings();
+  await hbLoadExtraRooms();
+  await hbLoadLinkedRequests();
+  hbLoadRoomsGrid();
+  hbShowToast('🔄 Оновлено');
+}
+
+async function hbClearHotelBookings(){
+  const hotelName = HB_HOTEL_STRUCTURE[hbCurrentHotel].name;
+  if(!confirm(`Точно обнулити всі бронювання в "${hotelName}" для заїзду ${hbCurrentPeriod}? Це стосується тільки цього готелю й цього заїзду, інші не постраждають. Дію не можна скасувати.`)) return;
+  const { error: e1 } = await sb.from('room_bookings').delete().eq('hotel', hbCurrentHotel).eq('period', hbCurrentPeriod);
+  const { error: e2 } = await sb.from('linked_requests').delete().eq('hotel', hbCurrentHotel).eq('period', hbCurrentPeriod);
+  if(e1 || e2){ alert('Не вдалося обнулити: ' + friendlyErrorMessage(e1||e2)); return; }
+  await hbManualRefresh();
+  hbShowToast(`🗑️ ${hotelName} обнулено для цього заїзду`);
+}
+
+function hbLoadRoomsGrid(){
+  const grid = document.getElementById('hbRoomsGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+
+  const floors = HB_HOTEL_STRUCTURE[hbCurrentHotel].floors;
+  const hotelDb = (hbDatabase[hbCurrentHotel] && hbDatabase[hbCurrentHotel][hbCurrentPeriod]) || [];
+
+  const groupMap = (hbLinkGroups[hbCurrentHotel] && hbLinkGroups[hbCurrentHotel][hbCurrentPeriod]) || {};
+  const colorKeyFor = req => groupMap[req] || req;
+
+  const keyCounts = {};
+  hotelDb.forEach(entry=> entry.shares.forEach(sh=>{
+    if(!sh.requestNum) return;
+    const key = colorKeyFor(sh.requestNum);
+    keyCounts[key] = (keyCounts[key]||0) + 1;
+  }));
+
+  const roomsPerRequest = {};
+  hotelDb.forEach(entry=> entry.shares.forEach(sh=>{
+    if(!sh.requestNum) return;
+    if(!roomsPerRequest[sh.requestNum]) roomsPerRequest[sh.requestNum] = new Set();
+    roomsPerRequest[sh.requestNum].add(entry.number);
+  }));
+  const multiRoomReqs = new Set(Object.keys(roomsPerRequest).filter(req=>roomsPerRequest[req].size>1));
+  const groupColors = ['#8b5cf6','#0ea5e9','#ec4899','#22c55e','#f97316','#14b8a6'];
+  const keyColor = {};
+  let colorIdx = 0;
+  Object.keys(keyCounts).forEach(key=>{ if(keyCounts[key]>1){ keyColor[key]=groupColors[colorIdx % groupColors.length]; colorIdx++; } });
+  const roomBorderColor = entry=>{
+    for(const sh of entry.shares){ if(!sh.requestNum) continue; const c = keyColor[colorKeyFor(sh.requestNum)]; if(c) return c; }
+    return null;
+  };
+
+  function renderRoomTile(room, isExtra){
+    const entry = hotelDb.find(e=>e.number===room.number);
+    const shares = entry ? entry.shares : [];
+    const occupancy = hbRoomOccupancy(entry);
+    const capacity = hbRoomEffectiveCapacity(hbCurrentHotel, room.number, entry);
+    const isFree = shares.length===0;
+    const isSeeking = shares.length===1 && shares[0].seeking && occupancy<capacity;
+    const isShared = shares.length>=2;
+    const isMultiRoom = shares.some(sh=>sh.requestNum && multiRoomReqs.has(sh.requestNum));
+    const stateClass = isFree ? 'free' : (isSeeking ? 'seeking' : (isMultiRoom ? 'multiroom' : (isShared ? 'shared' : 'booked')));
+    const groupColor = !isFree ? roomBorderColor(entry) : null;
+    const groupStyle = groupColor ? `border:3px solid ${groupColor}; box-shadow:0 0 0 3px ${groupColor}55;` : '';
+    const hasExtraBed = hbRoomHasExtraBed(entry);
+    const extraBedBadge = hasExtraBed ? `<div style="position:absolute; top:-8px; right:-8px; background:#facc15; color:#1f2937; font-size:10px; font-weight:700; padding:2px 6px; border-radius:9999px; box-shadow:0 1px 4px rgba(0,0,0,.3); z-index:10;">🛏️+1</div>` : '';
+    const validReqs = shares.map(s=>s.requestNum).filter(Boolean);
+    const dataReqs = validReqs.length ? `data-hbreqs="${validReqs.join(',')}"` : '';
+    const centerInfo = shares.length===0 ? '' : shares.length===1
+      ? `<div style="font-size:11px; margin-top:6px; font-weight:700; background:rgba(255,255,255,.3); padding:3px; border-radius:6px;">${shares[0].requestNum ? '№'+shares[0].requestNum : '⚠️ без №'}</div>`
+      : `<div style="font-size:10px; margin-top:6px; font-weight:700; background:rgba(255,255,255,.3); padding:3px; border-radius:6px; line-height:1.3;">${shares.map(s=> s.requestNum ? `№${s.requestNum} (${s.total})` : `⚠️ без № (${s.total||0})`).join('<br>')}</div>`;
+    const occBadge = shares.length ? `<div class="hb-occupancy-badge" style="font-size:10px;">${occupancy}/${capacity}</div>` : '';
+    const label = isExtra ? room.label : room.number;
+    const subLabel = isExtra ? `${room.maxGuests} чол` : `${room.sea ? '🌊 ' : ''}${room.type}`;
+
+    return `<div onclick="hbHandleRoomClick(${room.number})" ${dataReqs} class="hb-room ${stateClass}" style="padding:10px; border-radius:12px; cursor:pointer; text-align:center; ${groupStyle}">
+        ${extraBedBadge}
+        <div style="font-size:${isExtra?'15px':'18px'}; font-weight:700;">${label}</div>
+        <div style="font-size:10px; margin-top:2px;">${subLabel}</div>
+        ${centerInfo}
+        ${occBadge}
+      </div>`;
+  }
+
+  Object.keys(floors).forEach(floorNum=>{
+    const rooms = floors[floorNum];
+    let html = `<div class="hb-floor-header" style="padding:10px 14px; border-radius:12px; font-size:15px; font-weight:700; margin-bottom:10px;">Поверх ${floorNum}</div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(90px,1fr)); gap:8px;">`;
+    rooms.forEach(room=>{ html += renderRoomTile(room, false); });
+    html += `</div>`;
+    grid.innerHTML += html;
+  });
+
+  const extras = hbExtraRooms[hbCurrentHotel] || [];
+  let extraHtml = `<div class="hb-floor-header" style="padding:10px 14px; border-radius:12px; font-size:15px; font-weight:700; margin-bottom:10px; background:linear-gradient(90deg,#b45309,#f59e0b);">➕ Додаткові місця (овербукінг)</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(90px,1fr)); gap:8px;">`;
+  extras.forEach(room=>{ extraHtml += renderRoomTile(room, true); });
+  extraHtml += `<div onclick="hbOpenAddRoomModal()" style="padding:10px; border-radius:12px; cursor:pointer; text-align:center; border:2px dashed #d97706; color:#d97706; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div style="font-size:18px;">➕</div>
+      <div style="font-size:10px; margin-top:2px; font-weight:600;">Додати місце</div>
+    </div>`;
+  extraHtml += `</div>`;
+  grid.innerHTML += extraHtml;
+
+  const totalGuests = hotelDb.reduce((s,e)=>s+hbRoomOccupancy(e),0);
+  const occupiedRoomsCount = hotelDb.filter(e=>e.shares.length>0).length;
+  const totalRoomsCount = hbGetAllRoomsForHotel(hbCurrentHotel).length;
+  document.getElementById('hbHotelSummary').textContent = `👥 Всього заброньовано туристів: ${totalGuests} · зайнято кімнат: ${occupiedRoomsCount} з ${totalRoomsCount}`;
+
+  const groupsEl = document.getElementById('hbGroupsSummary');
+  const groupedKeys = Object.keys(keyCounts).filter(k=>keyCounts[k]>1);
+  groupsEl.innerHTML = groupedKeys.length ? groupedKeys.map(key=>{
+    const roomsInGroup = [];
+    hotelDb.forEach(entry=> entry.shares.forEach(sh=>{ if(sh.requestNum && colorKeyFor(sh.requestNum)===key) roomsInGroup.push({ number:entry.number, share:sh }); }));
+    const groupTotal = roomsInGroup.reduce((s,r)=>s+(r.share.total||0),0);
+    const color = keyColor[key];
+    const rooms = roomsInGroup.map(r=>`${hbRoomDisplay(hbCurrentHotel,r.number)} (заявка №${r.share.requestNum}, ${r.share.total} чол)`).join(' · ');
+    return `<div style="padding:10px; border-radius:10px; font-size:13px; border:2px solid ${color}; background:${color}15;"><strong>🔗 Об'єднана компанія — ${groupTotal} чол:</strong> ${rooms}</div>`;
+  }).join('') : '';
+
+  const sharingEl = document.getElementById('hbSharingSummary');
+  const sharingRooms = hotelDb.filter(e=> e.shares.length>=2 || (e.shares.length===1 && e.shares[0].seeking));
+  sharingEl.innerHTML = sharingRooms.length ? `<div style="font-weight:600; font-size:13px; margin-bottom:2px;">🛌 Номери на підселення (${sharingRooms.length}):</div>` +
+    sharingRooms.map(e=>{
+      const cap = hbRoomEffectiveCapacity(hbCurrentHotel, e.number, e);
+      const occ = hbRoomOccupancy(e);
+      const isPending = e.shares.length===1 && e.shares[0].seeking;
+      const shBadges = e.shares.map(sh=>`№${sh.requestNum} (${sh.total} чол)`).join(' + ');
+      const status = isPending ? `<span style="color:#b45309; font-weight:700;">🔄 Шукаємо ще ${cap-occ} чол</span>` : `<span style="color:#4338ca; font-weight:700;">✅ Заповнено (${occ}/${cap})</span>`;
+      return `<div style="padding:10px; border-radius:10px; font-size:13px; border:2px solid ${isPending?'#fbbf24':'#a5b4fc'}; background:${isPending?'#fffbeb':'#eef2ff'};"><strong>${hbRoomDisplay(hbCurrentHotel,e.number)}:</strong> ${shBadges} — ${status}</div>`;
+    }).join('') : '';
+
+  const notesEl = document.getElementById('hbNotesSummary');
+  const notedShares = [];
+  hotelDb.forEach(entry=> entry.shares.forEach(sh=>{ if(sh.notes && sh.notes.trim()) notedShares.push({ roomNum:entry.number, share:sh }); }));
+  notesEl.innerHTML = notedShares.length ? `<div style="font-weight:600; font-size:13px; margin-bottom:2px;">📝 Нотатки про туристів (${notedShares.length}):</div>` +
+    notedShares.map(n=>`<div style="padding:10px; border-radius:10px; font-size:13px; border:2px solid #fde68a; background:#fefce8;"><strong>${hbRoomDisplay(hbCurrentHotel,n.roomNum)}</strong> · заявка №${n.share.requestNum ?? '⚠️'}:<div style="margin-top:4px;">${n.share.notes}</div></div>`).join('') : '';
+
+  hbAttachLinkHoverHighlight();
+}
+
+function hbAttachLinkHoverHighlight(){
+  const roomEls = Array.from(document.querySelectorAll('#hbRoomsGrid .hb-room[data-hbreqs]'));
+  const groupMap = (hbLinkGroups[hbCurrentHotel] && hbLinkGroups[hbCurrentHotel][hbCurrentPeriod]) || {};
+  const keyToRoomEls = {};
+  roomEls.forEach(el=>{
+    const myReqs = el.dataset.hbreqs.split(',');
+    const myKeys = new Set(myReqs.map(r=>groupMap[r]||r));
+    el._hbLinkKeys = myKeys;
+    myKeys.forEach(k=>{ if(!keyToRoomEls[k]) keyToRoomEls[k]=new Set(); keyToRoomEls[k].add(el); });
+  });
+  roomEls.forEach(el=>{
+    el.addEventListener('mouseenter', ()=>{
+      const related = new Set();
+      el._hbLinkKeys.forEach(k=>{ if(keyToRoomEls[k] && keyToRoomEls[k].size>1) keyToRoomEls[k].forEach(o=>related.add(o)); });
+      related.forEach(o=>o.classList.add('hb-link-hover'));
+    });
+    el.addEventListener('mouseleave', ()=>{ roomEls.forEach(o=>o.classList.remove('hb-link-hover')); });
+  });
+}
+
+function hbHandleRoomClick(roomNum){
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
+  if(!entry || entry.shares.length===0){
+    if(hbIsPeriodLocked(hbCurrentPeriod)) return alert("Бронювання заблоковано — заїзд уже почався або завершився");
+    hbOpenBookingModal(roomNum, 'new');
+    return;
+  }
+  hbOpenRoomDetailModal(roomNum);
+}
+
+function hbOpenBookingModal(roomNum, mode){
+  hbModalRoomNum = roomNum;
+  hbModalMode = mode;
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
+  const occupancy = hbRoomOccupancy(entry);
+  const capacity = hbRoomEffectiveCapacity(hbCurrentHotel, roomNum, entry);
+  const remaining = capacity - occupancy;
+  const hasExtraBedAlready = hbRoomHasExtraBed(entry);
+
+  document.getElementById('hbModalRoomNumber').textContent = hbRoomDisplay(hbCurrentHotel, roomNum);
+  document.getElementById('hbModalCapacityInfo').textContent = mode==='add'
+    ? `Вільно ще ${remaining} з ${capacity} місць${hasExtraBedAlready ? ' (уже з екстраліжком)' : ''}`
+    : `Місткість номера: ${capacity} осіб`;
+  document.getElementById('hbRequestNum').value = '';
+  document.getElementById('hbAdults').value = mode==='add' ? 1 : 2;
+  document.getElementById('hbKids612').value = 0;
+  document.getElementById('hbKidsUnder6').value = 0;
+  document.getElementById('hbShareNotes').value = '';
+  const extraBedCb = document.getElementById('hbExtraBedCheckbox');
+  extraBedCb.checked = false;
+  extraBedCb.disabled = hasExtraBedAlready;
+  const seekingWrap = document.getElementById('hbSeekingWrap');
+  document.getElementById('hbSeekingCheckbox').checked = false;
+  seekingWrap.style.display = mode==='add' ? 'none' : 'flex';
+  document.getElementById('hbBookingModal').classList.remove('app-hidden');
+}
+
+function hbOpenRoomDetailModal(roomNum){
+  hbActiveRoomNum = roomNum;
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
+  const occupancy = hbRoomOccupancy(entry);
+  const capacity = hbRoomEffectiveCapacity(hbCurrentHotel, roomNum, entry);
+
+  document.getElementById('hbRaRoomNumber').textContent = hbRoomDisplay(hbCurrentHotel, roomNum);
+  document.getElementById('hbRaCapacityLine').textContent = `Зайнято ${occupancy} з ${capacity} місць${hbRoomHasExtraBed(entry) ? ' · 🛏️ з екстраліжком' : ''}`;
+
+  const listEl = document.getElementById('hbRaSharesList');
+  listEl.innerHTML = entry.shares.map((sh, idx)=>{
+    const matchedNames = sh.requestNum
+      ? (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===String(sh.requestNum)).map(t=>t.full_name)
+      : [];
+    return `
+    <div style="padding:10px; border:2px solid ${!sh.requestNum?'#f87171':'var(--line)'}; background:${!sh.requestNum?'#fef2f2':'#fff'}; border-radius:10px;">
+      <div style="font-weight:600; font-size:14px;">Заявка №${sh.requestNum ?? '⚠️ невідома (биті дані)'} — ${sh.total ?? 0} чол${sh.seeking ? ' · 🔄 шукає сусіда' : ''}</div>
+      <div style="font-size:12px; color:#6b7280; margin-bottom:4px;">дорослих: ${sh.adults ?? 0}, діти 6-12: ${sh.kids612 ?? 0}, діти 0-5: ${sh.kidsUnder6 ?? 0}</div>
+      ${matchedNames.length ? `<div style="font-size:13px; font-weight:600; margin-bottom:8px;">${matchedNames.join(', ')}</div>` : `<div style="font-size:11.5px; color:#9ca3af; margin-bottom:8px;">Імена невідомі — завантаж базовий список у "Огляд і імпорт", щоб бачити їх тут.</div>`}
+      ${sh.notes ? `<div style="font-size:12px; background:#fefce8; border:1px solid #fde68a; border-radius:8px; padding:6px; margin-bottom:8px;">📝 ${sh.notes}</div>` : ''}
+      <div style="display:flex; gap:6px;">
+        <button onclick="hbOpenMoveModalByIndex(${idx})" class="btn btn-primary btn-small" style="flex:1;">🔀 Перенести</button>
+        <button onclick="hbOpenLinkModalByIndex(${idx})" class="btn btn-small" style="flex:1; background:#7c3aed; color:#fff;" ${!sh.requestNum?'disabled':''}>🔗 Зв'язати</button>
+        <button onclick="hbHandleCancelShareByIndex(${idx})" class="btn btn-danger-ghost btn-small" style="flex:1;">❌ Скасувати</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const addWrap = document.getElementById('hbRaAddSharerWrap');
+  addWrap.innerHTML = occupancy<capacity
+    ? `<button onclick="hbStartAddSharer()" class="btn" style="width:100%; background:#f97316; color:#fff; padding:12px;">➕ Підселити ще одну заявку (${capacity-occupancy} місць вільно)</button>`
+    : '';
+
+  document.getElementById('hbRoomActionsModal').classList.remove('app-hidden');
+}
+
+function hbHandleCancelShareByIndex(idx){
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, hbActiveRoomNum);
+  if(!entry || !entry.shares[idx]) return;
+  hbHandleCancelShare(entry.shares[idx].requestNum);
+}
+function hbOpenMoveModalByIndex(idx){
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, hbActiveRoomNum);
+  if(!entry || !entry.shares[idx]) return;
+  hbOpenMoveModal(entry.shares[idx].requestNum);
+}
+function hbOpenLinkModalByIndex(idx){
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, hbActiveRoomNum);
+  if(!entry || !entry.shares[idx]) return;
+  if(!entry.shares[idx].requestNum){ alert('У цього запису немає номера заявки, тож його не можна зв\'язати з іншими. Спочатку скасуйте цей запис.'); return; }
+  hbOpenLinkModal(entry.shares[idx].requestNum);
+}
+
+function hbStartAddSharer(){
+  const roomNum = hbActiveRoomNum;
+  document.getElementById('hbRoomActionsModal').classList.add('app-hidden');
+  hbOpenBookingModal(roomNum, 'add');
+}
+function hbCloseRoomActionsModal(){
+  document.getElementById('hbRoomActionsModal').classList.add('app-hidden');
+  hbActiveRoomNum = null;
+}
+
+async function hbHandleCancelShare(requestNum){
+  const roomNum = hbActiveRoomNum;
+  hbCloseRoomActionsModal();
+  await hbCancelShare(roomNum, requestNum);
+}
+
+function hbOpenMoveModal(requestNum){
+  hbActiveShareReq = requestNum;
+  const fromRoom = hbActiveRoomNum;
+  document.getElementById('hbRoomActionsModal').classList.add('app-hidden');
+  document.getElementById('hbMoveFromRoom').textContent = `заявку №${requestNum ?? '(без номера)'} з ${hbRoomDisplay(hbCurrentHotel, fromRoom)}`;
+  const sel = document.getElementById('hbMoveTargetRoom');
+  const allRooms = hbGetAllRoomsForHotel(hbCurrentHotel);
+  sel.innerHTML = allRooms.filter(r=>r.number!==fromRoom).map(r=>{
+    const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, r.number);
+    const occ = hbRoomOccupancy(entry);
+    const cap = hbRoomEffectiveCapacity(hbCurrentHotel, r.number, entry);
+    const remaining = cap - occ;
+    const label = hbRoomDisplay(hbCurrentHotel, r.number);
+    const status = remaining<=0 ? ' (немає місць)' : (occ>0 ? ` (вільно ${remaining} з ${cap})` : ' (вільна)');
+    return `<option value="${r.number}" ${remaining<=0?'disabled':''}>${label} — ${r.type}${status}</option>`;
+  }).join('');
+  document.getElementById('hbMoveRoomModal').classList.remove('app-hidden');
+}
+function hbCloseMoveModal(){
+  document.getElementById('hbMoveRoomModal').classList.add('app-hidden');
+  hbActiveRoomNum = null; hbActiveShareReq = null;
+}
+async function hbConfirmMove(){
+  const fromRoom = hbActiveRoomNum;
+  const fromReq = hbActiveShareReq;
+  const toRoom = parseInt(document.getElementById('hbMoveTargetRoom').value);
+  document.getElementById('hbMoveRoomModal').classList.add('app-hidden');
+  await hbMoveShare(fromRoom, fromReq, toRoom);
+  hbActiveRoomNum = null; hbActiveShareReq = null;
+
+  // If this booking is linked to others (same company), offer to bring them closer too.
+  const groupMap = (hbLinkGroups[hbCurrentHotel] && hbLinkGroups[hbCurrentHotel][hbCurrentPeriod]) || {};
+  const myGroupId = fromReq ? groupMap[fromReq] : null;
+  if(myGroupId){
+    const siblings = Object.keys(groupMap).filter(req => req!==fromReq && groupMap[req]===myGroupId);
+    const hotelDb = (hbDatabase[hbCurrentHotel] && hbDatabase[hbCurrentHotel][hbCurrentPeriod]) || [];
+    const elsewhere = siblings.filter(req=>{
+      const entry = hotelDb.find(e=>e.shares.some(s=>s.requestNum===req));
+      return entry && entry.number !== toRoom;
+    });
+    if(elsewhere.length){
+      const wants = await hbAskYesNo(`Заявка №${fromReq} пов'язана з №${elsewhere.join(', №')}. Запропонувати перенести їх теж ближче до ${hbRoomDisplay(hbCurrentHotel,toRoom)}?`);
+      if(wants){
+        for(const req of elsewhere){ await hbSuggestMoveSiblingNear(req, toRoom); }
+      }
+    }
+  }
+}
+
+async function hbSuggestMoveSiblingNear(req, targetRoomNum){
+  const hotelDb = (hbDatabase[hbCurrentHotel] && hbDatabase[hbCurrentHotel][hbCurrentPeriod]) || [];
+  const entry = hotelDb.find(e=>e.shares.some(s=>s.requestNum===req));
+  if(!entry){ hbShowToast(`Заявку №${req} не знайдено в поточному готелі/заїзді.`); return; }
+  const share = entry.shares.find(s=>s.requestNum===req);
+  const targetRoomDef = hbGetAllRoomsForHotel(hbCurrentHotel).find(r=>r.number===targetRoomNum);
+  const targetFloor = targetRoomDef ? targetRoomDef.floor : null;
+
+  const slots = hbBuildRoomSlots().filter(s=>s.roomNum!==entry.number);
+  const sameFloor = slots.filter(s=>s.floor===targetFloor && s.remaining>=share.total);
+  const candidates = (sameFloor.length ? sameFloor : slots.filter(s=>s.remaining>=share.total)).sort((a,b)=>a.remaining-b.remaining);
+  if(!candidates.length){ hbShowToast(`Немає вільного місця для заявки №${req} поруч.`); return; }
+  const best = candidates[0];
+
+  const wants = await hbAskYesNo(`Перенести заявку №${req} (${share.total} чол) з ${hbRoomDisplay(hbCurrentHotel,entry.number)} в ${hbRoomDisplay(hbCurrentHotel,best.roomNum)} (поверх ${best.floor})?`);
+  if(wants){
+    await hbMoveShare(entry.number, req, best.roomNum);
+    hbLoadRoomsGrid();
+  }
+}
+
+async function hbConfirmBooking(){
+  const requestNum = document.getElementById('hbRequestNum').value.trim();
+  const adults = parseInt(document.getElementById('hbAdults').value) || 0;
+  const kids612 = parseInt(document.getElementById('hbKids612').value) || 0;
+  const kidsUnder6 = parseInt(document.getElementById('hbKidsUnder6').value) || 0;
+  const extraBed = document.getElementById('hbExtraBedCheckbox').checked;
+  const seeking = document.getElementById('hbSeekingCheckbox').checked;
+  const notes = document.getElementById('hbShareNotes').value.trim();
+  const total = adults + kids612 + kidsUnder6;
+  const roomNum = hbModalRoomNum;
+
+  if(!requestNum || requestNum.length<4) return alert("Введіть номер заявки (4-5 цифр)");
+
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
+  const alreadyHasExtraBed = hbRoomHasExtraBed(entry);
+  const occupancy = hbRoomOccupancy(entry);
+  const baseCapacity = hbRoomBaseCapacity(hbCurrentHotel, roomNum);
+  const effectiveCapacity = baseCapacity + ((alreadyHasExtraBed||extraBed) ? 1 : 0);
+  const remaining = effectiveCapacity - occupancy;
+
+  if(total > remaining) return alert(`Недостатньо місць! У ${hbRoomDisplay(hbCurrentHotel,roomNum)} вільно лише ${remaining} з ${effectiveCapacity}${(alreadyHasExtraBed||extraBed)?' (з екстраліжком)':''}.`);
+
+  const share = { requestNum, adults, kids612, kidsUnder6, total, extraBed: extraBed||alreadyHasExtraBed, seeking: seeking && (occupancy+total<effectiveCapacity), notes };
+
+  if(!hbDatabase[hbCurrentHotel]) hbDatabase[hbCurrentHotel] = {};
+  if(!hbDatabase[hbCurrentHotel][hbCurrentPeriod]) hbDatabase[hbCurrentHotel][hbCurrentPeriod] = [];
+  const list = hbDatabase[hbCurrentHotel][hbCurrentPeriod];
+  let roomEntry = list.find(e=>e.number===roomNum);
+  if(!roomEntry){ roomEntry = { number:roomNum, shares:[] }; list.push(roomEntry); }
+  roomEntry.shares = roomEntry.shares.filter(s=>s.requestNum!==requestNum);
+  roomEntry.shares.push(share);
+
+  await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, roomNum, share);
+  hbShowToast("✅ Кімната заброньована!");
+  hbLoadRoomsGrid();
+  setTimeout(()=> hbCloseModal(), 800);
+}
+
+async function hbCancelShare(roomNum, requestNum){
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
+  if(entry) entry.shares = entry.shares.filter(s=>s.requestNum!==requestNum);
+  await hbDeleteShare(hbCurrentHotel, hbCurrentPeriod, roomNum, requestNum);
+  if(requestNum!==null && requestNum!==undefined && requestNum!=='') await hbUnlinkRequest(hbCurrentHotel, hbCurrentPeriod, requestNum);
+  hbLoadRoomsGrid();
+}
+
+async function hbMoveShare(fromRoom, fromReq, toRoom){
+  const fromEntry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, fromRoom);
+  if(!fromEntry) return alert("Помилка: кімнату не знайдено в базі.");
+  const share = fromEntry.shares.find(s=>s.requestNum===fromReq);
+  if(!share) return alert("Помилка: заявку не знайдено в цій кімнаті.");
+  if(!toRoom) return;
+
+  const toEntry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, toRoom);
+  const toOccupied = hbRoomOccupancy(toEntry);
+  const toHasExtraBed = hbRoomHasExtraBed(toEntry);
+  const baseCap = hbRoomBaseCapacity(hbCurrentHotel, toRoom);
+  let effectiveCap = baseCap + (toHasExtraBed?1:0);
+  let remaining = effectiveCap - toOccupied;
+
+  let needsExtraBed = false;
+  if(share.total > remaining){
+    if(share.total > remaining+1){ alert(`Недостатньо місць! У ${hbRoomDisplay(hbCurrentHotel,toRoom)} вільно лише ${remaining} (навіть з екстраліжком не вистачить на ${share.total} осіб).`); return; }
+    const wantsExtraBed = await hbAskYesNo(`У ${hbRoomDisplay(hbCurrentHotel,toRoom)} вільно лише ${remaining} місць — не вистачає для ${share.total} осіб. Додати екстраліжко (+1 місце)?`);
+    if(!wantsExtraBed) return;
+    needsExtraBed = true;
+  }
+
+  const movedShare = { ...share, extraBed: share.extraBed || needsExtraBed };
+  fromEntry.shares = fromEntry.shares.filter(s=>s.requestNum!==fromReq);
+  await hbDeleteShare(hbCurrentHotel, hbCurrentPeriod, fromRoom, fromReq);
+
+  let destEntry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, toRoom);
+  if(!destEntry){ destEntry = { number:toRoom, shares:[] }; hbDatabase[hbCurrentHotel][hbCurrentPeriod].push(destEntry); }
+  destEntry.shares.push(movedShare);
+  await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, toRoom, movedShare);
+
+  hbLoadRoomsGrid();
+  hbShowToast(`✅ Заявку №${fromReq} перенесено в ${hbRoomDisplay(hbCurrentHotel,toRoom)}${movedShare.extraBed?' (з екстраліжком)':''}`);
+}
+
+function hbOpenAddRoomModal(){
+  document.getElementById('hbExtraRoomCapacity').value = 2;
+  document.getElementById('hbAddRoomModal').classList.remove('app-hidden');
+}
+function hbCloseAddRoomModal(){ document.getElementById('hbAddRoomModal').classList.add('app-hidden'); }
+async function hbConfirmAddExtraRoom(){
+  const capacity = parseInt(document.getElementById('hbExtraRoomCapacity').value) || 1;
+  const existing = hbExtraRooms[hbCurrentHotel] || [];
+  const nextIndex = existing.length + 1;
+  const usedNumbers = new Set(hbGetAllRoomsForHotel(hbCurrentHotel).map(r=>r.number));
+  let internalNumber = 9000 + nextIndex;
+  while(usedNumbers.has(internalNumber)) internalNumber++;
+  const label = `Місце ${nextIndex}`;
+  const typeLabel = `Додаткове місце (${capacity} чол)`;
+  const ok = await hbSaveExtraRoom(hbCurrentHotel, internalNumber, typeLabel, capacity, label);
+  if(!ok) return;
+  if(!hbExtraRooms[hbCurrentHotel]) hbExtraRooms[hbCurrentHotel] = [];
+  hbExtraRooms[hbCurrentHotel].push({ number:internalNumber, type:typeLabel, maxGuests:capacity, label });
+  hbCloseAddRoomModal();
+  hbLoadRoomsGrid();
+}
+
+function hbCloseModal(){ document.getElementById('hbBookingModal').classList.add('app-hidden'); }
+
+function hbOpenLinkModal(myReq){
+  document.getElementById('hbRoomActionsModal').classList.add('app-hidden');
+  document.getElementById('hbLinkFromRequest').textContent = myReq;
+  const list = (hbDatabase[hbCurrentHotel] && hbDatabase[hbCurrentHotel][hbCurrentPeriod]) || [];
+  const allReqs = new Set();
+  list.forEach(entry=>entry.shares.forEach(sh=>{ if(sh.requestNum) allReqs.add(sh.requestNum); }));
+  allReqs.delete(myReq);
+  const otherReqs = [...allReqs];
+  const groupMap = (hbLinkGroups[hbCurrentHotel] && hbLinkGroups[hbCurrentHotel][hbCurrentPeriod]) || {};
+  const myGroup = groupMap[myReq] || null;
+  const optsEl = document.getElementById('hbLinkOptionsList');
+  optsEl.innerHTML = otherReqs.length ? otherReqs.map(req=>{
+    const checked = myGroup && groupMap[req]===myGroup;
+    return `<label style="display:flex; align-items:center; gap:8px; padding:8px; border:2px solid var(--line); border-radius:8px; cursor:pointer;" class="hb-link-option-row" data-hbreq="${req}">
+      <input type="checkbox" class="hb-link-req-cb" value="${req}" ${checked?'checked':''} style="width:16px; height:16px;">
+      <span style="font-size:13px;">Заявка №${req}</span>
+    </label>`;
+  }).join('') : '<p class="muted" style="font-size:13px;">Немає інших активних заявок цього заїзду для зв\'язку.</p>';
+  document.getElementById('hbLinkSearchInput').value = '';
+  document.getElementById('hbLinkModal').classList.remove('app-hidden');
+}
+function hbCloseLinkModal(){ document.getElementById('hbLinkModal').classList.add('app-hidden'); hbActiveRoomNum = null; }
+async function hbSaveLinkSelection(){
+  const myReq = document.getElementById('hbLinkFromRequest').textContent;
+  const checked = Array.from(document.querySelectorAll('.hb-link-req-cb:checked')).map(cb=>cb.value);
+  hbCloseLinkModal();
+  if(!checked.length) await hbUnlinkRequest(hbCurrentHotel, hbCurrentPeriod, myReq);
+  else await hbLinkRequestsFn(hbCurrentHotel, hbCurrentPeriod, [myReq, ...checked]);
+  hbLoadRoomsGrid();
+}
+document.addEventListener('input', e=>{
+  if(e.target && e.target.id==='hbLinkSearchInput'){
+    const query = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#hbLinkOptionsList .hb-link-option-row').forEach(row=>{
+      const req = (row.dataset.hbreq||'').toLowerCase();
+      row.style.display = (!query || req.includes(query)) ? '' : 'none';
+    });
+  }
+});
+
+/* ---------- Планувальник розселення ---------- */
+async function hbLoadDemandsFromBaseList(){
+  const { data: tourists, error } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', currentTripId).order('row_order');
+  if(error || !tourists || !tourists.length){ alert('Немає завантаженого базового списку для цього заїзду (спочатку завантаж його у вкладці "Огляд і імпорт").'); return; }
+  const groups = {};
+  tourists.forEach(t=>{
+    const key = t.link_group || t.id;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+  const existingReqs = new Set();
+  Object.keys(hbDatabase).forEach(h=> Object.keys(hbDatabase[h]||{}).forEach(p=>{
+    (hbDatabase[h][p]||[]).forEach(entry=> entry.shares.forEach(sh=>{ if(sh.requestNum) existingReqs.add(String(sh.requestNum)); }));
+  }));
+  document.getElementById('hbPlannerDemandRows').innerHTML = '';
+  let added = 0;
+  Object.values(groups).forEach(members=>{
+    const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean))];
+    const primaryReq = (bookingNumbers[0]||'').replace(/^#/,'').trim();
+    if(!primaryReq || existingReqs.has(primaryReq)) return;
+    const combinedComment = members.map(m=>m.comment).filter(Boolean).join(' ');
+    hbAddDemandRow(primaryReq, members.length, combinedComment);
+    added++;
+  });
+  if(!added) alert('Усі групи з базового списку вже заброньовані (або список порожній).');
+  else hbShowToast(`Завантажено ${added} груп із базового списку.`);
+}
+
+function hbOpenPlannerModal(){
+  hbPlannerSuggestions = [];
+  document.getElementById('hbPlannerResults').innerHTML = '';
+  hbRenderSeekingInfo();
+  document.getElementById('hbPlannerDemandRows').innerHTML = '';
+  hbAddDemandRow();
+  document.getElementById('hbPlannerModal').classList.remove('app-hidden');
+}
+function hbClosePlannerModal(){ document.getElementById('hbPlannerModal').classList.add('app-hidden'); }
+function hbRenderSeekingInfo(){
+  const hotelDb = (hbDatabase[hbCurrentHotel] && hbDatabase[hbCurrentHotel][hbCurrentPeriod]) || [];
+  const seekingRooms = hotelDb.filter(e=>e.shares.length===1 && e.shares[0].seeking && hbRoomOccupancy(e)<hbRoomEffectiveCapacity(hbCurrentHotel,e.number,e));
+  const infoEl = document.getElementById('hbPlannerSeekingInfo');
+  if(!seekingRooms.length){ infoEl.innerHTML = '<p class="muted" style="font-size:13px;">Наразі немає кімнат, що шукають сусіда для цього готелю/заїзду.</p>'; return; }
+  infoEl.innerHTML = `<div style="padding:10px; background:#fffbeb; border:2px solid #fbbf24; border-radius:10px; font-size:13px;">
+    <div style="font-weight:700; color:#92400e; margin-bottom:4px;">🔄 Ці кімнати вже шукають сусіда — підказчик спробує заповнити їх у першу чергу:</div>
+    ${seekingRooms.map(e=>{ const cap=hbRoomEffectiveCapacity(hbCurrentHotel,e.number,e); const occ=hbRoomOccupancy(e); return `<div>${hbRoomDisplay(hbCurrentHotel,e.number)}: заявка №${e.shares[0].requestNum} (${occ}/${cap}), вільно ще ${cap-occ}</div>`; }).join('')}
+  </div>`;
+}
+function hbAddDemandRow(reqVal, totalVal, wishText){
+  const id = ++hbPlannerDemandIdSeq;
+  const rowsEl = document.getElementById('hbPlannerDemandRows');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; gap:8px; align-items:center; flex-wrap:wrap;';
+  row.id = `hbDemandRow-${id}`;
+  row.innerHTML = `
+    <input type="text" maxlength="5" placeholder="№ заявки" value="${reqVal||''}" class="hb-demand-req" style="width:70px; padding:8px; border:2px solid var(--line); border-radius:8px; font-size:13px;">
+    <input type="number" min="1" value="${totalVal||2}" placeholder="осіб" class="hb-demand-total" style="width:60px; padding:8px; border:2px solid var(--line); border-radius:8px; font-size:13px;">
+    <input type="text" placeholder="побажання (море, бік, 2 поверх...)" value="${wishText||''}" class="hb-demand-wish" style="flex:1; min-width:140px; padding:8px; border:2px solid var(--line); border-radius:8px; font-size:13px;">
+    <button onclick="hbRemoveDemandRow(${id})" style="color:#dc2626; padding:8px 10px; font-weight:600; background:none; border:none; cursor:pointer;">✕</button>`;
+  rowsEl.appendChild(row);
+}
+function hbRemoveDemandRow(id){ const row = document.getElementById(`hbDemandRow-${id}`); if(row) row.remove(); }
+function hbCollectDemandsFromInputs(){
+  const rows = Array.from(document.querySelectorAll('#hbPlannerDemandRows > div'));
+  const demands = []; const errors = [];
+  rows.forEach(row=>{
+    const req = row.querySelector('.hb-demand-req').value.trim();
+    const total = parseInt(row.querySelector('.hb-demand-total').value) || 0;
+    const wishText = row.querySelector('.hb-demand-wish') ? row.querySelector('.hb-demand-wish').value.trim() : '';
+    if(!req && total===0) return;
+    if(!req || req.length<4){ errors.push(`Вкажіть коректний номер заявки (4-5 цифр) у рядку з ${total||'?'} особами.`); return; }
+    if(total<1){ errors.push(`Заявка №${req}: вкажіть кількість людей.`); return; }
+    demands.push({ requestNum:req, total, wish: hbParseWish(wishText) });
+  });
+  return { demands, errors };
+}
+function hbBuildRoomSlots(){
+  const hotelDb = (hbDatabase[hbCurrentHotel] && hbDatabase[hbCurrentHotel][hbCurrentPeriod]) || [];
+  const allRooms = hbGetAllRoomsForHotel(hbCurrentHotel);
+  const slots = [];
+  allRooms.forEach(room=>{
+    const entry = hotelDb.find(e=>e.number===room.number);
+    const occ = hbRoomOccupancy(entry);
+    const cap = hbRoomEffectiveCapacity(hbCurrentHotel, room.number, entry);
+    const remaining = cap - occ;
+    if(remaining<=0) return;
+    const isFree = !entry || entry.shares.length===0;
+    const hasExtraBedAlready = hbRoomHasExtraBed(entry);
+    slots.push({
+      roomNum:room.number, label:hbRoomDisplay(hbCurrentHotel,room.number), remaining, isFree,
+      canAddExtraBed: !hasExtraBedAlready, floor: room.floor, sea: !!room.sea,
+      side: /бік/.test(room.type||''), street: /вулиц/.test(room.type||''),
+      hasDoubleBed: /двоспальне/.test(room.type||'')
+    });
+  });
+  return slots;
+}
+// How well a slot matches a demand's wish — lower is better (0 = perfect match).
+function hbWishMismatchScore(slot, wish){
+  if(!wish) return 0;
+  let score = 0;
+  if(wish.seaView && !slot.sea) score += 100;
+  if(wish.floor && slot.floor !== wish.floor) score += 20;
+  if(wish.side && !slot.side) score += 5;
+  if(wish.street && !slot.street) score += 5;
+  return score;
+}
+function hbComputeAllocation(demands){
+  const slots = hbBuildRoomSlots();
+  const sorted = [...demands].sort((a,b)=>b.total-a.total);
+  const assignments = []; const unplaced = [];
+  sorted.forEach(dem=>{
+    let remainingToPlace = dem.total;
+    let splitParts = 0;
+    let firstFloor = null;
+    while(remainingToPlace>0){
+      const candidates = slots.filter(s=>s.remaining>0).sort((a,b)=>{
+        const am = hbWishMismatchScore(a, dem.wish) + (splitParts>0 && firstFloor!==null && a.floor!==firstFloor ? 8 : 0);
+        const bm = hbWishMismatchScore(b, dem.wish) + (splitParts>0 && firstFloor!==null && b.floor!==firstFloor ? 8 : 0);
+        if(am!==bm) return am-bm;
+        if(a.isFree!==b.isFree) return a.isFree ? 1 : -1;
+        return a.remaining-b.remaining;
+      });
+      if(!candidates.length){ unplaced.push({ requestNum:dem.requestNum, total:remainingToPlace }); break; }
+      let chosen = candidates.find(s=>s.remaining>=remainingToPlace);
+      let needsExtraBed = false;
+      if(!chosen){ chosen = candidates.find(s=>s.canAddExtraBed && (s.remaining+1)>=remainingToPlace); if(chosen) needsExtraBed=true; }
+      if(!chosen){
+        chosen = candidates.reduce((max,c)=>{
+          const cCap = c.remaining + (c.canAddExtraBed?1:0);
+          const maxCap = max ? (max.remaining + (max.canAddExtraBed?1:0)) : -1;
+          return cCap>maxCap ? c : max;
+        }, null);
+        needsExtraBed = chosen.canAddExtraBed;
+      }
+      if(firstFloor===null) firstFloor = chosen.floor;
+      const wishUnmet = hbWishMismatchScore(chosen, dem.wish) > 0;
+      const availableWithExtra = needsExtraBed ? chosen.remaining+1 : chosen.remaining;
+      const placeCount = Math.min(remainingToPlace, availableWithExtra);
+      assignments.push({ roomNum:chosen.roomNum, label:chosen.label, requestNum:dem.requestNum, total:placeCount, isSplitPart: splitParts>0 || placeCount<remainingToPlace, needsExtraBed, wishUnmet, wish: dem.wish });
+      chosen.remaining = availableWithExtra - placeCount;
+      if(needsExtraBed) chosen.canAddExtraBed = false;
+      chosen.isFree = false;
+      remainingToPlace -= placeCount;
+      splitParts++;
+    }
+  });
+  return { assignments, unplaced };
+}
+function hbComputePlanSuggestions(){
+  const { demands, errors } = hbCollectDemandsFromInputs();
+  if(errors.length){ alert(errors.join('\n')); return; }
+  if(!demands.length){ alert('Додайте хоча б одну заявку з номером і кількістю людей.'); return; }
+  const { assignments, unplaced } = hbComputeAllocation(demands);
+  hbPlannerSuggestions = assignments;
+  hbRenderSuggestions(assignments, unplaced);
+}
+function hbRenderSuggestions(assignments, unplaced){
+  const resEl = document.getElementById('hbPlannerResults');
+  if(!assignments.length && !unplaced.length){ resEl.innerHTML = '<p class="muted" style="font-size:13px;">Немає варіантів для показу.</p>'; return; }
+  let html = '';
+  if(assignments.length){
+    html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+      <div style="font-weight:600; font-size:14px;">Запропонований варіант:</div>
+      <button onclick="hbApplyAllAssignments()" class="btn btn-small" style="background:#16a34a; color:#fff;">✅ Застосувати все</button>
+    </div>`;
+    html += assignments.map((a,idx)=>`
+      <div id="hbSuggestionRow-${idx}" style="padding:10px; border:2px solid ${a.isSplitPart?'#fbbf24':'#86efac'}; background:${a.isSplitPart?'#fffbeb':'#f0fdf4'}; border-radius:10px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="font-size:13px;">
+          <strong>${a.label}</strong> ← заявка №${a.requestNum}, ${a.total} чол
+          ${a.wish && hbWishLabel(a.wish) ? `<div style="font-size:11px; color:#0369a1;">Побажання: ${hbWishLabel(a.wish)}${a.wishUnmet ? ' — <b style="color:#b91c1c;">не вдалося врахувати</b>' : ' ✓'}</div>` : ''}
+          ${a.needsExtraBed ? '<div style="font-size:11px; color:#92400e;">🛏️ потрібне екстраліжко</div>' : ''}
+          ${a.isSplitPart ? '<div style="font-size:11px; color:#92400e;">⚠️ заявку розбито на кілька кімнат</div>' : ''}
+        </div>
+        <button onclick="hbApplyAssignment(${idx})" class="btn btn-primary btn-small">Застосувати</button>
+      </div>`).join('');
+  }
+  if(unplaced.length){
+    html += `<div style="padding:10px; border:2px solid #f87171; background:#fef2f2; border-radius:10px; margin-top:8px;">
+      <div style="font-weight:700; color:#b91c1c; font-size:13px; margin-bottom:4px;">❌ Не вдалося розмістити:</div>
+      ${unplaced.map(u=>`<div style="font-size:13px;">Заявка №${u.requestNum}: ${u.total} чол — немає вільних місць</div>`).join('')}
+    </div>`;
+  }
+  resEl.innerHTML = html;
+}
+async function hbApplyPlannedShare(roomNum, share){
+  if(!hbDatabase[hbCurrentHotel]) hbDatabase[hbCurrentHotel] = {};
+  if(!hbDatabase[hbCurrentHotel][hbCurrentPeriod]) hbDatabase[hbCurrentHotel][hbCurrentPeriod] = [];
+  const list = hbDatabase[hbCurrentHotel][hbCurrentPeriod];
+  let roomEntry = list.find(e=>e.number===roomNum);
+  if(!roomEntry){ roomEntry = { number:roomNum, shares:[] }; list.push(roomEntry); }
+  roomEntry.shares = roomEntry.shares.filter(s=>s.requestNum!==share.requestNum);
+  roomEntry.shares.push(share);
+  await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, roomNum, share);
+}
+async function hbApplyAssignment(idx){
+  const a = hbPlannerSuggestions[idx];
+  if(!a) return;
+  const share = { requestNum:a.requestNum, adults:a.total, kids612:0, kidsUnder6:0, total:a.total, extraBed:a.needsExtraBed, seeking:false };
+  await hbApplyPlannedShare(a.roomNum, share);
+  const rowEl = document.getElementById(`hbSuggestionRow-${idx}`);
+  if(rowEl) rowEl.remove();
+  hbLoadRoomsGrid();
+  hbRenderSeekingInfo();
+  hbShowToast(`✅ Заявку №${a.requestNum} поселено в ${a.label}`);
+}
+async function hbApplyAllAssignments(){
+  for(let i=0;i<hbPlannerSuggestions.length;i++){
+    const a = hbPlannerSuggestions[i];
+    const rowEl = document.getElementById(`hbSuggestionRow-${i}`);
+    if(rowEl && rowEl.dataset.applied==='1') continue;
+    const share = { requestNum:a.requestNum, adults:a.total, kids612:0, kidsUnder6:0, total:a.total, extraBed:a.needsExtraBed, seeking:false };
+    await hbApplyPlannedShare(a.roomNum, share);
+    if(rowEl) rowEl.dataset.applied = '1';
+  }
+  document.getElementById('hbPlannerResults').innerHTML = '<p style="color:#15803d; font-weight:600; font-size:13px;">✅ Всі заявки з варіанту застосовано.</p>';
+  hbLoadRoomsGrid();
+  hbRenderSeekingInfo();
+  hbShowToast('✅ Розселення застосовано!');
+}
+
+/* ---------- Step-by-step allocation wizard (goes through groups one at a time) ---------- */
+let hbWizardGroups = [];
+let hbWizardIndex = 0;
+let hbWizardSelectedRoom = null;
+let hbWizardActiveTab = 'hotel';
+let hbWizardSubAssignments = {}; // { bookingNum: [{hotel, roomNum}, ...] } — a booking can span several rooms
+let hbWizardSubRemaining = {}; // { bookingNum: [members not yet placed] }
+let hbWizardActiveBooking = null;
+
+function hbWizardComputeBreakdown(group){
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  let adults=0, kids612=0, kidsUnder6=0;
+  group.members.forEach(m=>{
+    const age = m.birth_date && def ? calcAgeAtTrip(m.birth_date, def.start) : null;
+    if(age===null || age>=12) adults++;
+    else if(age>=6) kids612++;
+    else kidsUnder6++;
+  });
+  return { adults, kids612, kidsUnder6, total: group.members.length };
+}
+
+async function hbOpenWizard(){
+  const { data: tourists, error } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', currentTripId).order('row_order');
+  if(error || !tourists || !tourists.length){ alert('Немає завантаженого базового списку для цього заїзду (спочатку завантаж його у вкладці "Огляд і імпорт").'); return; }
+  const groupsByKey = {};
+  tourists.forEach(t=>{ const key=t.link_group||t.id; if(!groupsByKey[key]) groupsByKey[key]=[]; groupsByKey[key].push(t); });
+
+  const existingReqs = new Set();
+  Object.keys(hbDatabase).forEach(h=> Object.keys(hbDatabase[h]||{}).forEach(p=>{
+    if(p!==hbCurrentPeriod) return;
+    (hbDatabase[h][p]||[]).forEach(entry=> entry.shares.forEach(sh=>{ if(sh.requestNum) existingReqs.add(String(sh.requestNum)); }));
+  }));
+
+  hbWizardGroups = Object.values(groupsByKey)
+    .map(members=>{
+      const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean).map(b=>b.replace(/^#/,'')))];
+      const targetHotel = members[0].target_hotel || '';
+      return { members, bookingNumbers, minRowOrder: Math.min(...members.map(m=>m.row_order||0)), targetHotel };
+    })
+    .filter(g=> g.bookingNumbers.length && !g.bookingNumbers.some(b=>existingReqs.has(b)))
+    .sort((a,b)=>a.minRowOrder-b.minRowOrder);
+
+  if(!hbWizardGroups.length){ alert('Усі групи з базового списку вже розселені!'); return; }
+
+  hbWizardIndex = 0;
+  hbWizardSelectedRoom = null;
+  hbWizardActiveTab = 'hotel';
+  hbWizardSubAssignments = {};
+  hbWizardSubRemaining = {};
+  hbWizardActiveBooking = null;
+  if(hbWizardGroups[0].targetHotel) hbCurrentHotel = hbWizardGroups[0].targetHotel;
+  document.getElementById('hbWizardModal').classList.remove('app-hidden');
+  document.getElementById('hbWizardHotelSelect').value = hbCurrentHotel;
+  hbRenderWizard();
+}
+
+function hbWizardInitGroupState(group){
+  const bySub = {};
+  group.members.forEach(m=>{
+    const b = (m.booking_number||'').replace(/^#/,'') || '—';
+    if(!bySub[b]) bySub[b] = [];
+    bySub[b].push(m);
+  });
+  Object.keys(bySub).forEach(b=>{
+    if(!(b in hbWizardSubRemaining)) hbWizardSubRemaining[b] = [...bySub[b]];
+    if(!(b in hbWizardSubAssignments)) hbWizardSubAssignments[b] = [];
+  });
+  return bySub;
+}
+
+function hbRenderWizard(){
+  const group = hbWizardGroups[hbWizardIndex];
+  document.getElementById('hbWizardProgress').textContent = `Заявка ${hbWizardIndex+1} з ${hbWizardGroups.length}`;
+
+  const hotelWrap = document.getElementById('hbWizardHotelSelectorWrap');
+  if(group.targetHotel){
+    hbCurrentHotel = group.targetHotel;
+    hotelWrap.innerHTML = `<div style="font-weight:600; font-size:13px; padding:6px 10px; background:var(--whitewash-2); border-radius:8px; display:inline-block;">🏨 Готель: ${HB_HOTEL_STRUCTURE[group.targetHotel].name} <span class="muted" style="font-weight:400;">(визначено базовим файлом)</span></div>`;
+  } else {
+    hotelWrap.innerHTML = `<label style="font-weight:600; font-size:13px;">🏨 Готель:
+      <select id="hbWizardHotelSelect" onchange="hbWizardHotelChanged()" style="margin-left:6px; padding:6px 8px; border:2px solid var(--line); border-radius:8px;">
+        <option value="konstantin" ${hbCurrentHotel==='konstantin'?'selected':''}>Hotel Konstantin 3*</option>
+        <option value="greataleksander" ${hbCurrentHotel==='greataleksander'?'selected':''}>Great Aleksander 3*</option>
+      </select>
+    </label>`;
+  }
+
+  const { adults, kids612, kidsUnder6, total } = hbWizardComputeBreakdown(group);
+  const isLinked = group.bookingNumbers.length > 1;
+  const comments = [...new Set(group.members.map(m=>m.comment).filter(Boolean))];
+
+  const wizardDef = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const bySub = hbWizardInitGroupState(group);
+
+  if(!hbWizardActiveBooking || !bySub[hbWizardActiveBooking]) hbWizardActiveBooking = Object.keys(bySub).find(b=>(hbWizardSubRemaining[b]||[]).length>0) || Object.keys(bySub)[0];
+
+  const chipsHtml = Object.keys(bySub).map(b=>{
+    const remaining = hbWizardSubRemaining[b] || [];
+    const roomsAssigned = hbWizardSubAssignments[b] || [];
+    const done = remaining.length === 0;
+    const isActive = hbWizardActiveBooking === b;
+    const bg = done ? '#dcfce7' : (isActive ? '#dbeafe' : '#f3f4f6');
+    const border = isActive ? '2px solid #2563eb' : (done ? '2px solid #86efac' : '2px solid var(--line)');
+    const roomsLabel = roomsAssigned.length ? ` ${done?'✅':'🔸'} ${roomsAssigned.map(r=>hbRoomDisplay(r.hotel,r.roomNum)).join('+')}` : '';
+    return `<button onclick="hbWizardSetActiveBooking('${b}')" style="background:${bg}; border:${border}; border-radius:8px; padding:6px 10px; font-size:12.5px; cursor:pointer;">
+      <b>№${b}</b> (${bySub[b].length} чол${remaining.length!==bySub[b].length ? ', лишилось '+remaining.length : ''})${roomsLabel}
+    </button>`;
+  }).join('');
+
+  const breakdownHtml = Object.keys(bySub).map(b=>{
+    const names = bySub[b].map(m=>{
+      const age = m.birth_date && wizardDef ? calcAgeAtTrip(m.birth_date, wizardDef.start) : null;
+      return `${m.full_name}${age!==null ? ` (${age}р.)` : ''}`;
+    }).join(', ');
+    return `<div style="margin-top:3px;"><b>№${b}</b> (${bySub[b].length} чол): ${names}</div>`;
+  }).join('');
+
+  const suggestion = hbWizardComputeSuggestion(group);
+  hbWizardCurrentSuggestion = suggestion;
+  const nothingPlacedYet = Object.keys(bySub).every(b=>(hbWizardSubRemaining[b]||[]).length === bySub[b].length);
+  const suggestionHtml = (suggestion && !isLinked && nothingPlacedYet)
+    ? `<div style="padding:10px; background:#ecfdf5; border:2px solid #6ee7b7; border-radius:10px; margin-top:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="font-size:13px;"><b>💡 Пропозиція (одна кімната на всіх):</b> ${HB_HOTEL_STRUCTURE[suggestion.hotel].name} — кімната ${suggestion.slot.roomNum} (поверх ${suggestion.slot.floor}${suggestion.slot.sea?', 🌊 море':''}), вільно ${suggestion.slot.remaining}${suggestion.slot.hasDoubleBed && total===3 && !hbGroupHasYoungChild(group,10) ? ' <span style="color:#b45309;">⚠️ двоспальне ліжко — без малої дитини незручно на трьох</span>' : (suggestion.score>0?' <span style="color:#b45309;">(побажання не повністю враховано)</span>':'')}</div>
+        <button onclick="hbWizardAcceptSuggestion()" class="btn btn-primary btn-small">Погодити пропозицію</button>
+      </div>`
+    : (!isLinked && nothingPlacedYet ? `<div style="padding:10px; background:#fef2f2; border:2px solid #fca5a5; border-radius:10px; margin-top:8px; font-size:13px;">⚠️ Немає жодної вільної кімнати, яка вміщає всі ${total} осіб цілком. Скористайся кнопкою нижче, щоб розбити на кілька кімнат.</div>` : '');
+
+  document.getElementById('hbWizardGroupCard').innerHTML = `
+    <div style="padding:12px; border:2px solid #93c5fd; background:#eff6ff; border-radius:10px;">
+      <div style="font-weight:700; font-size:15px;">Заявка №${group.bookingNumbers.join(', №')} — ${total} чол ${isLinked ? '<span style="color:#7c3aed;">🔗 Об\'єднана компанія</span>' : '<span style="color:#6b7280;">· самостійна заявка</span>'}</div>
+      <div style="font-size:12px; color:#374151; margin-top:2px;">Дорослих (12+): ${adults} · Дітей 6-12: ${kids612} · Дітей 0-5: ${kidsUnder6}</div>
+      <div style="font-size:13px; margin-top:6px;">${breakdownHtml}</div>
+      ${comments.length ? `<div style="font-size:12px; margin-top:6px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:6px;">📝 ${comments.join(' | ')}</div>` : ''}
+      <div style="margin-top:10px;"><div class="muted" style="font-size:11.5px; text-transform:uppercase; margin-bottom:4px;">Обери, яку заявку зараз поселяєш (можна в кілька кімнат):</div><div style="display:flex; gap:6px; flex-wrap:wrap;">${chipsHtml}</div></div>
+      ${suggestionHtml}
+      <div style="margin-top:10px;"><button onclick="hbWizardSuggestFamily()" class="btn btn-primary btn-small">💡 Як би я поселив цю заявку (можливо в кілька кімнат)</button><div id="hbWizardFamilySuggestion" style="margin-top:8px;"></div></div>
+    </div>
+  `;
+
+  hbWizardSwitchTab(hbWizardActiveTab);
+  hbWizardRenderRoomsGrid();
+  hbWizardRenderSelectionPanel();
+  hbWizardRenderGroupTable();
+}
+
+let hbWizardCurrentSuggestion = null;
+function hbGroupHasYoungChild(group, maxAge){
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  return group.members.some(m=>{
+    const age = m.birth_date && def ? calcAgeAtTrip(m.birth_date, def.start) : null;
+    return age !== null && age < maxAge;
+  });
+}
+function hbDoubleBedPenalty(slot, groupSize, hasYoungChild){
+  // A "двоспальне+односпальне" triple room means two people share the double bed —
+  // fine for a parent with a young child, awkward for 3 separate adults/older kids.
+  return (groupSize===3 && slot.hasDoubleBed && !hasYoungChild) ? 15 : 0;
+}
+function hbWizardComputeSuggestion(group){
+  const wish = hbParseWish(group.members.map(m=>m.comment).filter(Boolean).join(' '));
+  const total = group.members.length;
+  const hasYoungChild = hbGroupHasYoungChild(group, 10);
+  const hotels = group.targetHotel ? [group.targetHotel] : ['konstantin','greataleksander'];
+  const savedHotel = hbCurrentHotel;
+  let best = null;
+  hotels.forEach(hotel=>{
+    hbCurrentHotel = hotel; // hbBuildRoomSlots reads the current hotel — temporarily switch to check both
+    const slots = hbBuildRoomSlots();
+    const fitting = slots.filter(s=>s.remaining>=total).sort((a,b)=>{
+      const am = hbWishMismatchScore(a, wish) + hbDoubleBedPenalty(a, total, hasYoungChild);
+      const bm = hbWishMismatchScore(b, wish) + hbDoubleBedPenalty(b, total, hasYoungChild);
+      if(am!==bm) return am-bm;
+      return a.remaining-b.remaining;
+    });
+    if(fitting.length){
+      const s = fitting[0];
+      const score = hbWishMismatchScore(s, wish) + hbDoubleBedPenalty(s, total, hasYoungChild);
+      if(!best || score < best.score || (score===best.score && s.remaining < best.slot.remaining)) best = { hotel, slot:s, score };
+    }
+  });
+  hbCurrentHotel = savedHotel;
+  return best;
+}
+function hbWizardAcceptSuggestion(){
+  if(!hbWizardCurrentSuggestion) return;
+  hbCurrentHotel = hbWizardCurrentSuggestion.hotel;
+  document.getElementById('hbWizardHotelSelect').value = hbCurrentHotel;
+  hbWizardSelectedRoom = hbWizardCurrentSuggestion.slot.roomNum;
+  hbWizardSwitchTab('hotel');
+  hbWizardRenderRoomsGrid();
+  hbWizardRenderSelectionPanel();
+}
+
+let hbWizardFamilyPlan = null;
+function hbWizardSuggestFamily(){
+  const group = hbWizardGroups[hbWizardIndex];
+  const familyWish = hbParseWish(group.members.map(m=>m.comment).filter(Boolean).join(' '));
+  const hasYoungChild = hbGroupHasYoungChild(group, 10);
+  hbWizardInitGroupState(group);
+  const demands = Object.keys(hbWizardSubRemaining)
+    .filter(b => group.bookingNumbers.includes(b) && (hbWizardSubRemaining[b]||[]).length > 0)
+    .map(b => ({ requestNum:b, total: hbWizardSubRemaining[b].length }))
+    .sort((a,b)=>b.total-a.total);
+
+  const savedHotel = hbCurrentHotel;
+  let bestPlan = null;
+  (group.targetHotel ? [group.targetHotel] : ['konstantin','greataleksander']).forEach(hotel=>{
+    hbCurrentHotel = hotel;
+    const slots = hbBuildRoomSlots();
+    let preferredFloor = null;
+    const assignments = []; let feasible = true; let totalScore = 0;
+    demands.forEach(dem=>{
+      let remaining = dem.total;
+      let splitParts = 0;
+      let demFirstFloor = null;
+      while(remaining>0){
+        const candidates = slots.filter(s=>s.remaining>0).sort((a,b)=>{
+          const am = hbWishMismatchScore(a,familyWish) + hbDoubleBedPenalty(a,dem.total,hasYoungChild) + (preferredFloor!==null && a.floor!==preferredFloor ? 6:0) + (splitParts>0 && demFirstFloor!==null && a.floor!==demFirstFloor ? 8:0);
+          const bm = hbWishMismatchScore(b,familyWish) + hbDoubleBedPenalty(b,dem.total,hasYoungChild) + (preferredFloor!==null && b.floor!==preferredFloor ? 6:0) + (splitParts>0 && demFirstFloor!==null && b.floor!==demFirstFloor ? 8:0);
+          if(am!==bm) return am-bm;
+          return a.remaining-b.remaining;
+        });
+        if(!candidates.length){ feasible=false; break; }
+        let chosen = candidates.find(s=>s.remaining>=remaining);
+        let needsExtra=false;
+        if(!chosen){ chosen = candidates.find(s=>s.canAddExtraBed && (s.remaining+1)>=remaining); if(chosen) needsExtra=true; }
+        if(!chosen){ chosen = candidates[0]; needsExtra = chosen.canAddExtraBed; }
+        if(demFirstFloor===null) demFirstFloor = chosen.floor;
+        if(preferredFloor===null) preferredFloor = chosen.floor;
+        const avail = needsExtra ? chosen.remaining+1 : chosen.remaining;
+        const place = Math.min(remaining, avail);
+        assignments.push({ requestNum:dem.requestNum, roomNum:chosen.roomNum, label:chosen.label, floor:chosen.floor, total:place, needsExtraBed:needsExtra, isSplit: splitParts>0||place<remaining });
+        totalScore += hbWishMismatchScore(chosen,familyWish) + hbDoubleBedPenalty(chosen,dem.total,hasYoungChild);
+        chosen.remaining = avail - place;
+        if(needsExtra) chosen.canAddExtraBed = false;
+        chosen.isFree = false;
+        remaining -= place;
+        splitParts++;
+      }
+    });
+    if(feasible && (!bestPlan || totalScore < bestPlan.totalScore)) bestPlan = { hotel, assignments, totalScore };
+  });
+  hbCurrentHotel = savedHotel;
+  hbWizardFamilyPlan = bestPlan;
+
+  const resEl = document.getElementById('hbWizardFamilySuggestion');
+  if(!bestPlan){
+    resEl.innerHTML = `<div style="padding:8px; background:#fef2f2; border:2px solid #fca5a5; border-radius:8px; font-size:13px;">⚠️ Не вдалося розмістити всіх — забракло вільних місць навіть розбивши по кімнатах.</div>`;
+    return;
+  }
+  resEl.innerHTML = `<div style="padding:10px; background:#ecfdf5; border:2px solid #6ee7b7; border-radius:10px;">
+    <div style="font-weight:600; font-size:13px; margin-bottom:6px;">${HB_HOTEL_STRUCTURE[bestPlan.hotel].name}:</div>
+    ${bestPlan.assignments.map(a=>`<div style="font-size:13px;">№${a.requestNum} (${a.total} чол) → кімната ${a.roomNum} (поверх ${a.floor})${a.needsExtraBed?' 🛏️ +екстраліжко':''}${a.isSplit?' <span style="color:#b45309;">⚠️ розбито</span>':''}</div>`).join('')}
+    <button onclick="hbWizardApplyFamilyPlan()" class="btn btn-primary btn-small" style="margin-top:8px; width:100%;">✅ Погодити всі пропозиції</button>
+  </div>`;
+}
+
+async function hbWizardApplyFamilyPlan(){
+  if(!hbWizardFamilyPlan) return;
+  const group = hbWizardGroups[hbWizardIndex];
+  hbCurrentHotel = hbWizardFamilyPlan.hotel;
+  document.getElementById('hbWizardHotelSelect').value = hbCurrentHotel;
+
+  // Track a cursor per booking into its remaining-members list, since the plan
+  // may split a single booking across more than one room.
+  const cursors = {};
+  for(const a of hbWizardFamilyPlan.assignments){
+    const pool = hbWizardSubRemaining[a.requestNum] || [];
+    const start = cursors[a.requestNum] || 0;
+    const members = pool.slice(start, start + a.total);
+    cursors[a.requestNum] = start + a.total;
+
+    const { adults, kids612, kidsUnder6 } = hbWizardComputeSubBreakdown(members);
+    const share = { requestNum: a.requestNum, adults, kids612, kidsUnder6, total: a.total, extraBed: a.needsExtraBed, seeking:false };
+    await hbApplyPlannedShare(a.roomNum, share);
+    if(!hbWizardSubAssignments[a.requestNum]) hbWizardSubAssignments[a.requestNum] = [];
+    hbWizardSubAssignments[a.requestNum].push({ hotel: hbCurrentHotel, roomNum: a.roomNum });
+  }
+  Object.keys(cursors).forEach(reqNum=>{
+    hbWizardSubRemaining[reqNum] = (hbWizardSubRemaining[reqNum]||[]).slice(cursors[reqNum]);
+  });
+
+  if(group.bookingNumbers.length>1) await hbLinkRequestsFn(hbCurrentHotel, hbCurrentPeriod, group.bookingNumbers);
+
+  hbShowToast('✅ Компанію розселено за пропозицією!');
+  const allDone = group.bookingNumbers.every(b => (hbWizardSubRemaining[b]||[]).length === 0);
+  if(allDone) hbWizardAdvance();
+  else {
+    hbWizardActiveBooking = group.bookingNumbers.find(b => (hbWizardSubRemaining[b]||[]).length > 0);
+    hbWizardSelectedRoom = null;
+    hbLoadRoomsGrid();
+    hbRenderWizard();
+  }
+}
+
+function hbWizardSwitchTab(tab){
+  hbWizardActiveTab = tab;
+  document.getElementById('hbWizardTabHotel').style.display = tab==='hotel' ? 'block' : 'none';
+  document.getElementById('hbWizardTabGroup').style.display = tab==='group' ? 'block' : 'none';
+  const hotelBtn = document.getElementById('hbWizardTabHotelBtn');
+  const groupBtn = document.getElementById('hbWizardTabGroupBtn');
+  hotelBtn.style.background = tab==='hotel' ? 'var(--aegean-deep, #1e3a8a)' : '';
+  hotelBtn.style.color = tab==='hotel' ? '#fff' : '';
+  groupBtn.style.background = tab==='group' ? 'var(--aegean-deep, #1e3a8a)' : '';
+  groupBtn.style.color = tab==='group' ? '#fff' : '';
+}
+
+function hbWizardHotelChanged(){
+  hbCurrentHotel = document.getElementById('hbWizardHotelSelect').value;
+  hbWizardSelectedRoom = null;
+  hbWizardRenderRoomsGrid();
+  hbWizardRenderSelectionPanel();
+}
+
+function hbWizardActiveSubBookingMembers(group){
+  if(!hbWizardActiveBooking) return group.members;
+  return hbWizardSubRemaining[hbWizardActiveBooking] || group.members;
+}
+
+function hbWizardRenderRoomsGrid(){
+  const grid = document.getElementById('hbWizardRoomsGrid');
+  if(!grid) return;
+  const floors = HB_HOTEL_STRUCTURE[hbCurrentHotel].floors;
+  const hotelDb = (hbDatabase[hbCurrentHotel] && hbDatabase[hbCurrentHotel][hbCurrentPeriod]) || [];
+  const group = hbWizardGroups[hbWizardIndex];
+  const neededSize = hbWizardActiveSubBookingMembers(group).length;
+  const currentAssignment = hbWizardActiveBooking ? hbWizardSubAssignments[hbWizardActiveBooking] : null;
+
+  let html = '';
+  Object.keys(floors).forEach(floorNum=>{
+    const rooms = floors[floorNum];
+    html += `<div>
+      <div class="hb-floor-header" style="padding:8px 12px; border-radius:10px; font-size:13px; font-weight:700; margin-bottom:8px;">Поверх ${floorNum}</div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(80px,1fr)); gap:6px;">`;
+    rooms.forEach(room=>{
+      const entry = hotelDb.find(e=>e.number===room.number);
+      const occ = hbRoomOccupancy(entry);
+      const cap = hbRoomEffectiveCapacity(hbCurrentHotel, room.number, entry);
+      const remaining = cap - occ;
+      const isFree = !entry || entry.shares.length===0;
+      const fits = remaining >= neededSize;
+      const selected = currentAssignment && currentAssignment.hotel===hbCurrentHotel && currentAssignment.roomNum===room.number;
+      const disabled = remaining<=0;
+      const stateClass = isFree ? 'free' : 'booked';
+      const border = selected ? 'border:3px solid #0369a1; box-shadow:0 0 0 3px #0369a155;' : (fits && !isFree ? 'border:3px solid #f59e0b;' : '');
+      html += `<div onclick="${disabled?'':'hbWizardSelectRoom('+room.number+')'}" class="hb-room ${stateClass}" style="padding:8px; border-radius:10px; text-align:center; cursor:${disabled?'not-allowed':'pointer'}; opacity:${disabled?0.4:1}; ${border}">
+        <div style="font-size:15px; font-weight:700;">${room.number}</div>
+        <div style="font-size:9px;">${room.sea?'🌊 ':''}${room.type}</div>
+        <div style="font-size:9px; margin-top:4px; font-weight:700;">${occ}/${cap}</div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+  grid.innerHTML = html;
+}
+
+function hbWizardSetActiveBooking(bookingNum){
+  hbWizardActiveBooking = bookingNum;
+  hbWizardRenderRoomsGrid();
+  hbWizardRenderSelectionPanel();
+}
+
+function hbWizardSelectRoom(num){
+  hbWizardSelectedRoom = num;
+  hbWizardRenderRoomsGrid();
+  hbWizardRenderSelectionPanel();
+}
+
+function hbWizardRenderSelectionPanel(){
+  const panel = document.getElementById('hbWizardSelectionPanel');
+  const group = hbWizardGroups[hbWizardIndex];
+  const remainingMembers = hbWizardSubRemaining[hbWizardActiveBooking] || [];
+  const wizardDef = TRIPS_DEF.find(d=>d.id===currentTripId);
+
+  if(!remainingMembers.length){
+    panel.innerHTML = `<p class="muted" style="font-size:13px;">✅ Заявку №${hbWizardActiveBooking||''} повністю розселено.</p>`;
+    return;
+  }
+  if(!hbWizardSelectedRoom){
+    panel.innerHTML = `<p class="muted" style="font-size:13px;">☝️ Обери кімнату вище для заявки №${hbWizardActiveBooking} (лишилось ${remainingMembers.length} чол).</p>`;
+    return;
+  }
+  const roomNum = hbWizardSelectedRoom;
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
+  const occ = hbRoomOccupancy(entry);
+  const baseCap = hbRoomBaseCapacity(hbCurrentHotel, roomNum);
+  const hasExtraAlready = hbRoomHasExtraBed(entry);
+  const capNoExtra = baseCap + (hasExtraAlready?1:0);
+  const remainingCapNoExtra = capNoExtra - occ;
+  const fitCount = remainingCapNoExtra>0 ? Math.min(remainingMembers.length, remainingCapNoExtra) : remainingMembers.length;
+
+  const checklistHtml = remainingMembers.map((m,idx)=>{
+    const age = m.birth_date && wizardDef ? calcAgeAtTrip(m.birth_date, wizardDef.start) : null;
+    const checked = idx < fitCount;
+    return `<label style="display:flex; align-items:center; gap:6px; font-size:13px; padding:3px 0;">
+      <input type="checkbox" class="hb-wizard-member-cb" data-idx="${idx}" ${checked?'checked':''} onchange="hbWizardRefreshExtraBedHint()">
+      <span>${m.full_name}${age!==null?` (${age}р.)`:''}</span>
+    </label>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div style="padding:10px; border:2px solid var(--line); border-radius:10px;">
+      <div style="font-weight:600; font-size:13px; margin-bottom:8px;">${hbRoomDisplay(hbCurrentHotel,roomNum)}: зайнято ${occ} з ${capNoExtra}${hasExtraAlready?' (уже з екстраліжком)':''}</div>
+      <div class="muted" style="font-size:11.5px; text-transform:uppercase; margin-bottom:4px;">Кого з заявки №${hbWizardActiveBooking} поселити сюди (можна не всіх — решта лишиться на іншу кімнату):</div>
+      <div style="max-height:150px; overflow-y:auto; margin-bottom:8px;">${checklistHtml}</div>
+      ${!hasExtraAlready ? `<label style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <input type="checkbox" id="hbWizardExtraBedCb">
+        <span id="hbWizardExtraBedLabel" style="font-size:13px;">🛏️ Екстраліжко</span>
+      </label>` : ''}
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <input type="checkbox" id="hbWizardSeekingCb">
+        <span style="font-size:13px;">🔄 Залишити місце і шукати підселення</span>
+      </label>
+      <button onclick="hbWizardConfirmSubBooking()" class="btn btn-primary" style="width:100%;">✅ Поселити обраних сюди</button>
+    </div>
+  `;
+}
+
+function hbWizardRefreshExtraBedHint(){
+  const label = document.getElementById('hbWizardExtraBedLabel');
+  if(!label) return;
+  const checkedCount = document.querySelectorAll('.hb-wizard-member-cb:checked').length;
+  const roomNum = hbWizardSelectedRoom;
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
+  const occ = hbRoomOccupancy(entry);
+  const baseCap = hbRoomBaseCapacity(hbCurrentHotel, roomNum);
+  const needsExtra = checkedCount > (baseCap - occ);
+  label.textContent = `🛏️ Екстраліжко ${needsExtra ? '(потрібне для цієї кількості)' : '(додатково)'}`;
+  const cb = document.getElementById('hbWizardExtraBedCb');
+  if(needsExtra) cb.checked = true;
+}
+
+function hbWizardRenderGroupTable(){
+  const group = hbWizardGroups[hbWizardIndex];
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const rows = group.members.map(m=>{
+    const age = m.birth_date && def ? calcAgeAtTrip(m.birth_date, def.start) : null;
+    return `<tr>
+      <td style="text-align:left;">${m.full_name}</td>
+      <td>${age!==null ? age+' р.' : '—'}</td>
+      <td style="text-align:left;">${m.passport||'—'}</td>
+      <td style="text-align:left;">${m.comment||'—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('hbWizardGroupTable').innerHTML = `
+    <table class="report-table" style="font-size:12.5px;">
+      <thead><tr><th style="text-align:left;">ПІБ</th><th>Вік</th><th style="text-align:left;">Паспорт</th><th style="text-align:left;">Коментар/побажання</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function hbWizardComputeSubBreakdown(members){
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  let adults=0, kids612=0, kidsUnder6=0;
+  members.forEach(m=>{
+    const age = m.birth_date && def ? calcAgeAtTrip(m.birth_date, def.start) : null;
+    if(age===null || age>=12) adults++;
+    else if(age>=6) kids612++;
+    else kidsUnder6++;
+  });
+  return { adults, kids612, kidsUnder6, total: members.length };
+}
+
+async function hbWizardConfirmSubBooking(){
+  const roomNum = hbWizardSelectedRoom;
+  if(!roomNum){ alert('Спочатку обери кімнату.'); return; }
+  const remainingMembers = hbWizardSubRemaining[hbWizardActiveBooking] || [];
+  const checkboxes = Array.from(document.querySelectorAll('.hb-wizard-member-cb'));
+  const checkedIdx = checkboxes.filter(cb=>cb.checked).map(cb=>parseInt(cb.dataset.idx));
+  if(!checkedIdx.length){ alert('Познач хоча б одну людину, яку поселяємо сюди.'); return; }
+  const selectedMembers = checkedIdx.map(i=>remainingMembers[i]);
+  const { adults, kids612, kidsUnder6, total } = hbWizardComputeSubBreakdown(selectedMembers);
+
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
+  const alreadyHasExtraBed = hbRoomHasExtraBed(entry);
+  const occupancy = hbRoomOccupancy(entry);
+  const baseCapacity = hbRoomBaseCapacity(hbCurrentHotel, roomNum);
+  const extraBedCb = document.getElementById('hbWizardExtraBedCb');
+  const wantsExtraBed = extraBedCb ? extraBedCb.checked : false;
+  const effectiveCapacity = baseCapacity + ((alreadyHasExtraBed||wantsExtraBed) ? 1 : 0);
+  const remaining = effectiveCapacity - occupancy;
+  if(total > remaining){ alert(`Недостатньо місць! Вільно лише ${remaining} з ${effectiveCapacity}.`); return; }
+  const seekingCb = document.getElementById('hbWizardSeekingCb');
+  const wantsSeeking = seekingCb ? seekingCb.checked : false;
+
+  const share = { requestNum: hbWizardActiveBooking, adults, kids612, kidsUnder6, total, extraBed: wantsExtraBed||alreadyHasExtraBed, seeking: wantsSeeking && (occupancy+total<effectiveCapacity) };
+  await hbApplyPlannedShare(roomNum, share);
+
+  const placedIdxSet = new Set(checkedIdx);
+  hbWizardSubRemaining[hbWizardActiveBooking] = remainingMembers.filter((m,i)=>!placedIdxSet.has(i));
+  if(!hbWizardSubAssignments[hbWizardActiveBooking]) hbWizardSubAssignments[hbWizardActiveBooking] = [];
+  hbWizardSubAssignments[hbWizardActiveBooking].push({ hotel: hbCurrentHotel, roomNum });
+
+  hbShowToast(`✅ ${total} чол з заявки №${hbWizardActiveBooking} поселено в ${hbRoomDisplay(hbCurrentHotel, roomNum)}`);
+  hbWizardSelectedRoom = null;
+
+  const group = hbWizardGroups[hbWizardIndex];
+  const allBookingNums = group.bookingNumbers;
+  const allDone = allBookingNums.every(b => (hbWizardSubRemaining[b]||[]).length === 0);
+  if(allDone){
+    if(allBookingNums.length>1) await hbLinkRequestsFn(hbCurrentHotel, hbCurrentPeriod, allBookingNums);
+    hbWizardAdvance();
+  } else {
+    if((hbWizardSubRemaining[hbWizardActiveBooking]||[]).length === 0){
+      const nextBooking = allBookingNums.find(b => (hbWizardSubRemaining[b]||[]).length > 0);
+      hbWizardActiveBooking = nextBooking;
+    }
+    hbLoadRoomsGrid();
+    hbRenderWizard();
+  }
+}
+
+function hbWizardSkip(){ hbWizardAdvance(); }
+
+function hbWizardAdvance(){
+  hbWizardIndex++;
+  hbWizardSelectedRoom = null;
+  hbWizardSubAssignments = {};
+  hbWizardSubRemaining = {};
+  hbWizardActiveBooking = null;
+  if(hbWizardGroups[hbWizardIndex] && hbWizardGroups[hbWizardIndex].targetHotel) hbCurrentHotel = hbWizardGroups[hbWizardIndex].targetHotel;
+  hbLoadRoomsGrid();
+  if(hbWizardIndex >= hbWizardGroups.length){
+    document.getElementById('hbWizardGroupCard').innerHTML = '<p style="color:#15803d; font-weight:700;">✅ Усі заявки з базового списку розселені (або пропущені)!</p>';
+    document.getElementById('hbWizardRoomsGrid').innerHTML = '';
+    document.getElementById('hbWizardSelectionPanel').innerHTML = '';
+    document.getElementById('hbWizardGroupTable').innerHTML = '';
+    document.getElementById('hbWizardProgress').textContent = '';
+    return;
+  }
+  hbRenderWizard();
+}
+
+function hbCloseWizard(){
+  document.getElementById('hbWizardModal').classList.add('app-hidden');
+  hbLoadRoomsGrid();
 }
 
 /* ---------- Bootstrap ---------- */
