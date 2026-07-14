@@ -563,7 +563,7 @@
         <div><label style="display:block; font-size:11px; font-weight:600; margin-bottom:2px;">0-5</label><input id="hbKidsUnder6" type="number" min="0" value="0" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:10px; text-align:center;"></div>
       </div>
       <label style="display:flex; align-items:center; gap:8px; padding:10px; border:2px solid #fcd34d; background:#fffbeb; border-radius:10px; cursor:pointer;">
-        <input id="hbExtraBedCheckbox" type="checkbox" style="width:18px; height:18px;">
+        <input id="hbExtraBedCheckbox" type="checkbox" onchange="hbModalExtraBedToggled()" style="width:18px; height:18px;">
         <span style="font-size:13px; font-weight:600; color:#92400e;">🛏️ Додати екстраліжко (+1 місце в кімнаті)</span>
       </label>
       <label id="hbSeekingWrap" style="display:flex; align-items:center; gap:8px; padding:10px; border:2px solid #fdba74; background:#fff7ed; border-radius:10px; cursor:pointer;">
@@ -3866,6 +3866,26 @@ function renderTripPrepOverview(){
         <button class="btn btn-danger-ghost btn-small" id="tpClearTouristsBtn">🗑️ Очистити обидва</button>
       </div>
     </div>
+
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <p class="step-title">Додати туриста вручну (власний заїзд)</p>
+      <p class="report-note">Для людей поза базовим файлом — наприклад власні тури без окремої агенції.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+        <div><label style="display:block; font-size:11px; font-weight:600;">Ім'я Прізвище</label><input type="text" id="tpManualFullName" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
+        <div><label style="display:block; font-size:11px; font-weight:600;">Дата народження</label><input type="date" id="tpManualBirth" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
+        <div><label style="display:block; font-size:11px; font-weight:600;">Паспорт</label><input type="text" id="tpManualPassport" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:110px;"></div>
+        <div><label style="display:block; font-size:11px; font-weight:600;">Номер заявки</label><input type="text" id="tpManualBooking" placeholder="напр. #ВЛАСНИЙ1" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:120px;"></div>
+        <div><label style="display:block; font-size:11px; font-weight:600;">Готель</label>
+          <select id="tpManualHotel" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;">
+            <option value="konstantin">Hotel Konstantin 3*</option>
+            <option value="greataleksander">Great Aleksander 3*</option>
+          </select>
+        </div>
+        <div><label style="display:block; font-size:11px; font-weight:600;">Місто посадки</label><input type="text" id="tpManualCity" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:110px;"></div>
+        <div><label style="display:block; font-size:11px; font-weight:600;">Телефон</label><input type="text" id="tpManualPhone" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:130px;"></div>
+        <button class="btn btn-primary btn-small" id="tpAddManualTouristBtn">+ Додати</button>
+      </div>
+    </div>
     <p class="report-note">Якщо дві чи більше заявок насправді одна компанія (у файлі позначено кольором/смугою, а не текстом у коментарі) — постав галочки навпроти них (в одній з таблиць нижче) і натисни "Об'єднати".</p>
     <div class="no-print" style="margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap;">
       <button class="btn btn-ghost btn-small" id="tpMergeGroupsBtn">🔗 Об'єднати вибрані групи</button>
@@ -3911,6 +3931,33 @@ function renderTripPrepOverview(){
     if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
+  });
+  document.getElementById('tpAddManualTouristBtn').addEventListener('click', async ()=>{
+    const fullName = document.getElementById('tpManualFullName').value.trim();
+    if(!fullName){ alert("Впиши ім'я та прізвище."); return; }
+    const birth = document.getElementById('tpManualBirth').value;
+    const passport = document.getElementById('tpManualPassport').value.trim();
+    let booking = document.getElementById('tpManualBooking').value.trim();
+    const hotel = document.getElementById('tpManualHotel').value;
+    const city = document.getElementById('tpManualCity').value.trim();
+    const phone = document.getElementById('tpManualPhone').value.trim();
+    if(!booking) booking = 'ВЛАСНИЙ-' + Date.now().toString().slice(-6);
+    const maxRow = Math.max(0, ...tripPrepData.tourists.map(t=>t.row_order||0));
+    const { error } = await sb.from('trip_prep_tourists').insert({
+      trip_id: currentTripId, row_order: maxRow+1, booking_number: booking, link_group: booking,
+      full_name: fullName, birth_date: birth||null, passport, target_hotel: hotel,
+      pickup_city: city, phone, agency: 'Власний заїзд'
+    });
+    if(error){ alert('Не вдалося додати: ' + friendlyErrorMessage(error)); return; }
+    document.getElementById('tpManualFullName').value = '';
+    document.getElementById('tpManualBirth').value = '';
+    document.getElementById('tpManualPassport').value = '';
+    document.getElementById('tpManualBooking').value = '';
+    document.getElementById('tpManualCity').value = '';
+    document.getElementById('tpManualPhone').value = '';
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepView();
+    hbShowToast(`✅ ${fullName} додано до списку (${HB_HOTEL_STRUCTURE[hotel].name})`);
   });
   document.getElementById('tpMergeGroupsBtn').addEventListener('click', async ()=>{
     const checked = Array.from(content.querySelectorAll('.tp-group-cb:checked')).map(cb=>cb.dataset.group);
@@ -4095,7 +4142,7 @@ async function renderTripPrepBuses(){
     });
     if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
     hbShowToast(`✅ Конфігурацію для ${b} збережено`);
-    await loadBusSeatData(currentTripId);
+    await loadBusSeatData(currentTripId, true);
     renderTripPrepBuses();
   }));
   const customUploadEl = document.getElementById('tpCustomBusUpload');
@@ -4110,7 +4157,7 @@ async function renderTripPrepBuses(){
     const { error } = await sb.from('custom_bus_layouts').insert({ trip_id: currentTripId, name, layout_json: rows, seat_count: seatCount });
     if(error){ alert('Не вдалося зберегти схему: ' + friendlyErrorMessage(error)); return; }
     hbShowToast(`✅ Схему "${name}" додано — тепер доступна у списку "Фізичний автобус"`);
-    await loadBusSeatData(currentTripId);
+    await loadBusSeatData(currentTripId, true);
     renderTripPrepBuses();
   });
 
@@ -4182,7 +4229,9 @@ function classifyCorridor(cities){
   return 'не визначено';
 }
 
-async function loadBusSeatData(tripId){
+let tripPrepBusSeatDataLoadedForTrip = null;
+async function loadBusSeatData(tripId, force){
+  if(!force && tripPrepBusSeatDataLoadedForTrip === tripId) return; // already cached — avoid redundant network round-trips
   const { data: assignments } = await sb.from('bus_seat_assignments').select('*').eq('trip_id', tripId);
   const { data: configs } = await sb.from('bus_seat_configs').select('*').eq('trip_id', tripId);
   const { data: customLayouts } = await sb.from('custom_bus_layouts').select('*').eq('trip_id', tripId);
@@ -4198,6 +4247,7 @@ async function loadBusSeatData(tripId){
   const customLayoutMap = {};
   (customLayouts||[]).forEach(c=> customLayoutMap[c.name] = { rows: c.layout_json, seat_count: c.seat_count, id: c.id });
   tripPrepBusSeatData = { assignments: assignments||[], configs: configMap, layouts: layoutMap, fullConfigs: fullConfigMap, customLayouts: customLayoutMap };
+  tripPrepBusSeatDataLoadedForTrip = tripId;
 }
 
 function renderBusSeatChart(busName){
@@ -4299,14 +4349,14 @@ function renderBusSeatChart(busName){
       : (countInput ? Number(countInput.value)||50 : seatCount);
     const { error } = await sb.from('bus_seat_configs').upsert({ trip_id: currentTripId, bus_name: busName, seat_count: newCount, layout_name: newLayout });
     if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
-    await loadBusSeatData(currentTripId);
+    await loadBusSeatData(currentTripId, true);
     renderBusSeatChart(busName);
   });
   document.getElementById('tpClearSeatChartBtn').addEventListener('click', async ()=>{
     if(!confirm(`Точно очистити всю розсадку для "${busName}"? Розподіл груп по автобусах не зміниться, тільки конкретні місця.`)) return;
     const { error } = await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName);
     if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
-    await loadBusSeatData(currentTripId);
+    await loadBusSeatData(currentTripId, true);
     renderBusSeatChart(busName);
   });
 }
@@ -4317,7 +4367,7 @@ async function hbBusSeatClick(busName, seatNum){
     const wantsClear = confirm(`Місце ${seatNum}: ${existing.full_name}.\nOK — звільнити це місце.\nСкасувати — нічого не робити.`);
     if(wantsClear){
       await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName).eq('seat_number', seatNum);
-      await loadBusSeatData(currentTripId);
+      await loadBusSeatData(currentTripId, true);
       renderBusSeatChart(busName);
     }
     return;
@@ -4334,7 +4384,7 @@ async function hbBusSeatClick(busName, seatNum){
     link_group: matchGk || '', paid_seat: !!paidSeat
   }, { onConflict: 'trip_id,bus_name,seat_number' });
   if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
-  await loadBusSeatData(currentTripId);
+  await loadBusSeatData(currentTripId, true);
   renderBusSeatChart(busName);
 }
 
@@ -4881,7 +4931,7 @@ async function hbLoadBookings(){
     if(!entry){ entry = { number:r.room_number, shares:[] }; hbDatabase[r.hotel][r.period].push(entry); }
     entry.shares.push({
       requestNum: r.request_id, adults:r.adults, kids612:r.kids_612, kidsUnder6:r.kids_under6,
-      total:r.total, extraBed: !!r.extra_bed, seeking: !!r.seeking_roommate, notes: r.notes||''
+      total:r.total, extraBed: !!r.extra_bed, seeking: !!r.seeking_roommate, notes: r.notes||'', memberNames: r.member_names||[]
     });
   });
 }
@@ -4896,7 +4946,8 @@ async function hbSaveShare(hotel, period, roomNum, share){
   const { error } = await sb.from('room_bookings').insert({
     hotel, period, room_number: roomNum, request_id: share.requestNum,
     adults: share.adults||0, kids_612: share.kids612||0, kids_under6: share.kidsUnder6||0,
-    total: share.total||0, extra_bed: !!share.extraBed, seeking_roommate: !!share.seeking, notes: share.notes||''
+    total: share.total||0, extra_bed: !!share.extraBed, seeking_roommate: !!share.seeking, notes: share.notes||'',
+    member_names: share.memberNames||[]
   });
   if(error){ alert('⚠️ Не вдалося зберегти в хмару. Перевірте інтернет.'); }
 }
@@ -5298,8 +5349,22 @@ function hbLookupRequestInModal(){
   }
   const remainingMembers = hbWizardSubRemaining[reqNum];
 
+  // If the system thinks some/all are already placed, show exactly where — so it can be verified.
+  const hotelDbForLocation = (hbDatabase[hbCurrentHotel] && hbDatabase[hbCurrentHotel][hbCurrentPeriod]) || [];
+  const foundInRooms = hotelDbForLocation.filter(e=>e.shares.some(sh=>sh.requestNum===reqNum)).map(e=>e.number);
+  const locationNote = remainingMembers.length < matched.length
+    ? (foundInRooms.length
+        ? `<div style="margin-top:4px; font-size:12px;">📍 Вже позначено як поселені в кімнаті(ах): №${foundInRooms.join(', №')}.</div>`
+        : `<div style="margin-top:4px; font-size:12px; color:#b45309;">⚠️ Система вважає частину людей поселеною, але не знаходить їх у жодній кімнаті цього готелю зараз — це може бути застаріла позначка з попередньої дії на цій сторінці.</div>`)
+    : '';
+  const resetBtn = remainingMembers.length < matched.length
+    ? `<button onclick="hbModalResetRemaining('${reqNum}')" class="btn btn-ghost btn-small" style="display:block; width:100%; margin-top:6px; box-sizing:border-box;">🔄 Це помилка — показати всіх ${matched.length} знову</button>`
+    : '';
+
   infoEl.innerHTML = `<div style="padding:8px 10px; background:#eff6ff; border:2px solid #93c5fd; border-radius:8px; font-size:12.5px;">
     <b>Заявка №${reqNum}:</b> усього ${matched.length} чол${remainingMembers.length!==matched.length ? `, ще не поселено: ${remainingMembers.length}` : ''}
+    ${locationNote}
+    ${resetBtn}
     ${linkedBookings.length ? `<div style="margin-top:4px; color:#7c3aed;">🔗 Пов'язана з: №${linkedBookings.join(', №')}</div>
       <button onclick="hbModalSuggestLinkedRooms()" class="btn btn-primary btn-small" style="display:block; width:100%; margin-top:6px; box-sizing:border-box;">💡 Запропонувати кімнати для всіх пов'язаних</button>
       <div style="margin-top:8px; padding:8px; border:2px solid var(--line); border-radius:8px;">
@@ -5334,6 +5399,27 @@ function hbLookupRequestInModal(){
       <span>${m.full_name}${age!==null?` (${age}р.)`:''}</span>
     </label>`;
   }).join('');
+  hbModalRecomputeCountsFromChecklist();
+}
+
+function hbModalResetRemaining(reqNum){
+  delete hbWizardSubRemaining[reqNum];
+  hbLookupRequestInModal();
+}
+
+function hbModalExtraBedToggled(){
+  const extraBedChecked = document.getElementById('hbExtraBedCheckbox').checked;
+  const boxes = Array.from(document.querySelectorAll('.hb-modal-member-cb'));
+  if(!boxes.length) return;
+  if(extraBedChecked){
+    // Adding an extra bed frees up one more spot — auto-check the next unchecked person.
+    const nextUnchecked = boxes.find(cb=>!cb.checked);
+    if(nextUnchecked) nextUnchecked.checked = true;
+  } else {
+    // Removing the extra bed takes away one spot — uncheck the last checked person.
+    const checked = boxes.filter(cb=>cb.checked);
+    if(checked.length) checked[checked.length-1].checked = false;
+  }
   hbModalRecomputeCountsFromChecklist();
 }
 
@@ -5396,9 +5482,11 @@ function hbOpenRoomDetailModal(roomNum){
 
   const listEl = document.getElementById('hbRaSharesList');
   listEl.innerHTML = entry.shares.map((sh, idx)=>{
-    const matchedNames = sh.requestNum
-      ? (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===String(sh.requestNum)).map(t=>t.full_name)
-      : [];
+    const matchedNames = (sh.memberNames && sh.memberNames.length)
+      ? sh.memberNames
+      : (sh.requestNum
+          ? (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===String(sh.requestNum)).map(t=>t.full_name)
+          : []);
     return `
     <div style="padding:10px; border:2px solid ${!sh.requestNum?'#f87171':'var(--line)'}; background:${!sh.requestNum?'#fef2f2':'#fff'}; border-radius:10px;">
       <div style="font-weight:600; font-size:14px;">Заявка №${sh.requestNum ?? '⚠️ невідома (биті дані)'} — ${sh.total ?? 0} чол${sh.seeking ? ' · 🔄 шукає сусіда' : ''}</div>
@@ -5552,7 +5640,13 @@ async function hbConfirmBooking(){
 
   if(total > remaining) return alert(`Недостатньо місць! У ${hbRoomDisplay(hbCurrentHotel,roomNum)} вільно лише ${remaining} з ${effectiveCapacity}${(alreadyHasExtraBed||extraBed)?' (з екстраліжком)':''}.`);
 
-  const share = { requestNum, adults, kids612, kidsUnder6, total, extraBed: extraBed||alreadyHasExtraBed, seeking: seeking && (occupancy+total<effectiveCapacity), notes };
+  let shareMemberNames = [];
+  if(document.getElementById('hbModalNamedChecklistWrap').style.display !== 'none' && requestNum in hbWizardSubRemaining){
+    const pool = hbWizardSubRemaining[requestNum];
+    const checkedIdxForNames = Array.from(document.querySelectorAll('.hb-modal-member-cb:checked')).map(cb=>parseInt(cb.dataset.idx));
+    shareMemberNames = checkedIdxForNames.map(i=>pool[i]).filter(Boolean).map(m=>m.full_name);
+  }
+  const share = { requestNum, adults, kids612, kidsUnder6, total, extraBed: extraBed||alreadyHasExtraBed, seeking: seeking && (occupancy+total<effectiveCapacity), notes, memberNames: shareMemberNames };
 
   if(!hbDatabase[hbCurrentHotel]) hbDatabase[hbCurrentHotel] = {};
   if(!hbDatabase[hbCurrentHotel][hbCurrentPeriod]) hbDatabase[hbCurrentHotel][hbCurrentPeriod] = [];
@@ -6170,7 +6264,7 @@ async function hbModalApplyManualLinkedRooms(){
       continue;
     }
     const { adults, kids612, kidsUnder6 } = hbWizardComputeSubBreakdown(members);
-    const share = { requestNum: reqB, adults, kids612, kidsUnder6, total: members.length, extraBed: hasExtra, seeking:false };
+    const share = { requestNum: reqB, adults, kids612, kidsUnder6, total: members.length, extraBed: hasExtra, seeking:false, memberNames: members.map(m=>m.full_name) };
     await hbApplyPlannedShare(roomNum, share);
     hbWizardSubRemaining[reqB] = [];
     anyApplied = true;
@@ -6247,7 +6341,7 @@ async function hbModalApplyLinkedPlan(){
     const members = pool.slice(start, start + a.total);
     cursors[a.requestNum] = start + a.total;
     const { adults, kids612, kidsUnder6 } = hbWizardComputeSubBreakdown(members);
-    const share = { requestNum: a.requestNum, adults, kids612, kidsUnder6, total: a.total, extraBed: a.needsExtraBed, seeking:false };
+    const share = { requestNum: a.requestNum, adults, kids612, kidsUnder6, total: a.total, extraBed: a.needsExtraBed, seeking:false, memberNames: members.map(m=>m.full_name) };
     await hbApplyPlannedShare(a.roomNum, share);
   }
   Object.keys(cursors).forEach(reqNum=>{ hbWizardSubRemaining[reqNum] = (hbWizardSubRemaining[reqNum]||[]).slice(cursors[reqNum]); });
@@ -6345,7 +6439,7 @@ async function hbWizardApplyFamilyPlan(){
     cursors[a.requestNum] = start + a.total;
 
     const { adults, kids612, kidsUnder6 } = hbWizardComputeSubBreakdown(members);
-    const share = { requestNum: a.requestNum, adults, kids612, kidsUnder6, total: a.total, extraBed: a.needsExtraBed, seeking:false };
+    const share = { requestNum: a.requestNum, adults, kids612, kidsUnder6, total: a.total, extraBed: a.needsExtraBed, seeking:false, memberNames: members.map(m=>m.full_name) };
     await hbApplyPlannedShare(a.roomNum, share);
     if(!hbWizardSubAssignments[a.requestNum]) hbWizardSubAssignments[a.requestNum] = [];
     hbWizardSubAssignments[a.requestNum].push({ hotel: hbCurrentHotel, roomNum: a.roomNum });
@@ -6558,7 +6652,7 @@ async function hbWizardConfirmSubBooking(){
   const seekingCb = document.getElementById('hbWizardSeekingCb');
   const wantsSeeking = seekingCb ? seekingCb.checked : false;
 
-  const share = { requestNum: hbWizardActiveBooking, adults, kids612, kidsUnder6, total, extraBed: wantsExtraBed||alreadyHasExtraBed, seeking: wantsSeeking && (occupancy+total<effectiveCapacity) };
+  const share = { requestNum: hbWizardActiveBooking, adults, kids612, kidsUnder6, total, extraBed: wantsExtraBed||alreadyHasExtraBed, seeking: wantsSeeking && (occupancy+total<effectiveCapacity), memberNames: selectedMembers.map(m=>m.full_name) };
   await hbApplyPlannedShare(roomNum, share);
 
   const placedIdxSet = new Set(checkedIdx);
