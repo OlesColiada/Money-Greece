@@ -2035,6 +2035,7 @@ const PRICE_MODE_LABELS = { standard:'Стандарт', discount:'Знижка'
 function renderTouristEditForm(block, t){
   const def = TRIPS_DEF.find(d=>d.id===currentTripId);
   const age = def ? calcAgeAtTrip(t.birth_date, def.start) : null;
+  const tripGuides = getTripData(currentTripId).guides.map(g=>g.name);
   block.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:10px;">
       <p class="report-title" style="margin:0;">Редагувати дані туриста</p>
@@ -2050,6 +2051,12 @@ function renderTouristEditForm(block, t){
     <div class="subgrid" style="margin-top:8px;">
       <div class="field-group"><span>Дата народження:</span><input type="date" id="editBirth" value="${t.birth_date||''}"></div>
       <div class="field-group"><span>Паспортні дані:</span><input type="text" id="editPassport" value="${t.passport_data||''}" style="flex:1;"></div>
+    </div>
+    <div class="field-group" style="margin-top:8px;">
+      <span>Гід:</span>
+      <select id="editGuide" style="flex:1;">
+        ${tripGuides.map(g=>`<option value="${g}" ${t.guide_name===g?'selected':''}>${g}</option>`).join('')}
+      </select>
     </div>
     <div class="field-group" style="margin-top:10px;">
       <span class="muted">${age===null ? '⚠ Вік не визначено — перевір дату народження вище.' : `Вік на момент туру: ${age} р.`}</span>
@@ -2073,8 +2080,9 @@ function renderTouristEditForm(block, t){
     const last = document.getElementById('editLast').value.trim();
     const birth = document.getElementById('editBirth').value || null;
     const passport = document.getElementById('editPassport').value.trim();
+    const guide = document.getElementById('editGuide').value;
     const birthChanged = birth !== (t.birth_date || null);
-    const { error } = await sb.from('tourists').update({ first_name:first, last_name:last, birth_date:birth, passport_data:passport }).eq('id', t.id);
+    const { error } = await sb.from('tourists').update({ first_name:first, last_name:last, birth_date:birth, passport_data:passport, guide_name:guide }).eq('id', t.id);
     if(error){ alert(friendlyErrorMessage(error)); return; }
     // If the birth date changed, re-price any selections still on standard pricing (don't touch manual overrides).
     if(birthChanged){
@@ -3637,6 +3645,7 @@ async function importTripPrepFile(file, tripId, targetHotel){
   const keyPassport = findHeaderKey(headers, ['Паспорт']);
   const keyAgency = findHeaderKey(headers, ['Агенція']);
   const keyInsurance = findHeaderKey(headers, ['Страхівка']);
+  const keyPaidSeats = findHeaderKey(headers, ['Платні місця']);
   const keyTariff = findHeaderKey(headers, ['Тариф']);
   const keyTourFee = findHeaderKey(headers, ['Тур.збір','Тур збір']);
   const keyCommission = findHeaderKey(headers, ['Комісія']);
@@ -3653,11 +3662,17 @@ async function importTripPrepFile(file, tripId, targetHotel){
 
   let lastBooking = '';
   let lastConnected = '';
+  let lastCity = '';
+  let lastPhone = '';
   const parsed = rows.map((r, idx)=>{
     let booking = keyBooking ? String(r[keyBooking]||'').trim() : '';
     if(booking) lastBooking = booking; else booking = lastBooking;
     let connected = keyConnected ? String(r[keyConnected]||'').trim() : '';
     if(connected) lastConnected = connected; else connected = lastConnected;
+    let city = keyCity ? String(r[keyCity]||'').trim() : '';
+    if(city) lastCity = city; else city = lastCity;
+    let phoneVal = keyPhone ? String(r[keyPhone]||'').trim() : '';
+    if(phoneVal) lastPhone = phoneVal; else phoneVal = lastPhone;
     return {
       row_order: idx,
       booking_number: booking,
@@ -3667,6 +3682,7 @@ async function importTripPrepFile(file, tripId, targetHotel){
       passport: keyPassport ? String(r[keyPassport]||'').trim() : '',
       agency: keyAgency ? String(r[keyAgency]||'').trim() : '',
       insurance: keyInsurance ? parseDecimalInput(r[keyInsurance]) : 0,
+      paid_seats: keyPaidSeats ? parseDecimalInput(r[keyPaidSeats]) : 0,
       tariff: keyTariff ? parseDecimalInput(r[keyTariff]) : 0,
       tour_fee: keyTourFee ? parseDecimalInput(r[keyTourFee]) : 0,
       commission: keyCommission ? parseDecimalInput(r[keyCommission]) : 0,
@@ -3674,8 +3690,8 @@ async function importTripPrepFile(file, tripId, targetHotel){
       paid: keyPaid ? parseDecimalInput(r[keyPaid]) : 0,
       remaining: keyRemaining ? parseDecimalInput(r[keyRemaining]) : 0,
       comment: keyComment ? String(r[keyComment]||'').trim() : '',
-      pickup_city: keyCity ? String(r[keyCity]||'').trim() : '',
-      phone: keyPhone ? String(r[keyPhone]||'').trim() : '',
+      pickup_city: city,
+      phone: phoneVal,
       linked_booking_raw: keyLinkedBooking ? String(r[keyLinkedBooking]||'').trim() : '',
       target_hotel: targetHotel || '',
     };
@@ -3808,7 +3824,7 @@ function renderTripPrepOverview(){
 
   const buildRowHtml = (gk)=>{
     const members = groups[gk];
-    const names = members.map(m=>m.full_name).join(', ');
+    const names = members.map(m=>`<span style="display:inline-flex; align-items:center; gap:3px; background:var(--whitewash-2); border-radius:6px; padding:2px 5px; margin:1px;">${m.full_name}<button class="no-print" data-role="tpRemovePerson" data-tourist="${m.id}" title="Видалити цю людину зі списку і з кімнати" style="border:none; background:none; color:#dc2626; cursor:pointer; font-weight:700; padding:0 2px;">✕</button></span>`).join(' ');
     const agencies = [...new Set(members.map(m=>m.agency).filter(Boolean))].join(', ');
     const cities = [...new Set(members.map(m=>m.pickup_city).filter(Boolean))].join(', ');
     const debt = members.reduce((s,m)=>s+(Number(m.remaining)||0),0);
@@ -3869,7 +3885,7 @@ function renderTripPrepOverview(){
 
     <div class="step-block no-print" style="margin-bottom:14px;">
       <p class="step-title">Додати туриста вручну (власний заїзд)</p>
-      <p class="report-note">Для людей поза базовим файлом — наприклад власні тури без окремої агенції.</p>
+      <p class="report-note">Для людей поза базовим файлом — наприклад власні тури без окремої агенції. Якщо вкажеш номер заявки, який уже є в списку — людина приєднається до тієї ж групи/готелю (наприклад, якщо в завантаженому файлі когось бракує).</p>
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
         <div><label style="display:block; font-size:11px; font-weight:600;">Ім'я Прізвище</label><input type="text" id="tpManualFullName" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
         <div><label style="display:block; font-size:11px; font-weight:600;">Дата народження</label><input type="date" id="tpManualBirth" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
@@ -3883,6 +3899,8 @@ function renderTripPrepOverview(){
         </div>
         <div><label style="display:block; font-size:11px; font-weight:600;">Місто посадки</label><input type="text" id="tpManualCity" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:110px;"></div>
         <div><label style="display:block; font-size:11px; font-weight:600;">Телефон</label><input type="text" id="tpManualPhone" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:130px;"></div>
+        <div><label style="display:block; font-size:11px; font-weight:600;">Страхівка (€)</label><input type="text" inputmode="decimal" id="tpManualInsurance" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:90px;"></div>
+        <div><label style="display:block; font-size:11px; font-weight:600;">Платні місця (€)</label><input type="text" inputmode="decimal" id="tpManualPaidSeats" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:100px;"></div>
         <button class="btn btn-primary btn-small" id="tpAddManualTouristBtn">+ Додати</button>
       </div>
     </div>
@@ -3938,15 +3956,29 @@ function renderTripPrepOverview(){
     const birth = document.getElementById('tpManualBirth').value;
     const passport = document.getElementById('tpManualPassport').value.trim();
     let booking = document.getElementById('tpManualBooking').value.trim();
-    const hotel = document.getElementById('tpManualHotel').value;
+    let hotel = document.getElementById('tpManualHotel').value;
     const city = document.getElementById('tpManualCity').value.trim();
     const phone = document.getElementById('tpManualPhone').value.trim();
+    const insurance = parseDecimalInput(document.getElementById('tpManualInsurance').value);
+    const paidSeats = parseDecimalInput(document.getElementById('tpManualPaidSeats').value);
     if(!booking) booking = 'ВЛАСНИЙ-' + Date.now().toString().slice(-6);
+
+    // If this booking number already exists in the base list, join that same group/hotel
+    // instead of creating a new isolated one.
+    const bookingClean = booking.replace(/^#/,'');
+    const existingMatch = tripPrepData.tourists.find(t=>(t.booking_number||'').replace(/^#/,'')===bookingClean);
+    const linkGroup = existingMatch ? existingMatch.link_group : booking;
+    let agency = 'Власний заїзд';
+    if(existingMatch){
+      hotel = existingMatch.target_hotel || hotel;
+      agency = existingMatch.agency || agency;
+    }
+
     const maxRow = Math.max(0, ...tripPrepData.tourists.map(t=>t.row_order||0));
     const { error } = await sb.from('trip_prep_tourists').insert({
-      trip_id: currentTripId, row_order: maxRow+1, booking_number: booking, link_group: booking,
+      trip_id: currentTripId, row_order: maxRow+1, booking_number: booking, link_group: linkGroup,
       full_name: fullName, birth_date: birth||null, passport, target_hotel: hotel,
-      pickup_city: city, phone, agency: 'Власний заїзд'
+      pickup_city: city, phone, agency, insurance, paid_seats: paidSeats
     });
     if(error){ alert('Не вдалося додати: ' + friendlyErrorMessage(error)); return; }
     document.getElementById('tpManualFullName').value = '';
@@ -3955,9 +3987,13 @@ function renderTripPrepOverview(){
     document.getElementById('tpManualBooking').value = '';
     document.getElementById('tpManualCity').value = '';
     document.getElementById('tpManualPhone').value = '';
+    document.getElementById('tpManualInsurance').value = '';
+    document.getElementById('tpManualPaidSeats').value = '';
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
-    hbShowToast(`✅ ${fullName} додано до списку (${HB_HOTEL_STRUCTURE[hotel].name})`);
+    hbShowToast(existingMatch
+      ? `✅ ${fullName} додано до заявки №${bookingClean} (${HB_HOTEL_STRUCTURE[hotel].name})`
+      : `✅ ${fullName} додано до списку (${HB_HOTEL_STRUCTURE[hotel].name})`);
   });
   document.getElementById('tpMergeGroupsBtn').addEventListener('click', async ()=>{
     const checked = Array.from(content.querySelectorAll('.tp-group-cb:checked')).map(cb=>cb.dataset.group);
@@ -4004,6 +4040,51 @@ function renderTripPrepOverview(){
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
   }));
+  content.querySelectorAll('[data-role="tpRemovePerson"]').forEach(el=> el.addEventListener('click', async e=>{
+    e.stopPropagation();
+    const touristId = e.target.dataset.tourist;
+    const tourist = tripPrepData.tourists.find(t=>t.id===touristId);
+    if(!tourist) return;
+    if(!confirm(`Точно видалити "${tourist.full_name}" зі списку і з кімнати (якщо вже поселено)? Це не можна скасувати.`)) return;
+
+    const targetHotel = tourist.target_hotel;
+    const bookingClean = (tourist.booking_number||'').replace(/^#/,'');
+    if(targetHotel && bookingClean){
+      const tripDefForRemoval = TRIPS_DEF.find(d=>d.id===currentTripId);
+      const periodForRemoval = tripDefForRemoval ? tripDefForRemoval.label : '';
+      const { data: allBookingsForHotel } = await sb.from('room_bookings').select('*').eq('hotel', targetHotel).eq('period', periodForRemoval).eq('request_id', bookingClean);
+      for(const row of (allBookingsForHotel||[])){
+        const names = row.member_names||[];
+        if(names.length && names.includes(tourist.full_name)){
+          const remainingNames = names.filter(n=>n!==tourist.full_name);
+          if(!remainingNames.length){
+            await sb.from('room_bookings').delete().eq('id', row.id);
+          } else {
+            const age = tourist.birth_date && tripDefForRemoval ? calcAgeAtTrip(tourist.birth_date, tripDefForRemoval.start) : null;
+            const isAdult = age===null || age>=12;
+            const isKid612 = age!==null && age>=6 && age<12;
+            await sb.from('room_bookings').update({
+              member_names: remainingNames,
+              total: row.total - 1,
+              adults: row.adults - (isAdult?1:0),
+              kids_612: row.kids_612 - (isKid612?1:0),
+              kids_under6: row.kids_under6 - ((age!==null && age<6)?1:0)
+            }).eq('id', row.id);
+          }
+        } else if(!names.length && row.total===1){
+          // Old booking without saved names, and this is the only person in the base list for this booking — safe to remove.
+          const otherMembersInBooking = tripPrepData.tourists.filter(t=>(t.booking_number||'').replace(/^#/,'')===bookingClean && t.id!==touristId);
+          if(!otherMembersInBooking.length) await sb.from('room_bookings').delete().eq('id', row.id);
+        }
+      }
+    }
+
+    const { error } = await sb.from('trip_prep_tourists').delete().eq('id', touristId);
+    if(error){ alert('Не вдалося видалити: ' + friendlyErrorMessage(error)); return; }
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepView();
+    hbShowToast(`🗑️ ${tourist.full_name} видалено`);
+  }));
 }
 
 function renderTripPrepRooms(){
@@ -4016,10 +4097,25 @@ async function renderTripPrepBuses(){
   const groupKeys = Object.keys(groups);
   const tripData = getTripData(currentTripId);
   const busNames = tripData.guides.map(g=>g.name);
+  const busDef = TRIPS_DEF.find(d=>d.id===currentTripId);
 
   if(!busNames.length){
     content.innerHTML = `<p class="report-note">Спочатку признач гідів цього заїзду у вкладці "Прибутковість".</p>`;
     return;
+  }
+
+  function corridorForBorder(border){
+    if(['Порубне (Румунія)','Красноільськ (Румунія)','Дяківці (Румунія)'].includes(border)) return 'blue';
+    if(['Чоп (Угорщина)','Дяково (Румунія)','Берегово (Угорщина)'].includes(border)) return 'pink';
+    return null;
+  }
+  function groupHasVulnerableAge(members){
+    if(!busDef) return false;
+    return members.some(m=>{
+      if(!m.birth_date) return false;
+      const age = calcAgeAtTrip(m.birth_date, busDef.start);
+      return age!==null && (age<7 || age>=60);
+    });
   }
   await loadBusSeatData(currentTripId);
 
@@ -4033,10 +4129,16 @@ async function renderTripPrepBuses(){
     }
   });
 
-  const unassigned = groupKeys.filter(gk=> !groups[gk][0].assigned_bus);
+  const isSelfArriving = (m)=> ['самостійно','self','own'].includes(String(m.pickup_city||'').trim().toLowerCase());
+  const selfArrivingGroups = groupKeys.filter(gk=> groups[gk].every(isSelfArriving));
+  const unassigned = groupKeys.filter(gk=> !groups[gk][0].assigned_bus && !selfArrivingGroups.includes(gk));
   const assigned = groupKeys.filter(gk=> groups[gk][0].assigned_bus);
 
-  const suggestBusForGroup = (city)=>{
+  const suggestBusForGroup = (city, preferChernivtsiCorridor)=>{
+    if(preferChernivtsiCorridor){
+      const chernivtsiBuses = busNames.filter(b=> corridorForBorder((tripPrepBusSeatData.fullConfigs[b]||{}).border_point||'')==='blue');
+      if(chernivtsiBuses.length) return chernivtsiBuses.sort((a,b)=>busCount[a]-busCount[b])[0];
+    }
     if(city){
       const withCity = busNames.filter(b=> busCities[b].has(city));
       if(withCity.length) return withCity.sort((a,b)=>busCount[a]-busCount[b])[0];
@@ -4044,28 +4146,83 @@ async function renderTripPrepBuses(){
     return busNames.slice().sort((a,b)=>busCount[a]-busCount[b])[0];
   };
 
-  const unassignedHtml = unassigned.map(gk=>{
+  const PICKUP_BLUE = ['івано-франківськ','коломия','чернівці','снятин'];
+  const PICKUP_PINK = ['стрий','мукачево','ужгород'];
+  const classifyPickupColor = (members)=>{
+    const cities = members.map(m=>normalizeCityName(m.pickup_city)).filter(Boolean);
+    if(cities.some(c=>PICKUP_BLUE.includes(c))) return 'blue';
+    if(cities.some(c=>PICKUP_PINK.includes(c))) return 'pink';
+    return 'none';
+  };
+  const unassignedSorted = [...unassigned].sort((a,b)=>{
+    const order = { blue:0, pink:1, none:2 };
+    return order[classifyPickupColor(groups[a])] - order[classifyPickupColor(groups[b])];
+  });
+  const unassignedHtml = unassignedSorted.map(gk=>{
     const members = groups[gk];
     const city = members[0].pickup_city;
-    const suggestion = suggestBusForGroup(city);
-    return `<div class="fin-row" style="flex-wrap:wrap;">
-      <span class="fin-label" style="min-width:220px;">${members.map(m=>m.full_name).join(', ')} <span class="muted">(${members.length} ос.${city ? ', '+city : ''})</span></span>
-      <select data-role="tpBusSelect" data-group="${gk}">
-        ${busNames.map(b=>`<option value="${b}" ${suggestion===b?'selected':''}>${b} (зараз ${busCount[b]} ос.)</option>`).join('')}
-      </select>
-      <button class="btn btn-primary btn-small no-print" data-role="tpAssignBus" data-group="${gk}">Погодити: ${suggestion}</button>
+    const vulnerableAge = groupHasVulnerableAge(members);
+    const suggestion = suggestBusForGroup(city, vulnerableAge);
+    const colorTag = classifyPickupColor(members);
+    const bg = colorTag==='blue' ? '#eff6ff' : (colorTag==='pink' ? '#fdf2f8' : 'transparent');
+    const border = colorTag==='blue' ? '2px solid #93c5fd' : (colorTag==='pink' ? '2px solid #f9a8d4' : '1px solid var(--line)');
+    const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean))].join(', ');
+    const vulnerableBadge = vulnerableAge ? `<div style="margin-top:4px; font-size:12px; color:#7c3aed;">👶👵 Є маленька дитина (до 7) або людина 60+ — рекомендовано автобус через Чернівці.</div>` : '';
+
+    const unrecognizedCities = [...new Set(members.map(m=>m.pickup_city).filter(Boolean))]
+      .filter(raw => !KNOWN_CANONICAL_CITIES.map(c=>c.toLowerCase()).includes(normalizeCityName(raw)))
+      .filter(raw => !['самостійно','self','own'].includes(String(raw).trim().toLowerCase()));
+    const unrecognizedHtml = unrecognizedCities.map(rawCity=>{
+      const namesWithThisCity = members.filter(m=>m.pickup_city===rawCity).map(m=>m.full_name).join(', ');
+      return `
+      <div style="margin-top:6px; padding:6px 8px; background:#fff7ed; border:2px solid #fdba74; border-radius:8px; font-size:12px;">
+        ⚠️ Місто "<b>${rawCity}</b>" не розпізнано — у: <b>${namesWithThisCity}</b>.
+        <select data-role="tpCityFix" data-raw="${rawCity}" style="margin-left:4px; padding:2px 4px; border:2px solid var(--line); border-radius:6px;">
+          <option value="">— обрати найближче —</option>
+          ${KNOWN_CANONICAL_CITIES.map(c=>`<option value="${c}">${c}</option>`).join('')}
+        </select>
+        <button class="btn btn-ghost btn-small no-print" data-role="tpApplyCityFix" data-raw="${rawCity}" style="margin-left:4px;">Виправити всюди</button>
+      </div>`;
+    }).join('');
+
+    return `<div class="fin-row" style="flex-wrap:wrap; background:${bg}; border:${border}; border-radius:8px; padding:8px; margin-bottom:6px; flex-direction:column; align-items:stretch;">
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+        <span class="fin-label" style="min-width:220px;">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(m=>m.full_name).join(', ')} <span class="muted">(${members.length} ос.${city ? ', '+city : ''})</span></span>
+        <select data-role="tpBusSelect" data-group="${gk}">
+          ${busNames.map(b=>`<option value="${b}" ${suggestion===b?'selected':''}>${b} (зараз ${busCount[b]} ос.)</option>`).join('')}
+        </select>
+        <button class="btn btn-primary btn-small no-print" data-role="tpAssignBus" data-group="${gk}">Погодити</button>
+      </div>
+      ${vulnerableBadge}
+      ${unrecognizedHtml}
     </div>`;
   }).join('') || `<p class="report-note">Усі групи вже розподілені по автобусах.</p>`;
 
   const assignedHtml = busNames.map(b=>{
     const rows = assigned.filter(gk=>groups[gk][0].assigned_bus===b);
-    return `<div style="margin-bottom:10px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <p style="font-weight:700; margin:0;">${b} — ${busCount[b]} ос.</p>
+    const busCfg = tripPrepBusSeatData.fullConfigs[b] || {};
+    const busCorridor = corridorForBorder(busCfg.border_point||'');
+    return `<details style="margin-bottom:10px;">
+      <summary style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span style="font-weight:700;">${b} — ${busCount[b]} ос.${busCfg.border_point ? ` <span class="muted" style="font-weight:400; font-size:12px;">(кордон: ${busCfg.border_point})</span>` : ''}</span>
         <button class="btn btn-ghost btn-small no-print" data-role="tpOpenSeatChart" data-bus="${b}">🪑 Розсадка</button>
-      </div>
-      ${rows.map(gk=>`<div class="fin-row"><span class="fin-label">${groups[gk].map(m=>m.full_name).join(', ')}</span><button class="btn btn-danger-ghost btn-small no-print" data-role="tpUnassignBus" data-group="${gk}">Скасувати</button></div>`).join('') || '<p class="muted" style="font-size:12px;">Порожньо.</p>'}
-    </div>`;
+      </summary>
+      ${rows.map(gk=>{
+        const members = groups[gk];
+        const memberColor = classifyPickupColor(members);
+        const mismatch = busCorridor && memberColor!=='none' && memberColor!==busCorridor;
+        const cities = [...new Set(members.map(m=>m.pickup_city).filter(Boolean))].join(', ');
+        return `<div class="fin-row" style="flex-wrap:wrap;">
+        <span class="fin-label">${groups[gk].map(m=>m.full_name).join(', ')}${cities ? ` <span class="muted">(${cities})</span>` : ''}</span>
+        <select data-role="tpBusTransferSelect" data-group="${gk}">
+          ${busNames.filter(bn=>bn!==b).map(bn=>`<option value="${bn}">→ ${bn}</option>`).join('')}
+        </select>
+        <button class="btn btn-ghost btn-small no-print" data-role="tpTransferBus" data-group="${gk}">Перемістити</button>
+        <button class="btn btn-danger-ghost btn-small no-print" data-role="tpUnassignBus" data-group="${gk}">Скасувати</button>
+        ${mismatch ? `<div style="width:100%; margin-top:4px; padding:6px 8px; background:#fef2f2; border:2px solid #fca5a5; border-radius:8px; font-size:12px;">⚠️ Ця людина/група — з іншого напрямку (${cities}), а автобус "${b}" їде через кордон "${busCfg.border_point}". Перевір маршрут.</div>` : ''}
+      </div>`;
+      }).join('') || '<p class="muted" style="font-size:12px;">Порожньо.</p>'}
+    </details>`;
   }).join('');
 
   if(tripPrepBusSeatView && busNames.includes(tripPrepBusSeatView)){
@@ -4080,6 +4237,11 @@ async function renderTripPrepBuses(){
       <p class="report-note">Барбі і Жовтий їдуть завжди; Миросик і Окатий — по черзі. Признач GR-слот, фізичний автобус, кордон і часовий слот для кожного гіда.</p>
       ${busNames.map(b=>{
         const cfg = tripPrepBusSeatData.fullConfigs[b] || {};
+        const guidePhoneVal = cfg.guide_phone || GUIDE_PHONE_MAP[b] || '';
+        const meetingPointVal = cfg.meeting_point || DEFAULT_MEETING_POINT;
+        const gatherTimeVal = cfg.gather_time || DEFAULT_GATHER_TIME;
+        const departTimeVal = cfg.departure_time || DEFAULT_DEPARTURE_TIME;
+        const pickupTextVal = cfg.pickup_points_text || pickupTextForBorder(cfg.border_point||'');
         return `<div style="display:flex; flex-direction:column; gap:6px; padding:10px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px;">
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
             <b style="min-width:90px;">${b}</b>
@@ -4091,19 +4253,19 @@ async function renderTripPrepBuses(){
               <option value="">Фізичний автобус — загальна</option>
               ${allLayoutNames.map(l=>`<option value="${l}" ${cfg.layout_name===l?'selected':''}>${l}</option>`).join('')}
             </select>
-            <select data-role="tpBusBorder" data-bus="${b}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px;">
+            <select data-role="tpBusBorder" data-bus="${b}" onchange="hbBusBorderChanged('${b}')" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px;">
               <option value="">Кордон</option>
               ${BORDER_POINTS.map(p=>`<option value="${p}" ${cfg.border_point===p?'selected':''}>${p}</option>`).join('')}
             </select>
             <input type="text" data-role="tpBusTimeSlot" data-bus="${b}" placeholder="Часовий слот (10-11)" value="${cfg.time_slot||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:130px;">
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <input type="text" data-role="tpBusGuidePhone" data-bus="${b}" placeholder="Телефон гіда (+380...)" value="${cfg.guide_phone||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:170px;">
-            <input type="text" data-role="tpBusMeetingPoint" data-bus="${b}" placeholder="Місце знаходження автобуса" value="${cfg.meeting_point||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; flex:1; min-width:220px;">
-            <input type="text" data-role="tpBusGatherTime" data-bus="${b}" placeholder="Час збору (05:30)" value="${cfg.gather_time||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:130px;">
-            <input type="text" data-role="tpBusDepartTime" data-bus="${b}" placeholder="Час відправлення (05:45)" value="${cfg.departure_time||''}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:150px;">
+            <input type="text" data-role="tpBusGuidePhone" data-bus="${b}" placeholder="Телефон гіда (+380...)" value="${guidePhoneVal}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:170px;">
+            <input type="text" data-role="tpBusMeetingPoint" data-bus="${b}" placeholder="Місце знаходження автобуса" value="${meetingPointVal}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; flex:1; min-width:220px;">
+            <input type="text" data-role="tpBusGatherTime" data-bus="${b}" placeholder="Час збору (05:30)" value="${gatherTimeVal}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:130px;">
+            <input type="text" data-role="tpBusDepartTime" data-bus="${b}" placeholder="Час відправлення (05:45)" value="${departTimeVal}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px; width:150px;">
           </div>
-          <textarea data-role="tpBusPickupText" data-bus="${b}" placeholder="Можливість приєднатись до автобуса (напр.: Стрий - орієнтовно 06:30, заправка ОККО, вул. Болехівська, 49)" rows="3" style="padding:6px; border:2px solid var(--line); border-radius:6px; width:100%; font-family:inherit; font-size:13px;">${cfg.pickup_points_text||''}</textarea>
+          <textarea data-role="tpBusPickupText" data-bus="${b}" placeholder="Можливість приєднатись до автобуса (напр.: Стрий - орієнтовно 06:30, заправка ОККО, вул. Болехівська, 49)" rows="3" style="padding:6px; border:2px solid var(--line); border-radius:6px; width:100%; font-family:inherit; font-size:13px;">${pickupTextVal}</textarea>
           <button class="btn btn-ghost btn-small" data-role="tpSaveBusConfig" data-bus="${b}" style="align-self:flex-start;">Зберегти</button>
         </div>`;
       }).join('')}
@@ -4115,12 +4277,23 @@ async function renderTripPrepBuses(){
     </div>
   `;
 
+  const selfArrivingHtml = selfArrivingGroups.map(gk=>{
+    const members = groups[gk];
+    const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean))].join(', ');
+    return `<div class="fin-row" style="background:#f3f4f6; border:1px dashed #9ca3af; border-radius:8px; padding:8px; margin-bottom:6px;">
+      <span class="fin-label">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(m=>m.full_name).join(', ')} <span class="muted">(${members.length} ос.)</span> · 🚶 самостійно</span>
+    </div>`;
+  }).join('') || `<p class="report-note">Немає.</p>`;
+
   content.innerHTML = `
     ${configPanelHtml}
-    <p class="fin-section-title">Ще не розподілені (${unassigned.length})</p>
-    ${unassignedHtml}
     <p class="fin-section-title">Розподілені по автобусах</p>
     ${assignedHtml}
+    <p class="fin-section-title">Ще не розподілені (${unassigned.length})</p>
+    <p class="report-note">🔵 блакитний — Івано-Франківськ/Коломия/Чернівці/Снятин (або пов'язана заявка, де хоч хтось звідти). 🌸 рожевий — Стрий/Мукачево/Ужгород.</p>
+    ${unassignedHtml}
+    <p class="fin-section-title">🚶 Дістаються самостійно (${selfArrivingGroups.length}, без автобуса)</p>
+    ${selfArrivingHtml}
   `;
 
   content.querySelectorAll('[data-role="tpSaveBusConfig"]').forEach(el=> el.addEventListener('click', async e=>{
@@ -4162,6 +4335,8 @@ async function renderTripPrepBuses(){
   });
 
   content.querySelectorAll('[data-role="tpOpenSeatChart"]').forEach(el=> el.addEventListener('click', async e=>{
+    e.preventDefault();
+    e.stopPropagation();
     tripPrepBusSeatView = e.target.dataset.bus;
     await loadBusSeatData(currentTripId);
     renderTripPrepBuses();
@@ -4174,10 +4349,30 @@ async function renderTripPrepBuses(){
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepBuses();
   }));
+  content.querySelectorAll('[data-role="tpApplyCityFix"]').forEach(el=> el.addEventListener('click', async e=>{
+    const rawCity = e.target.dataset.raw;
+    const sel = content.querySelector(`[data-role="tpCityFix"][data-raw="${rawCity}"]`);
+    const corrected = sel.value;
+    if(!corrected){ alert('Обери, на яке місто виправити.'); return; }
+    const idsToFix = tripPrepData.tourists.filter(t=>t.pickup_city===rawCity).map(t=>t.id);
+    const { error } = await sb.from('trip_prep_tourists').update({ pickup_city: corrected }).in('id', idsToFix);
+    if(error){ alert('Не вдалося виправити: ' + friendlyErrorMessage(error)); return; }
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepBuses();
+    hbShowToast(`✅ "${rawCity}" → "${corrected}" (${idsToFix.length} чол)`);
+  }));
   content.querySelectorAll('[data-role="tpUnassignBus"]').forEach(el=> el.addEventListener('click', async e=>{
     await unassignGroupFromBus(e.target.dataset.group);
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepBuses();
+  }));
+  content.querySelectorAll('[data-role="tpTransferBus"]').forEach(el=> el.addEventListener('click', async e=>{
+    const gk = e.target.dataset.group;
+    const sel = content.querySelector(`[data-role="tpBusTransferSelect"][data-group="${gk}"]`);
+    await assignGroupToBus(gk, sel.value);
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepBuses();
+    hbShowToast(`✅ Перенесено на ${sel.value}`);
   }));
 }
 
@@ -4186,8 +4381,27 @@ let tripPrepBusSeatView = null;
 let tripPrepBusSeatData = { assignments: [], configs: {} };
 const BUS_GROUP_COLORS = ['#8b5cf6','#0ea5e9','#ec4899','#22c55e','#f97316','#14b8a6','#eab308','#f43f5e','#6366f1','#84cc16'];
 const BUS_LAYOUTS = {"Барбі": [[{"col": "A", "label": "водій"}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 1}, {"col": "B", "label": "серв"}, {"col": "C", "seat": 2}, {"col": "D", "label": "серв"}, {"col": "G", "seat": 3}, {"col": "H", "label": "серв"}, {"col": "I", "seat": 4}, {"col": "J", "label": "серв"}], [{"col": "A", "seat": 5}, {"col": "C", "seat": 6}, {"col": "G", "seat": 7}, {"col": "I", "seat": 8}], [{"col": "A", "seat": 9}, {"col": "C", "seat": 10}, {"col": "G", "seat": 11}, {"col": "I", "seat": 12}], [{"col": "A", "seat": 13}, {"col": "C", "seat": 14}, {"col": "G", "seat": 15}, {"col": "I", "seat": 16}], [{"col": "A", "seat": 17}, {"col": "C", "seat": 18}, {"col": "G", "seat": 19}, {"col": "I", "seat": 20}], [{"col": "A", "seat": 21}, {"col": "C", "seat": 22}, {"col": "G", "seat": 23}, {"col": "I", "seat": 24}], [{"col": "A", "seat": 25}, {"col": "C", "seat": 26}], [{"col": "A", "seat": 29}, {"col": "C", "seat": 30}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 31}, {"col": "C", "seat": 32}, {"col": "G", "seat": 33}, {"col": "I", "seat": 34}], [{"col": "A", "seat": 35}, {"col": "C", "seat": 36}, {"col": "G", "seat": 37}, {"col": "I", "seat": 38}], [{"col": "A", "seat": 39}, {"col": "C", "seat": 40}, {"col": "G", "seat": 41}, {"col": "I", "seat": 42}], [{"col": "A", "seat": 43}, {"col": "C", "seat": 44}, {"col": "G", "seat": 45}, {"col": "I", "seat": 46}], [{"col": "A", "seat": 47}, {"col": "C", "seat": 48}, {"col": "G", "seat": 49}, {"col": "I", "seat": 50}], [{"col": "A", "seat": 51}, {"col": "C", "seat": 52}, {"col": "G", "seat": 53}, {"col": "I", "seat": 54}], [{"col": "A", "seat": 55}, {"col": "C", "seat": 56}, {"col": "E", "seat": 57}, {"col": "G", "seat": 58}, {"col": "I", "seat": 59}]], "Жовтий": [[{"col": "A", "label": "водій"}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 1}, {"col": "B", "label": "серв"}, {"col": "C", "seat": 2}, {"col": "D", "label": "серв"}, {"col": "G", "seat": 3}, {"col": "H", "label": "серв"}, {"col": "I", "seat": 4}, {"col": "J", "label": "серв"}], [{"col": "A", "seat": 5}, {"col": "C", "seat": 6}, {"col": "G", "seat": 7}, {"col": "I", "seat": 8}], [{"col": "A", "seat": 9}, {"col": "C", "seat": 10}, {"col": "G", "seat": 11}, {"col": "I", "seat": 12}], [{"col": "A", "seat": 13}, {"col": "C", "seat": 14}, {"col": "G", "seat": 15}, {"col": "I", "seat": 16}], [{"col": "A", "seat": 17}, {"col": "C", "seat": 18}, {"col": "G", "seat": 19}, {"col": "I", "seat": 20}], [{"col": "A", "seat": 21}, {"col": "C", "seat": 22}, {"col": "G", "seat": 23}, {"col": "I", "seat": 24}], [{"col": "A", "seat": 25}, {"col": "C", "seat": 26}, {"col": "G", "seat": 27}, {"col": "I", "seat": 28}], [{"col": "A", "seat": 29}, {"col": "C", "seat": 30}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 31}, {"col": "C", "seat": 32}, {"col": "G", "seat": 33}, {"col": "I", "seat": 34}], [{"col": "A", "seat": 35}, {"col": "C", "seat": 36}, {"col": "G", "seat": 37}, {"col": "I", "seat": 38}], [{"col": "A", "seat": 39}, {"col": "C", "seat": 40}, {"col": "G", "seat": 41}, {"col": "I", "seat": 42}], [{"col": "A", "seat": 43}, {"col": "C", "seat": 44}, {"col": "G", "seat": 45}, {"col": "I", "seat": 46}], [{"col": "A", "seat": 47}, {"col": "C", "seat": 48}, {"col": "G", "seat": 49}, {"col": "I", "seat": 50}], [{"col": "A", "seat": 51}, {"col": "C", "seat": 52}, {"col": "G", "seat": 53}, {"col": "I", "seat": 54}], [{"col": "A", "seat": 55}, {"col": "C", "seat": 56}, {"col": "E", "seat": 57}, {"col": "G", "seat": 58}, {"col": "I", "seat": 59}]], "Окатий": [[{"col": "A", "seat": 2}, {"col": "C", "seat": 1}, {"col": "F", "seat": 3}, {"col": "G", "label": "сервіс"}, {"col": "H", "seat": 4}, {"col": "I", "label": "сервіс"}], [{"col": "A", "seat": 6}, {"col": "C", "seat": 5}], [{"col": "A", "seat": 10}, {"col": "C", "seat": 9}, {"col": "F", "seat": 7}, {"col": "H", "seat": 8}], [{"col": "A", "seat": 14}, {"col": "C", "seat": 13}, {"col": "F", "seat": 11}, {"col": "H", "seat": 12}], [{"col": "A", "seat": 18}, {"col": "C", "seat": 17}, {"col": "F", "seat": 15}, {"col": "H", "seat": 16}], [{"col": "A", "seat": 22}, {"col": "C", "seat": 21}, {"col": "F", "seat": 19}, {"col": "H", "seat": 20}], [{"col": "A", "seat": 26}, {"col": "C", "seat": 25}, {"col": "F", "seat": 23}, {"col": "H", "seat": 24}], [{"col": "A", "seat": 30}, {"col": "C", "seat": 29}, {"col": "F", "seat": 27}, {"col": "H", "seat": 28}], [{"col": "A", "seat": 32}, {"col": "C", "seat": 31}], [{"col": "A", "seat": 34}, {"col": "C", "seat": 33}], [{"col": "A", "seat": 38}, {"col": "C", "seat": 37}, {"col": "F", "seat": 35}, {"col": "H", "seat": 36}], [{"col": "A", "seat": 42}, {"col": "C", "seat": 41}, {"col": "F", "seat": 39}, {"col": "H", "seat": 40}], [{"col": "A", "seat": 46}, {"col": "C", "seat": 45}, {"col": "F", "seat": 43}, {"col": "H", "seat": 44}], [{"col": "A", "seat": 50}, {"col": "C", "seat": 49}, {"col": "F", "seat": 57}, {"col": "H", "seat": 48}], [{"col": "A", "seat": 54}, {"col": "C", "seat": 53}, {"col": "F", "seat": 51}, {"col": "H", "seat": 52}], [{"col": "A", "seat": 58}, {"col": "C", "seat": 57}, {"col": "F", "seat": 55}, {"col": "H", "seat": 56}]], "Миросик": [[{"col": "A", "label": "водії"}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 3}, {"col": "B", "label": "серв"}, {"col": "C", "seat": 4}, {"col": "D", "label": "серв"}, {"col": "G", "seat": 1}, {"col": "H", "label": "серв"}, {"col": "I", "seat": 2}, {"col": "J", "label": "серв"}], [{"col": "A", "seat": 7}, {"col": "C", "seat": 8}, {"col": "G", "seat": 5}, {"col": "I", "seat": 6}], [{"col": "A", "seat": 11}, {"col": "C", "seat": 12}, {"col": "G", "seat": 9}, {"col": "I", "seat": 10}], [{"col": "A", "seat": 15}, {"col": "C", "seat": 16}, {"col": "G", "seat": 13}, {"col": "I", "seat": 14}], [{"col": "A", "seat": 19}, {"col": "C", "seat": 20}, {"col": "G", "seat": 17}, {"col": "I", "seat": 18}], [{"col": "A", "seat": 23}, {"col": "C", "seat": 24}, {"col": "G", "seat": 21}, {"col": "I", "seat": 22}], [{"col": "A", "seat": 27}, {"col": "C", "seat": 28}, {"col": "G", "seat": 25}, {"col": "I", "seat": 26}], [{"col": "A", "seat": 29}, {"col": "C", "seat": 30}, {"col": "G", "label": "сходи"}], [{"col": "A", "seat": 31}, {"col": "C", "seat": 32}], [{"col": "A", "seat": 35}, {"col": "C", "seat": 36}, {"col": "G", "seat": 33}, {"col": "I", "seat": 34}], [{"col": "A", "seat": 39}, {"col": "C", "seat": 40}, {"col": "G", "seat": 37}, {"col": "I", "seat": 38}], [{"col": "A", "seat": 43}, {"col": "C", "seat": 44}, {"col": "G", "seat": 41}, {"col": "I", "seat": 42}], [{"col": "A", "seat": 47}, {"col": "C", "seat": 48}, {"col": "G", "seat": 45}, {"col": "I", "seat": 46}], [{"col": "A", "seat": 51}, {"col": "C", "seat": 52}, {"col": "G", "seat": 49}, {"col": "I", "seat": 50}], [{"col": "A", "seat": 55}, {"col": "C", "seat": 56}, {"col": "G", "seat": 53}, {"col": "I", "seat": 54}], [{"col": "A", "seat": 59}, {"col": "C", "seat": 60}, {"col": "G", "seat": 57}, {"col": "I", "seat": 58}], [{"col": "A", "seat": 61}, {"col": "C", "seat": 62}, {"col": "E", "seat": 63}, {"col": "G", "seat": 64}, {"col": "I", "seat": 65}]]};
-const CORRIDOR_A_CITIES = ['Стрий','Мукачево','Ужгород'];
+const CORRIDOR_A_CITIES = ['стрий','мукачево','ужгород'];
 const BORDER_POINTS = ['Чоп (Угорщина)','Берегово (Угорщина)','Дяково (Румунія)','Порубне (Румунія)','Красноільськ (Румунія)','Дяківці (Румунія)'];
+
+const GUIDE_PHONE_MAP = {
+  'Іра': '+380665023030', 'Таня': '+380975551212', 'Мирослава': '+380660160919',
+  'Галя': '+380974337208', 'Марта': '+380678432711', 'Ліда': '+380976323858'
+};
+const DEFAULT_MEETING_POINT = 'Паркінг ТЦ «Victoria Gardens», м. Львів, вул. Кульпарківська 226а';
+const DEFAULT_GATHER_TIME = '5:00';
+const DEFAULT_DEPARTURE_TIME = '5:20';
+const PICKUP_TEXT_ROMANIA = `Івано-Франківськ: орієнтовно 07:45 (заправка UPG, вулиця Надвірнянська, 67-В, Черніїв)
+Чернівці: орієнтовно 09:45 (заправка WOG, вулиця Хотинська, 3б, Чернівці, Чернівецька область, 58000). Місце зустрічі в Чернівцях може бути змінено, залежно від кордону, який буде заброньовано для автобуса. Про це гід попередить за день до туру в телефонному дзвінку.
+Час є орієнтовним і залежить від ситуації на дорогах та кордоні (система «Є-Черга»). Щодо точного часу прибуття автобуса, ви будете зорієнтовані нашими гідами, що супроводжують групу.`;
+const PICKUP_TEXT_HUNGARY = `Стрий - орієнтовно 06:20 (заправка ОККО, вулиця Болехівська, 49)
+Мукачево - орієнтовно 09:00 (заправка UPG, вулиця Лавківська, 1-Ж. біля Епіцентру)
+Ужгород - орієнтовно 10:00 (заправка УКРНАФТА. вул. Карпатської України, 94, Баранинці)`;
+function pickupTextForBorder(border){
+  if(['Порубне (Румунія)','Красноільськ (Румунія)','Дяківці (Румунія)'].includes(border)) return PICKUP_TEXT_ROMANIA;
+  if(['Чоп (Угорщина)','Дяково (Румунія)','Берегово (Угорщина)'].includes(border)) return PICKUP_TEXT_HUNGARY;
+  return '';
+}
 
 async function parseCustomBusLayoutFile(file){
   const buf = await file.arrayBuffer();
@@ -4215,16 +4429,34 @@ async function parseCustomBusLayoutFile(file){
   return rows;
 }
 
-const CORRIDOR_B_CITIES = ['Івано-Франківськ','Чернівці'];
+const CORRIDOR_B_CITIES = ['івано-франківськ','чернівці','коломия','снятин'];
+
+const CITY_ALIASES = {
+  'lviv':'львів', 'львів':'львів',
+  'if':'івано-франківськ', 'іф':'івано-франківськ', 'ivano-frankivsk':'івано-франківськ', 'ivanofrankivsk':'івано-франківськ', 'івано-франківськ':'івано-франківськ',
+  'mukachevo':'мукачево', 'мукачево':'мукачево',
+  'uzhhorod':'ужгород', 'uzhgorod':'ужгород', 'ужгород':'ужгород',
+  'stryi':'стрий', 'stryy':'стрий', 'стрий':'стрий',
+  'chernivtsi':'чернівці', 'чернівці':'чернівці',
+  'kolomyia':'коломия', 'kolomyya':'коломия', 'коломия':'коломия',
+  'snyatyn':'снятин', 'снятин':'снятин'
+};
+const KNOWN_CANONICAL_CITIES = ['Львів','Івано-Франківськ','Коломия','Чернівці','Снятин','Стрий','Мукачево','Ужгород'];
+function normalizeCityName(raw){
+  if(!raw) return '';
+  const c = String(raw).trim().toLowerCase();
+  return CITY_ALIASES[c] || c;
+}
 
 function colorForGroupKey(key){
   let hash=0; for(let i=0;i<String(key).length;i++) hash = (hash*31 + key.charCodeAt(i)) >>> 0;
   return BUS_GROUP_COLORS[hash % BUS_GROUP_COLORS.length];
 }
 function classifyCorridor(cities){
-  const hasB = cities.some(c=>CORRIDOR_B_CITIES.includes(c));
-  const hasA = cities.some(c=>CORRIDOR_A_CITIES.includes(c));
-  if(hasB) return 'Б (ІФ–Чернівці)'; // Чернівці overrides Львів within the same booking
+  const normalized = cities.map(normalizeCityName);
+  const hasB = normalized.some(c=>CORRIDOR_B_CITIES.includes(c));
+  const hasA = normalized.some(c=>CORRIDOR_A_CITIES.includes(c));
+  if(hasB) return 'Б (ІФ–Коломия–Чернівці–Снятин)';
   if(hasA) return 'А (Стрий–Мукачево–Ужгород)';
   return 'не визначено';
 }
@@ -4250,6 +4482,42 @@ async function loadBusSeatData(tripId, force){
   tripPrepBusSeatDataLoadedForTrip = tripId;
 }
 
+async function hbSeatPersonByClick(touristId, busName){
+  const t = tripPrepData.tourists.find(x=>x.id===touristId);
+  if(!t) return;
+  const seatNumRaw = prompt(`На яке місце посадити ${t.full_name}? Введи номер місця:`);
+  if(seatNumRaw===null || seatNumRaw.trim()==='') return;
+  const seatNum = parseInt(seatNumRaw);
+  if(!seatNum){ alert('Введи число — номер місця.'); return; }
+  const existing = tripPrepBusSeatData.assignments.find(a=>a.bus_name===busName && a.seat_number===seatNum);
+  if(existing){ alert(`Місце ${seatNum} вже зайняте: ${existing.full_name}. Спочатку звільни його (клікнувши на місце в схемі).`); return; }
+  const defaultPaid = Number(t.paid_seats) > 0;
+  const wantsPaid = confirm(`Місце ${seatNum} — платне (+10€)? OK — так, Скасувати — ні.${defaultPaid ? ' (за даними цього туриста — платне місце)' : ''}`);
+  const { error } = await sb.from('bus_seat_assignments').upsert({
+    trip_id: currentTripId, bus_name: busName, seat_number: seatNum,
+    full_name: t.full_name, booking_number: (t.booking_number||'').replace(/^#/,''),
+    link_group: t.link_group||'', paid_seat: wantsPaid
+  }, { onConflict: 'trip_id,bus_name,seat_number' });
+  if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+  await loadBusSeatData(currentTripId, true);
+  renderBusSeatChart(busName);
+  hbShowToast(`✅ ${t.full_name} посаджений на місце ${seatNum}`);
+}
+
+async function hbEditSeatPersonFields(touristId){
+  const t = tripPrepData.tourists.find(x=>x.id===touristId);
+  if(!t) return;
+  const newCity = prompt(`Місце посадки для ${t.full_name}:`, t.pickup_city||'');
+  if(newCity===null) return;
+  const newPaidRaw = prompt(`Платні місця (€) для ${t.full_name} (0, якщо нема):`, t.paid_seats||0);
+  if(newPaidRaw===null) return;
+  const { error } = await sb.from('trip_prep_tourists').update({ pickup_city: newCity.trim(), paid_seats: parseDecimalInput(newPaidRaw) }).eq('id', touristId);
+  if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+  tripPrepData = await loadTripPrepData(currentTripId);
+  renderBusSeatChart(tripPrepBusSeatView);
+  hbShowToast(`✅ Оновлено: ${t.full_name}`);
+}
+
 function renderBusSeatChart(busName){
   const content = document.getElementById('tripPrepContent');
   const seatCount = tripPrepBusSeatData.configs[busName] || 50;
@@ -4263,36 +4531,83 @@ function renderBusSeatChart(busName){
   const seatedNames = new Set(Object.values(assignmentsByseat).map(a=>a.full_name));
   const notYetSeated = inThisBus.flatMap(gk=>groups[gk].map(m=>({ ...m, __gk:gk }))).filter(m=>!seatedNames.has(m.full_name));
 
-  // Sort the "not yet seated" list by corridor priority, respecting the "Чернівці overrides Львів" rule per booking.
-  const corridorByGroup = {};
-  inThisBus.forEach(gk=>{
-    const cities = groups[gk].map(m=>m.pickup_city).filter(Boolean);
-    corridorByGroup[gk] = classifyCorridor(cities);
+  const seatDef = TRIPS_DEF.find(d=>d.id===currentTripId);
+  notYetSeated.forEach(m=>{ m.__age = (m.birth_date && seatDef) ? calcAgeAtTrip(m.birth_date, seatDef.start) : null; });
+
+  // Order: paid-seat companies first, then by ascending booking number — but members of the
+  // same company (link_group) always stay adjacent.
+  const groupOrder = {};
+  notYetSeated.forEach(m=>{
+    const gk = m.__gk;
+    if(!groupOrder[gk]) groupOrder[gk] = { hasPaid:false, minBooking: Infinity };
+    if(Number(m.paid_seats)>0) groupOrder[gk].hasPaid = true;
+    const bnum = parseInt((m.booking_number||'').replace(/^#/,'')) || Infinity;
+    if(bnum < groupOrder[gk].minBooking) groupOrder[gk].minBooking = bnum;
   });
-  notYetSeated.sort((a,b)=> (corridorByGroup[a.__gk]||'').localeCompare(corridorByGroup[b.__gk]||''));
+  const sortedGroupKeys = [...new Set(notYetSeated.map(m=>m.__gk))].sort((a,b)=>{
+    const A = groupOrder[a], B = groupOrder[b];
+    if(A.hasPaid !== B.hasPaid) return A.hasPaid ? -1 : 1;
+    return A.minBooking - B.minBooking;
+  });
+  const orderedMembers = [];
+  sortedGroupKeys.forEach(gk=>{
+    const groupMembers = notYetSeated.filter(m=>m.__gk===gk).sort((a,b)=> (Number(b.paid_seats)>0?1:0) - (Number(a.paid_seats)>0?1:0));
+    orderedMembers.push(...groupMembers);
+  });
 
   const renderSeatTile = (seatNum)=>{
+    if(seatNum===3 || seatNum===4){
+      return `<div title="Місце гіда" style="width:50px; height:50px; border-radius:8px; background:#1e3a8a; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:9px; text-align:center; padding:2px;">
+        <div style="font-weight:700;">${seatNum}</div>
+        <div style="font-size:8px;">Гід</div>
+      </div>`;
+    }
     const a = assignmentsByseat[seatNum];
     const gkForSeat = a ? groupKeys.find(gk=>groups[gk].some(m=>m.full_name===a.full_name)) : null;
-    const color = a ? (gkForSeat ? colorForGroupKey(gkForSeat) : '#9ca3af') : '#e5e7eb';
+    const isDriverZone = (seatNum===1 || seatNum===2);
+    const isPaidZone = seatNum>=5 && seatNum<=20;
+    const color = a ? (gkForSeat ? colorForGroupKey(gkForSeat) : '#9ca3af') : (isPaidZone ? '#fef3c7' : '#e5e7eb');
     const textColor = a ? '#fff' : '#374151';
-    return `<div onclick="hbBusSeatClick('${busName}',${seatNum})" title="${a?a.full_name:'Вільне місце '+seatNum}" style="width:50px; height:50px; border-radius:8px; background:${color}; color:${textColor}; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:9px; cursor:pointer; text-align:center; padding:2px; position:relative;">
+    const border = isDriverZone ? 'border:2px dashed #6b7280;' : (isPaidZone ? 'border:2px solid #f59e0b;' : '');
+    return `<div onclick="hbBusSeatClick('${busName}',${seatNum})" title="${a?a.full_name:'Вільне місце '+seatNum}${isDriverZone?' (зазвичай водій)':''}${isPaidZone?' (+10€ доплата)':''}" style="width:50px; height:50px; border-radius:8px; background:${color}; color:${textColor}; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:9px; cursor:pointer; text-align:center; padding:2px; position:relative; ${border}">
       ${a && a.paid_seat ? '<span style="position:absolute; top:-4px; right:-4px; background:#facc15; color:#000; font-size:9px; border-radius:9999px; padding:0 3px; font-weight:700;">💰</span>' : ''}
       <div style="font-weight:700;">${seatNum}</div>
-      ${a ? `<div style="font-size:8px; line-height:1.1;">${a.full_name.split(' ')[0]}</div>` : ''}
+      ${a ? `<div style="font-size:8px; line-height:1.1;">${a.full_name.split(' ')[0]}</div>` : (isDriverZone ? `<div style="font-size:7px;">водій</div>` : '')}
     </div>`;
   };
-  const renderLabelTile = (label)=>`<div style="width:50px; height:50px; border-radius:8px; background:var(--whitewash-2); color:#9ca3af; display:flex; align-items:center; justify-content:center; font-size:9px; text-align:center; padding:2px;">${label}</div>`;
+  const renderLabelTile = (label)=>{
+    if(/^серв/i.test(label)) return `<div style="width:16px;"></div>`;
+    return `<div style="width:50px; height:50px; border-radius:8px; background:var(--whitewash-2); color:#9ca3af; display:flex; align-items:center; justify-content:center; font-size:9px; text-align:center; padding:2px;">${label}</div>`;
+  };
 
   let seatsHtml = '';
   const resolvedLayoutRows = layoutName ? (BUS_LAYOUTS[layoutName] || (tripPrepBusSeatData.customLayouts[layoutName]||{}).rows) : null;
   if(resolvedLayoutRows){
-    // Exact real layout: render using the file's own column positions.
     const rows = resolvedLayoutRows;
     const allCols = [...new Set(rows.flatMap(r=>r.map(c=>c.col)))].sort();
+    const isWideRow = (row)=> !row.some(c=>'label' in c) && row.filter(c=>'seat' in c).length >= 5;
+    const normalRows = rows.filter(r=>!isWideRow(r));
+    function computeRowWidth(row){
+      return allCols.reduce((sum,col)=>{
+        const cell = row.find(c=>c.col===col);
+        let w;
+        if(!cell) w = 14;
+        else if('seat' in cell) w = 50;
+        else w = /^серв/i.test(cell.label) ? 16 : 50;
+        return sum + w;
+      }, 0) + (allCols.length-1)*6;
+    }
+    const standardRowWidth = Math.max(...normalRows.map(computeRowWidth));
+
     seatsHtml = rows.map(row=>{
+      if(isWideRow(row)){
+        // Wide back row (extra middle seat): spread evenly across the exact same span as the
+        // standard rows above, instead of locking to the narrow per-column positions.
+        return `<div style="display:flex; justify-content:space-between; width:${standardRowWidth}px; margin-bottom:6px;">` +
+          row.filter(c=>'seat' in c).sort((a,b)=>a.seat-b.seat).map(c=>renderSeatTile(c.seat)).join('') + `</div>`;
+      }
       const byCol = {}; row.forEach(c=> byCol[c.col]=c);
-      return `<div style="display:flex; gap:6px; margin-bottom:6px;">` +
+      return `<div style="display:flex; gap:6px; margin-bottom:6px; width:${standardRowWidth}px;">` +
         allCols.map(col=>{
           const c = byCol[col];
           if(!c) return `<div style="width:14px;"></div>`;
@@ -4313,9 +4628,18 @@ function renderBusSeatChart(busName){
     }
   }
 
-  const notSeatedHtml = notYetSeated.map(m=>
-    `<div style="font-size:12px; padding:4px 8px; border-radius:6px; background:${colorForGroupKey(m.__gk)}22; border:2px solid ${colorForGroupKey(m.__gk)}; display:inline-block; margin:2px;">${m.full_name} <span class="muted">(${m.pickup_city||'?'})</span></div>`
-  ).join('') || '<span class="muted" style="font-size:12px;">Усі вже розсаджені.</span>';
+  const notSeatedListHtml = orderedMembers.map(m=>{
+    const isPaid = Number(m.paid_seats) > 0;
+    const groupColor = colorForGroupKey(m.__gk);
+    const bookingLabel = (m.booking_number||'').replace(/^#/,'');
+    return `<div style="padding:6px 8px; margin-bottom:4px; border-left:4px solid ${groupColor}; background:${groupColor}15; border-radius:6px; font-size:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">
+        <div onclick="hbSeatPersonByClick('${m.id}','${busName}')" style="cursor:pointer; flex:1; ${isPaid?'font-weight:700;':''}">${isPaid?'💰 ':''}${bookingLabel?`№${bookingLabel} — `:''}${m.full_name}${m.__age!==null?` (${m.__age}р.)`:''}</div>
+        <button onclick="hbEditSeatPersonFields('${m.id}')" title="Виправити місто/платні місця" class="no-print" style="border:none; background:none; cursor:pointer; font-size:12px; padding:0;">✏️</button>
+      </div>
+      <div class="muted" style="font-size:11px;">${m.pickup_city||'❓ місто не вказано'}${m.comment?' · '+m.comment:''}</div>
+    </div>`;
+  }).join('') || '<span class="muted" style="font-size:12px;">Усі вже розсаджені.</span>';
 
   content.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -4323,35 +4647,22 @@ function renderBusSeatChart(busName){
       <button class="btn btn-ghost btn-small no-print" id="tpBackToBusesBtn">← Назад до автобусів</button>
     </div>
     <div class="no-print" style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
-      <label style="font-size:13px;">Реальна схема:
-        <select id="tpBusLayoutSelect" style="margin-left:4px; padding:4px 6px; border:2px solid var(--line); border-radius:6px;">
-          <option value="">— загальна (без конкретної схеми) —</option>
-          ${Object.keys(BUS_LAYOUTS).map(l=>`<option value="${l}" ${layoutName===l?'selected':''}>${l}</option>`).join('')}
-          ${Object.keys(tripPrepBusSeatData.customLayouts||{}).map(l=>`<option value="${l}" ${layoutName===l?'selected':''}>${l} (завантажена)</option>`).join('')}
-        </select>
-      </label>
-      ${!layoutName ? `<label style="font-size:13px;">Кількість місць: <input type="number" id="tpBusSeatCountInput" value="${seatCount}" style="width:70px; padding:4px 6px; border:2px solid var(--line); border-radius:6px;"></label>` : ''}
-      <button class="btn btn-ghost btn-small" id="tpSaveSeatCountBtn">Зберегти</button>
+      <span style="font-size:13px;">Фізичний автобус: <b>${layoutName || 'загальна схема'}</b> <span class="muted">(змінити — у вкладці "Автобуси")</span></span>
       <button class="btn btn-danger-ghost btn-small" id="tpClearSeatChartBtn">🗑️ Очистити розсадку цього автобуса</button>
     </div>
-    <p class="report-note">Ще не розсаджені (${notYetSeated.length}), відсортовано за коридором (А: Стрий–Мукачево–Ужгород, Б: ІФ–Чернівці; якщо в заявці є і Львів, і Чернівці — вся заявка йде як "Б"):</p>
-    <div style="margin-bottom:14px;">${notSeatedHtml}</div>
-    <div>${seatsHtml}</div>
+    <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
+      <div style="flex:1; min-width:280px;">
+        <p class="report-note" style="margin-bottom:6px;">🔵 3-4 — завжди гід. Пунктир — 1-2, зазвичай водій (можна віддати туристам). 🟧 5-20 — місця з доплатою +10€.</p>
+        ${seatsHtml}
+      </div>
+      <div style="min-width:260px; max-width:300px; max-height:640px; overflow-y:auto; flex-shrink:0;">
+        <p class="report-note" style="margin-bottom:6px;">Ще не розсаджені (${notYetSeated.length}) — 💰 платні місця зверху жирним, далі компанії за зростанням номера заявки. Клікни на людину, щоб вписати номер місця:</p>
+        ${notSeatedListHtml}
+      </div>
+    </div>
   `;
 
   document.getElementById('tpBackToBusesBtn').addEventListener('click', ()=>{ tripPrepBusSeatView = null; renderTripPrepBuses(); });
-  document.getElementById('tpSaveSeatCountBtn').addEventListener('click', async ()=>{
-    const newLayout = document.getElementById('tpBusLayoutSelect').value;
-    const countInput = document.getElementById('tpBusSeatCountInput');
-    const newLayoutRows = newLayout ? (BUS_LAYOUTS[newLayout] || (tripPrepBusSeatData.customLayouts[newLayout]||{}).rows) : null;
-    const newCount = newLayoutRows
-      ? (newLayoutRows.flatMap(r=>r.filter(c=>'seat' in c)).length ? Math.max(...newLayoutRows.flatMap(r=>r.filter(c=>'seat' in c).map(c=>c.seat))) : 50)
-      : (countInput ? Number(countInput.value)||50 : seatCount);
-    const { error } = await sb.from('bus_seat_configs').upsert({ trip_id: currentTripId, bus_name: busName, seat_count: newCount, layout_name: newLayout });
-    if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
-    await loadBusSeatData(currentTripId, true);
-    renderBusSeatChart(busName);
-  });
   document.getElementById('tpClearSeatChartBtn').addEventListener('click', async ()=>{
     if(!confirm(`Точно очистити всю розсадку для "${busName}"? Розподіл груп по автобусах не зміниться, тільки конкретні місця.`)) return;
     const { error } = await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName);
@@ -4438,6 +4749,14 @@ function docOpenPrintWindow(title, bodyHtml){
   win.document.close();
 }
 
+function hbBusBorderChanged(busName){
+  const sel = document.querySelector(`[data-role="tpBusBorder"][data-bus="${busName}"]`);
+  const textarea = document.querySelector(`[data-role="tpBusPickupText"][data-bus="${busName}"]`);
+  if(!sel || !textarea) return;
+  const text = pickupTextForBorder(sel.value);
+  if(text) textarea.value = text;
+}
+
 async function renderTripPrepDocs(){
   const content = document.getElementById('tripPrepContent');
   content.innerHTML = `<p class="report-note">Завантаження…</p>`;
@@ -4510,10 +4829,11 @@ async function renderTripPrepDocs(){
         if(matched.length){
           matched.forEach((t,idx)=>{
             const age = t.birth_date && def ? calcAgeAtTrip(t.birth_date, def.start) : '';
-            rows.push([n++, t.full_name, formatDateGreek(t.birth_date)||t.birth_date||'', t.passport||'', age, idx===0?room.number:'']);
+            const arrival = ['самостійно','self','own'].includes(String(t.pickup_city||'').trim().toLowerCase()) ? '🚶 самостійно' : 'автобус';
+            rows.push([n++, t.full_name, formatDateGreek(t.birth_date)||t.birth_date||'', t.passport||'', age, idx===0?room.number:'', arrival]);
           });
         } else {
-          rows.push([n++, `Заявка №${sh.requestNum||'?'} (${sh.total} чол)`, '', '', '', room.number]);
+          rows.push([n++, `Заявка №${sh.requestNum||'?'} (${sh.total} чол)`, '', '', '', room.number, '']);
         }
       });
     });
@@ -4525,7 +4845,7 @@ async function renderTripPrepDocs(){
     const docFmt = e.target.dataset.fmt;
     const hotelLabel = HB_HOTEL_STRUCTURE[hotelKey].name;
     const rows = buildRoomingRows(hotelKey);
-    const headers = ['№','Name Surname','Date of birth','Passport','Вік','№ кімнати'];
+    const headers = ['№','Name Surname','Date of birth','Passport','Вік','№ кімнати','Прибуття'];
     const fname = `Rooming_${hotelKey==='konstantin'?'Konstantin':'Great_Aleksander'}_${tripLabel}`;
     if(docFmt==='excel') docExportExcel(headers, rows, 'Rooming', fname+'.xlsx');
     else if(docFmt==='word') docExportWord('Rooming', `<h2>${hotelLabel} — ${tripLabel}</h2>${docBuildTableHtml(headers, rows)}`, fname+'.doc');
@@ -6243,6 +6563,11 @@ async function hbModalApplyManualLinkedRooms(){
     const roomNum = parseInt(inp.value);
     if(!roomNum) continue;
     const reqB = inp.dataset.req;
+    const validRoomNumbers = new Set([...hbGetAllRoomsForHotel(hbCurrentHotel).map(r=>r.number), ...(hbExtraRooms[hbCurrentHotel]||[]).map(r=>r.number)]);
+    if(!validRoomNumbers.has(roomNum)){
+      alert(`⚠️ Кімнати №${roomNum} не існує в ${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}. Заявку №${reqB} пропущено — перевір номер.`);
+      continue;
+    }
     if(!(reqB in hbWizardSubRemaining)){
       const tourists = tripPrepData.tourists || [];
       const members = tourists.filter(t=>(t.booking_number||'').replace(/^#/,'')===reqB);
