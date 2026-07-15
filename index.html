@@ -12,6 +12,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Rich Tour">
 <link rel="apple-touch-icon" href="icon-192_1.png">
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('./sw.js').catch(()=>{ /* offline shell just won't work, app still functions normally online */ });
+    });
+  }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
@@ -837,6 +844,143 @@ function renderOfflineBanner(){
 }
 window.addEventListener('online', renderOfflineBanner);
 window.addEventListener('offline', renderOfflineBanner);
+
+/* ---------- IndexedDB-backed offline write queue (guide modules only: tourists,
+   excursion selections, financial report). Read-only cache above stays as-is;
+   this adds real "save now, sync later" support for these three screens. ---------- */
+const RT_DB_NAME = 'richtour_offline_v1';
+const RT_DB_VERSION = 1;
+let rtDbPromise = null;
+function rtOpenDB(){
+  if(rtDbPromise) return rtDbPromise;
+  rtDbPromise = new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){ reject(new Error('no indexeddb')); return; }
+    const req = indexedDB.open(RT_DB_NAME, RT_DB_VERSION);
+    req.onupgradeneeded = (e)=>{
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains('cache')) db.createObjectStore('cache', {keyPath:'key'});
+      if(!db.objectStoreNames.contains('outbox')) db.createObjectStore('outbox', {keyPath:'id', autoIncrement:true});
+    };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+  return rtDbPromise;
+}
+async function rtCacheSet(key, value){
+  try{
+    const db = await rtOpenDB();
+    await new Promise((resolve,reject)=>{
+      const tx = db.transaction('cache','readwrite');
+      tx.objectStore('cache').put({key, value, ts:Date.now()});
+      tx.oncomplete = resolve; tx.onerror = ()=>reject(tx.error);
+    });
+  }catch(e){ /* IndexedDB unavailable — offline writes simply won't be queued, online mode still works */ }
+}
+async function rtCacheGet(key){
+  try{
+    const db = await rtOpenDB();
+    return await new Promise((resolve,reject)=>{
+      const tx = db.transaction('cache','readonly');
+      const req = tx.objectStore('cache').get(key);
+      req.onsuccess = ()=> resolve(req.result ? req.result.value : null);
+      req.onerror = ()=> reject(req.error);
+    });
+  }catch(e){ return null; }
+}
+async function rtOutboxAdd(op){
+  try{
+    const db = await rtOpenDB();
+    await new Promise((resolve,reject)=>{
+      const tx = db.transaction('outbox','readwrite');
+      tx.objectStore('outbox').add({...op, ts:Date.now()});
+      tx.oncomplete = resolve; tx.onerror = ()=>reject(tx.error);
+    });
+    updateOutboxBadge();
+  }catch(e){ /* couldn't queue — the calling write already showed a friendly offline message */ }
+}
+async function rtOutboxAll(){
+  try{
+    const db = await rtOpenDB();
+    return await new Promise((resolve,reject)=>{
+      const tx = db.transaction('outbox','readonly');
+      const req = tx.objectStore('outbox').getAll();
+      req.onsuccess = ()=> resolve(req.result||[]);
+      req.onerror = ()=> reject(req.error);
+    });
+  }catch(e){ return []; }
+}
+async function rtOutboxRemove(id){
+  try{
+    const db = await rtOpenDB();
+    await new Promise((resolve,reject)=>{
+      const tx = db.transaction('outbox','readwrite');
+      tx.objectStore('outbox').delete(id);
+      tx.oncomplete = resolve; tx.onerror = ()=>reject(tx.error);
+    });
+  }catch(e){}
+}
+async function updateOutboxBadge(){
+  const ops = await rtOutboxAll();
+  let badge = document.getElementById('outboxBadge');
+  if(!ops.length){ if(badge) badge.remove(); return; }
+  if(!badge){
+    badge = document.createElement('div');
+    badge.id = 'outboxBadge';
+    badge.style.cssText = 'position:fixed; bottom:14px; right:14px; z-index:600; background:#b45309; color:#fff; padding:8px 14px; border-radius:999px; font-size:12.5px; font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.2); cursor:pointer;';
+    document.body.appendChild(badge);
+    badge.addEventListener('click', rtProcessOutbox);
+  }
+  badge.textContent = `⏳ ${ops.length} збереж${ops.length===1?'ення':'ень'} чекають синхронізації — тисни, щоб спробувати зараз`;
+}
+let rtSyncInFlight = false;
+async function rtProcessOutbox(){
+  if(rtSyncInFlight || !navigator.onLine) return;
+  rtSyncInFlight = true;
+  try{
+    const ops = await rtOutboxAll();
+    for(const op of ops){
+      try{
+        let error = null;
+        if(op.type==='upsert') ({ error } = await sb.from(op.table).upsert(op.payload, op.options||{}));
+        else if(op.type==='update') ({ error } = await sb.from(op.table).update(op.payload).match(op.match));
+        else if(op.type==='delete') ({ error } = await sb.from(op.table).delete().match(op.match));
+        if(error) continue; // leave in queue, try again next pass
+        await rtOutboxRemove(op.id);
+      }catch(e){ break; } // network dropped again mid-sync — stop, resume later
+    }
+  } finally {
+    rtSyncInFlight = false;
+    updateOutboxBadge();
+  }
+}
+window.addEventListener('online', rtProcessOutbox);
+setInterval(rtProcessOutbox, 30000);
+updateOutboxBadge();
+
+// Generic "write with offline fallback" used by the guide-facing modules
+// (tourist excursion selections, financial report). Reads still go through
+// the normal Supabase calls with the existing read-only cache fallback above.
+async function rtGuideWrite(type, table, payload, matchOrOptions){
+  if(!navigator.onLine){
+    await rtOutboxAdd({ type, table, payload, match: type!=='upsert'?matchOrOptions:undefined, options: type==='upsert'?matchOrOptions:undefined });
+    renderOfflineBanner();
+    return { error: null, queued: true };
+  }
+  try{
+    let error = null;
+    if(type==='upsert') ({ error } = await sb.from(table).upsert(payload, matchOrOptions||{}));
+    else if(type==='update') ({ error } = await sb.from(table).update(payload).match(matchOrOptions));
+    else if(type==='delete') ({ error } = await sb.from(table).delete().match(matchOrOptions));
+    if(error && /fetch|network|failed to fetch/i.test(error.message||'')){
+      await rtOutboxAdd({ type, table, payload, match: type!=='upsert'?matchOrOptions:undefined, options: type==='upsert'?matchOrOptions:undefined });
+      return { error: null, queued: true };
+    }
+    return { error };
+  }catch(e){
+    await rtOutboxAdd({ type, table, payload, match: type!=='upsert'?matchOrOptions:undefined, options: type==='upsert'?matchOrOptions:undefined });
+    return { error: null, queued: true };
+  }
+}
 
 async function fetchTrips(){
   const { data, error } = await sb.from('trips').select('id,label,start_date,end_date').order('start_date');
@@ -1911,7 +2055,7 @@ async function loadTourists(){
     });
   });
   if(toInsert.length){
-    const { error: insErr } = await sb.from('tourist_excursion_selections').upsert(toInsert);
+    const { error: insErr } = await rtGuideWrite('upsert', 'tourist_excursion_selections', toInsert);
     if(insErr) console.error(insErr);
   }
   cacheOffline(cacheKey, touristData);
@@ -2239,12 +2383,12 @@ function updateSelectionLocal(touristId, selId, patch, debounce){
   const s = sels.find(x=>x.id===selId);
   Object.assign(s, patch);
   renderTouristDetail();
-  const doPersist = ()=> sb.from('tourist_excursion_selections').upsert({
+  const doPersist = ()=> rtGuideWrite('upsert', 'tourist_excursion_selections', {
     id:s.id, tourist_id:s.tourist_id, trip_id:s.trip_id, excursion_name:s.excursion_name,
     going:s.going, price_mode:s.price_mode, price:Number(s.price)||0,
     cancelled: !!s.cancelled, cancelled_reason: s.cancelled_reason||'',
     paid: !!s.paid, refunded: !!s.refunded
-  }).then(({error})=>{ if(error){ console.error(error); alert(friendlyErrorMessage(error)); } });
+  }).then(({error, queued})=>{ if(error){ console.error(error); alert(friendlyErrorMessage(error)); } else if(queued){ hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет'); } });
   if(debounce) debouncedPersist('sel:'+selId, doPersist); else persistNow('sel:'+selId, doPersist);
   renderTouristStats();
 }
@@ -2585,9 +2729,25 @@ function computeFinanceSuggestions(guideName){
 }
 
 async function loadFinanceReport(tripId, guideName){
+  const cacheKey = 'financeReport:'+tripId+':'+guideName;
   const { data, error } = await sb.from('financial_reports').select('*').eq('trip_id', tripId).eq('guide_name', guideName).maybeSingle();
-  if(error){ console.error(error); }
-  if(data) return { trip_id: tripId, guide_name: guideName, handed_over: data.handed_over||0, entries: data.entries||[] };
+  if(error){
+    console.error(error);
+    const cached = getOfflineCache(cacheKey);
+    if(cached){
+      isOfflineCacheActive = true;
+      renderOfflineBanner();
+      return cached.data;
+    }
+  } else {
+    isOfflineCacheActive = false;
+    renderOfflineBanner();
+  }
+  if(data){
+    const report = { trip_id: tripId, guide_name: guideName, handed_over: data.handed_over||0, entries: data.entries||[] };
+    cacheOffline(cacheKey, report);
+    return report;
+  }
   const tripData = getTripData(tripId);
   const perGuide = calcTripByGuide(tripData)[guideName] || { guideIncome: 0 };
   const manual = DEFAULT_MANUAL_ENTRIES.map(e=>{
@@ -2596,15 +2756,18 @@ async function loadFinanceReport(tripId, guideName){
     if(e.label==='Відсоток') entry.amount = Math.round((perGuide.guideIncome||0)*100)/100;
     return entry;
   });
-  return { trip_id: tripId, guide_name: guideName, handed_over: 0, entries: manual };
+  const freshReport = { trip_id: tripId, guide_name: guideName, handed_over: 0, entries: manual };
+  cacheOffline(cacheKey, freshReport);
+  return freshReport;
 }
 
 async function saveFinanceReport(report){
-  const { error } = await sb.from('financial_reports').upsert({
+  const { error, queued } = await rtGuideWrite('upsert', 'financial_reports', {
     trip_id: report.trip_id, guide_name: report.guide_name,
     handed_over: Number(report.handed_over)||0, entries: report.entries
   }, { onConflict: 'trip_id,guide_name' });
   if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
+  else if(queued){ hbShowToast('💾 Звіт збережено локально — синхронізується, коли з\'явиться інтернет'); }
 }
 
 function renderFinanceGuideFilterChips(){
