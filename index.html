@@ -4587,34 +4587,41 @@ function renderBusSeatChart(busName){
     const allCols = [...new Set(rows.flatMap(r=>r.map(c=>c.col)))].sort();
     const isWideRow = (row)=> !row.some(c=>'label' in c) && row.filter(c=>'seat' in c).length >= 5;
     const normalRows = rows.filter(r=>!isWideRow(r));
-    function computeRowWidth(row){
-      return allCols.reduce((sum,col)=>{
-        const cell = row.find(c=>c.col===col);
-        let w;
-        if(!cell) w = 14;
-        else if('seat' in cell) w = 50;
-        else w = /^серв/i.test(cell.label) ? 16 : 50;
-        return sum + w;
-      }, 0) + (allCols.length-1)*6;
-    }
-    const standardRowWidth = Math.max(...normalRows.map(computeRowWidth));
 
-    seatsHtml = rows.map(row=>{
+    // Determine each column's width from whichever normal row first defines it — this drives
+    // the grid's fixed column tracks, so every row is guaranteed to align (CSS Grid, not
+    // hand-summed flexbox widths).
+    const colWidths = {};
+    allCols.forEach(col=>{
+      let width = 14; // column never used in a normal row -> narrow gap
+      for(const r of normalRows){
+        const cell = r.find(c=>c.col===col);
+        if(cell){
+          width = ('seat' in cell) ? 50 : (/^серв/i.test(cell.label) ? 16 : 50);
+          break;
+        }
+      }
+      colWidths[col] = width;
+    });
+    const gridTemplateColumns = allCols.map(col=>colWidths[col]+'px').join(' ');
+
+    const gridCells = [];
+    rows.forEach(row=>{
       if(isWideRow(row)){
-        // Wide back row (extra middle seat): spread evenly across the exact same span as the
-        // standard rows above, instead of locking to the narrow per-column positions.
-        return `<div style="display:flex; justify-content:space-between; width:${standardRowWidth}px; margin-bottom:6px;">` +
-          row.filter(c=>'seat' in c).sort((a,b)=>a.seat-b.seat).map(c=>renderSeatTile(c.seat)).join('') + `</div>`;
+        const inner = row.filter(c=>'seat' in c).sort((a,b)=>a.seat-b.seat).map(c=>renderSeatTile(c.seat)).join('');
+        gridCells.push(`<div style="grid-column:1 / -1; display:flex; justify-content:space-between;">${inner}</div>`);
+        return;
       }
       const byCol = {}; row.forEach(c=> byCol[c.col]=c);
-      return `<div style="display:flex; gap:6px; margin-bottom:6px; width:${standardRowWidth}px;">` +
-        allCols.map(col=>{
-          const c = byCol[col];
-          if(!c) return `<div style="width:14px;"></div>`;
-          if('seat' in c) return renderSeatTile(c.seat);
-          return renderLabelTile(c.label);
-        }).join('') + `</div>`;
-    }).join('');
+      allCols.forEach(col=>{
+        const c = byCol[col];
+        if(!c){ gridCells.push(`<div></div>`); return; }
+        if('seat' in c){ gridCells.push(renderSeatTile(c.seat)); return; }
+        // Drop purely structural labels (driver/stairs/service filler) — just an empty slot.
+        gridCells.push(`<div></div>`);
+      });
+    });
+    seatsHtml = `<div style="display:grid; grid-template-columns:${gridTemplateColumns}; column-gap:6px; row-gap:6px;">${gridCells.join('')}</div>`;
   } else {
     for(let row=1; row<=Math.ceil(seatCount/4); row++){
       seatsHtml += `<div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">        <span class="muted" style="width:22px; font-size:11px;">${row}</span>`;
@@ -4675,12 +4682,32 @@ function renderBusSeatChart(busName){
 async function hbBusSeatClick(busName, seatNum){
   const existing = tripPrepBusSeatData.assignments.find(a=>a.bus_name===busName && a.seat_number===seatNum);
   if(existing){
-    const wantsClear = confirm(`Місце ${seatNum}: ${existing.full_name}.\nOK — звільнити це місце.\nСкасувати — нічого не робити.`);
-    if(wantsClear){
+    const action = prompt(`Місце ${seatNum}: ${existing.full_name}.\n\nЩоб ПЕРЕНЕСТИ — впиши новий номер місця.\nЩоб ЗВІЛЬНИТИ — впиши слово "очистити".\nЩоб нічого не робити — натисни Скасувати.`);
+    if(action===null) return;
+    const trimmed = action.trim().toLowerCase();
+    if(!trimmed) return;
+    if(trimmed==='очистити' || trimmed==='clear'){
       await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName).eq('seat_number', seatNum);
       await loadBusSeatData(currentTripId, true);
       renderBusSeatChart(busName);
+      hbShowToast(`✅ Місце ${seatNum} звільнено`);
+      return;
     }
+    const newSeatNum = parseInt(trimmed);
+    if(!newSeatNum){ alert('Не розпізнав номер місця — впиши число, або слово "очистити".'); return; }
+    if(newSeatNum === seatNum) return;
+    const targetOccupied = tripPrepBusSeatData.assignments.find(a=>a.bus_name===busName && a.seat_number===newSeatNum);
+    if(targetOccupied){ alert(`Місце ${newSeatNum} вже зайняте: ${targetOccupied.full_name}. Спочатку звільни його.`); return; }
+    await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName).eq('seat_number', seatNum);
+    const { error } = await sb.from('bus_seat_assignments').upsert({
+      trip_id: currentTripId, bus_name: busName, seat_number: newSeatNum,
+      full_name: existing.full_name, booking_number: existing.booking_number,
+      link_group: existing.link_group, paid_seat: existing.paid_seat
+    }, { onConflict: 'trip_id,bus_name,seat_number' });
+    if(error){ alert('Не вдалося перенести: ' + friendlyErrorMessage(error)); return; }
+    await loadBusSeatData(currentTripId, true);
+    renderBusSeatChart(busName);
+    hbShowToast(`✅ ${existing.full_name}: місце ${seatNum} → ${newSeatNum}`);
     return;
   }
   const name = prompt(`Кого посадити на місце ${seatNum}? (Ім'я Прізвище)`);
