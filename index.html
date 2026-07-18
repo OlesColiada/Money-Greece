@@ -521,15 +521,15 @@
 
   <section class="step-block manager-only" id="touristRefBanner" style="display:none;"></section>
 
-  <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-    <button class="btn btn-ghost btn-small" id="excursionsSaveBtn">💾 Зберегти</button>
-    <button class="btn btn-ghost btn-small" id="excursionsDownloadBtn">⬇ Завантажити збережений</button>
-  </div>
-
   <div id="excursionsWrap"></div>
 
   <div class="no-print" style="margin-top:14px;">
     <button class="btn btn-primary" id="addExcursionBtn">+ Додати екскурсію</button>
+  </div>
+
+  <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:16px; border-top:1px solid var(--line); padding-top:14px;">
+    <button class="btn btn-ghost btn-small" id="excursionsSaveBtn">💾 Зберегти</button>
+    <button class="btn btn-ghost btn-small" id="excursionsDownloadBtn">⬇ Завантажити збережений</button>
   </div>
 
   <section class="step-block manager-only" id="tripReportSection" style="margin-top:34px;">
@@ -563,12 +563,12 @@
       <details>
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Статистика по екскурсіях</summary>
         <p class="report-note" style="margin:6px 0 0;">К-сть туристів і зібрана сума по кожній екскурсії (поточна група поточного заїзду).</p>
-        <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
-          <button class="btn btn-ghost btn-small" id="touristStatsSaveBtn">💾 Зберегти</button>
-          <button class="btn btn-ghost btn-small" id="touristStatsDownloadBtn">⬇ Завантажити збережений</button>
-        </div>
         <div class="table-scroll" style="margin-top:10px;">
           <table class="report-table" id="touristStatsTable"></table>
+        </div>
+        <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:12px;">
+          <button class="btn btn-ghost btn-small" id="touristStatsSaveBtn">💾 Зберегти</button>
+          <button class="btn btn-ghost btn-small" id="touristStatsDownloadBtn">⬇ Завантажити збережений</button>
         </div>
       </details>
     </section>
@@ -627,13 +627,15 @@
         <p class="step-title" style="margin:0;">Туристи</p>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn btn-primary btn-small no-print" id="touristListSyncBtn">🔄 Підтягнути з базового списку</button>
-          <button class="btn btn-ghost btn-small no-print" id="touristListSaveBtn">💾 Зберегти</button>
-          <button class="btn btn-ghost btn-small no-print" id="touristListDownloadBtn">⬇ Завантажити збережений</button>
           <button class="btn btn-danger-ghost no-print manager-only" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
         </div>
       </div>
       <p class="report-note" style="margin-top:4px;">Основа списку вже є в "Документи до туру" (базовий файл + розселення + автобуси) — тисни "🔄 Підтягнути", щоб не вносити людей вдруге. Додасть лише тих, кого ще нема в цьому списку; кого вручну прибереш звідси — назад сам не з'явиться.</p>
       <div id="touristListWrap"></div>
+      <div class="no-print" style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--line); padding-top:14px;">
+        <button class="btn btn-ghost btn-small" id="touristListSaveBtn">💾 Зберегти</button>
+        <button class="btn btn-ghost btn-small" id="touristListDownloadBtn">⬇ Завантажити збережений</button>
+      </div>
     </div>
 
     <div class="step-block" id="touristDetailBlock" style="display:none; margin-top:16px;"></div>
@@ -1438,6 +1440,7 @@ function personColor(row){
 }
 function canEditRow(r){
   if(!currentProfile) return false;
+  if(currentProfile.is_test_account) return false; // test account: view-only in profitability
   // Any authenticated person with access to this trip (manager, or a guide within the
   // ±3-day window enforced by RLS) can edit any row — not just their own. Real security
   // (who can even reach this trip's data at all) is enforced at the database level.
@@ -1505,6 +1508,7 @@ let excOpenState = {};
 function renderExcursions(){
   const wrap = document.getElementById('excursionsWrap');
   wrap.innerHTML = "";
+  wrap.classList.toggle('tp-readonly', !!(currentProfile && currentProfile.is_test_account));
   if(!currentTripId){
     wrap.innerHTML = `<div class="empty-state"><div class="glyph">⛵</div>Оберіть заїзд у Кроці 1, щоб додавати екскурсії.</div>`;
     return;
@@ -3196,6 +3200,7 @@ function activeFinanceGuideName(){
 function computeFinanceSuggestions(guideName){
   const tripData = getTripData(currentTripId);
   const suggestions = [];
+  const excNamesWithRowSuggestion = new Set();
   tripData.excursions.forEach(exc=>{
     const calc = calcExcursion(exc);
     const excLabel = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
@@ -3203,6 +3208,7 @@ function computeFinanceSuggestions(guideName){
     if(row){
       if(Number(row.zibrano) > 0){
         suggestions.push({ section:'received', label:`Зібрано: ${excLabel}`, amount:row.zibrano, key:'collected:'+exc.id });
+        excNamesWithRowSuggestion.add(exc.name==='Інше...' ? excLabel : exc.name);
       }
       if(Number(row.quitky) > 0){
         suggestions.push({ section:'paid', label:`Квитки: ${excLabel}`, amount:row.quitky, key:'tickets:'+exc.id });
@@ -3213,6 +3219,18 @@ function computeFinanceSuggestions(guideName){
     }
     if(exc.busOwner==='partner' && exc.payerGuide===guideName && exc.payerPaid && calc.settlementAmount>0){
       suggestions.push({ section:'paid', label:`Сплачено партнеру: ${excLabel}`, amount:calc.settlementAmount, key:'toPartners:'+exc.id });
+    }
+  });
+  // From "Список збору коштів" — tourists of this guide marked paid for an excursion.
+  // Only suggested if there isn't already a "Прибутковість"-based suggestion for the same
+  // excursion name, to avoid offering the same money twice from two different sources.
+  const statsKey = currentTripId+':'+guideName;
+  const touristStats = financeTouristStatsCache[statsKey] || {};
+  Object.keys(touristStats).forEach(excName=>{
+    if(excNamesWithRowSuggestion.has(excName)) return;
+    const stat = touristStats[excName];
+    if(stat.sum > 0){
+      suggestions.push({ section:'received', label:`Зібрано (зі списку туристів): ${excName} — ${stat.count} чол`, amount: Math.round(stat.sum*100)/100, key:'touristPaid:'+excName });
     }
   });
   return suggestions;
@@ -3283,10 +3301,8 @@ function renderFinanceGuideFilterChips(){
     wrap.appendChild(chip);
   });
   const note = blockEl.querySelector('.tp-readonly-note') || (()=>{ const p=document.createElement('p'); p.className='report-note tp-readonly-note'; blockEl.appendChild(p); return p; })();
-  note.textContent = activeFinanceGuideName() === currentProfile.guide_name
-    ? 'Це твій власний тестовий звіт — тут можна редагувати вільно.'
-    : `⚠️ Переглядаєш реальний звіт гіда "${activeFinanceGuideName()}" — тут усе тільки для перегляду.`;
-  document.getElementById('financeSection').classList.toggle('tp-readonly', activeFinanceGuideName() !== currentProfile.guide_name);
+  note.textContent = `⚠️ Тестовий режим — перегляд звітів гідів без можливості щось змінити.`;
+  document.getElementById('financeSection').classList.toggle('tp-readonly', true);
 }
 function renderFinanceGuideFilterChipsOld(){
   const wrap = document.getElementById('financeGuideFilterChips');
@@ -3377,6 +3393,7 @@ function renderFinanceReport(report){
     const isPerDiem = e.label==='Добові' || e.label==='Добові супроводжуючого';
     const isHotel = e.label==='Готель';
     const isPercent = e.label==='Відсоток';
+    const isBus = e.label==='Автобус';
     return `<div class="fin-card">
       <div class="fin-card-top">
         <input type="text" class="fin-label-input" data-role="finLabel" data-idx="${idx}" value="${e.label}">
@@ -3391,9 +3408,12 @@ function renderFinanceReport(report){
             <option value="Konstantin 3*" ${e.hotel==='Konstantin 3*'?'selected':''}>Konstantin 3*</option>
             <option value="Great Aleksander 3*" ${e.hotel==='Great Aleksander 3*'?'selected':''}>Great Aleksander 3*</option>
           </select></label>` : ''}
+        ${isBus ? `<label>Поч. км<input type="text" inputmode="decimal" class="num-input" data-role="finBusStartKm" data-idx="${idx}" value="${e.start_km||''}"></label>
+          <label>Кін. км<input type="text" inputmode="decimal" class="num-input" data-role="finBusEndKm" data-idx="${idx}" value="${e.end_km||''}"></label>
+          <span class="muted" style="align-self:center; font-size:11.5px;">× 1,6 €/км</span>` : ''}
         <label>Сума €
           <div style="display:flex; align-items:center; gap:6px;">
-            <input type="text" inputmode="decimal" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem?'disabled title="Змінюється чекбоксом KPI"':''}>
+            <input type="text" inputmode="decimal" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem||isBus?'disabled':''} title="${isPerDiem?'Змінюється чекбоксом KPI':isBus?'Рахується автоматично з км':''}">
             ${isPercent ? `<button class="edit-toggle-btn no-print" data-role="finRefreshPercent" data-idx="${idx}" title="Підтягнути суму комісії з прибутковості">🔄</button>` : ''}
           </div>
         </label>
@@ -3402,14 +3422,9 @@ function renderFinanceReport(report){
   };
 
   block.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <div>
-        <p class="report-title" style="margin:0;">Фінансовий звіт</p>
-        <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${report.guide_name}${substituteNote}</p>
-      </div>
-      <button class="btn btn-ghost btn-small no-print" id="finPrintBtn">🖨 Друк</button>
-      <button class="btn btn-ghost btn-small no-print" id="finSaveToStorageBtn">💾 Зберегти звіт</button>
-      <button class="btn btn-ghost btn-small no-print" id="finDownloadSavedBtn">⬇ Завантажити збережений</button>
+    <div>
+      <p class="report-title" style="margin:0;">Фінансовий звіт</p>
+      <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${report.guide_name}${substituteNote}</p>
     </div>
 
     ${suggestions.length ? `<div class="no-print" style="margin-top:12px; background:var(--whitewash-2); border-radius:8px; padding:8px 10px;">
@@ -3448,6 +3463,11 @@ function renderFinanceReport(report){
       <button class="btn ${report.submitted?'btn-ghost':'btn-primary'}" id="finSubmitBtn" ${report.submitted?'disabled':''} style="width:100%; padding:14px;">
         ${report.submitted ? `✅ Відправлено${report.submitted_at ? ' · '+new Date(report.submitted_at).toLocaleString('uk-UA') : ''}` : '📤 Відправити менеджеру'}
       </button>
+    </div>
+    <div class="no-print" style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--line); padding-top:14px;">
+      <button class="btn btn-ghost btn-small" id="finPrintBtn">🖨 Друк</button>
+      <button class="btn btn-ghost btn-small" id="finSaveToStorageBtn">💾 Зберегти звіт</button>
+      <button class="btn btn-ghost btn-small" id="finDownloadSavedBtn">⬇ Завантажити збережений</button>
     </div>
   `;
 
@@ -3492,6 +3512,27 @@ function renderFinanceReport(report){
     const idx = Number(e.target.dataset.idx);
     report.entries[idx].hotel = e.target.value;
     persistNow('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+  }));
+  const recalcBusAmount = (idx)=>{
+    const entry = report.entries[idx];
+    const startKm = Number(entry.start_km)||0;
+    const endKm = Number(entry.end_km)||0;
+    const km = Math.max(0, endKm - startKm);
+    entry.amount = Math.round(km * OWN_BUS_RATE * 100)/100;
+  };
+  block.querySelectorAll('[data-role="finBusStartKm"]').forEach(el=> el.addEventListener('input', e=>{
+    const idx = Number(e.target.dataset.idx);
+    report.entries[idx].start_km = parseDecimalInput(e.target.value);
+    recalcBusAmount(idx);
+    debouncedPersist('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    debouncedFinanceRerender(report);
+  }));
+  block.querySelectorAll('[data-role="finBusEndKm"]').forEach(el=> el.addEventListener('input', e=>{
+    const idx = Number(e.target.dataset.idx);
+    report.entries[idx].end_km = parseDecimalInput(e.target.value);
+    recalcBusAmount(idx);
+    debouncedPersist('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    debouncedFinanceRerender(report);
   }));
   block.querySelectorAll('[data-role="finRefreshPercent"]').forEach(el=> el.addEventListener('click', e=>{
     const idx = Number(e.target.dataset.idx);
@@ -3543,6 +3584,22 @@ function renderFinanceReport(report){
   });
 }
 
+let financeTouristStatsCache = {};
+async function loadFinanceTouristPaidStats(tripId, guideName){
+  const { data: tourists } = await sb.from('tourists').select('id').eq('trip_id', tripId).eq('guide_name', guideName);
+  if(!tourists || !tourists.length) return {};
+  const ids = tourists.map(t=>t.id);
+  const { data: selections } = await sb.from('tourist_excursion_selections').select('*').in('tourist_id', ids);
+  const byExc = {};
+  (selections||[]).forEach(s=>{
+    if(!(s.going && s.paid && !s.cancelled)) return;
+    if(!byExc[s.excursion_name]) byExc[s.excursion_name] = {count:0, sum:0};
+    byExc[s.excursion_name].count++;
+    byExc[s.excursion_name].sum += Number(s.price)||0;
+  });
+  return byExc;
+}
+
 async function renderFinanceSection(){
   renderFinanceGuideFilterChips();
   const guideName = activeFinanceGuideName();
@@ -3554,6 +3611,11 @@ async function renderFinanceSection(){
   if(cached) renderFinanceReport(cached.data);
   const report = await loadFinanceReport(currentTripId, guideName);
   renderFinanceReport(report);
+  const statsKey = currentTripId+':'+guideName;
+  if(!financeTouristStatsCache[statsKey]){
+    financeTouristStatsCache[statsKey] = await loadFinanceTouristPaidStats(currentTripId, guideName);
+    if(activeFinanceGuideName()===guideName) renderFinanceReport(report);
+  }
 }
 
 /* ============================================================
@@ -3843,18 +3905,9 @@ function renderManagerReport(report, officeTotal, missing){
   };
 
   block.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <div>
-        <p class="report-title" style="margin:0;">Звіт керівника</p>
-        <p class="report-note" style="margin:2px 0 0;">Заїзд: ${def?def.label:''}</p>
-      </div>
-      <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button class="btn btn-ghost btn-small" id="mrExportExcelBtn">📥 Excel</button>
-        <button class="btn btn-ghost btn-small" id="mrExportWordBtn">📥 Word</button>
-        <button class="btn btn-ghost btn-small" id="mrPrintBtn">🖨 Друк / PDF</button>
-        <button class="btn btn-primary btn-small" id="mrSaveToStorageBtn">💾 Зберегти в сховище</button>
-        <button class="btn btn-ghost btn-small" id="mrDownloadSavedBtn">⬇ Завантажити збережений</button>
-      </div>
+    <div>
+      <p class="report-title" style="margin:0;">Звіт керівника</p>
+      <p class="report-note" style="margin:2px 0 0;">Заїзд: ${def?def.label:''}</p>
     </div>
 
     <p class="fin-section-title">Отримав</p>
@@ -3883,6 +3936,13 @@ function renderManagerReport(report, officeTotal, missing){
       <button class="btn" id="mrSubmittedBtn" style="background:${report.submitted?'#3f7a4f':'#c65b43'}; color:#fff; font-weight:700; padding:12px 28px;">
         ${report.submitted ? '✓ Звіт здав' : 'Звіт не здав'}
       </button>
+    </div>
+    <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:16px; border-top:1px solid var(--line); padding-top:14px;">
+      <button class="btn btn-ghost btn-small" id="mrExportExcelBtn">📥 Excel</button>
+      <button class="btn btn-ghost btn-small" id="mrExportWordBtn">📥 Word</button>
+      <button class="btn btn-ghost btn-small" id="mrPrintBtn">🖨 Друк / PDF</button>
+      <button class="btn btn-primary btn-small" id="mrSaveToStorageBtn">💾 Зберегти в сховище</button>
+      <button class="btn btn-ghost btn-small" id="mrDownloadSavedBtn">⬇ Завантажити збережений</button>
     </div>
   `;
 
@@ -4350,18 +4410,16 @@ async function renderSkiatosManifest(){
   </div>`;
 
   block.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-      <p class="report-note" style="margin:0;">Розрахунок за тарифами катера (27€ дорослий, 0-5 безкоштовно, 6-11 → 15€, 12-16 → 20€). Гіди їдуть безкоштовно.</p>
-      <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button class="btn btn-ghost btn-small" id="manSaveBtn">💾 Зберегти</button>
-        <button class="btn btn-ghost btn-small" id="manDownloadBtn">⬇ Завантажити збережений</button>
-        ${currentProfile.role==='manager' ? `<button class="btn btn-ghost btn-small manager-only" id="manExportBtn">📥 Excel (внутрішній)</button>
-        <button class="btn btn-ghost btn-small manager-only" id="manExportFerryBtn">📥 Список для порому</button>` : ''}
-      </div>
-    </div>
+    <p class="report-note" style="margin:0;">Розрахунок за тарифами катера (27€ дорослий, 0-5 безкоштовно, 6-11 → 15€, 12-16 → 20€). Гіди їдуть безкоштовно.</p>
     <div style="margin-top:10px;">${bodyHtml || '<p class="report-note">Ще ніхто не записаний на Скіатос.</p>'}</div>
     ${driversHtml}
     <div class="fin-total-row" style="margin-top:10px;"><span>Загалом до сплати катеру</span><span>${fmt(grandTotal)} €</span></div>
+    <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:14px; border-top:1px solid var(--line); padding-top:14px;">
+      <button class="btn btn-ghost btn-small" id="manSaveBtn">💾 Зберегти</button>
+      <button class="btn btn-ghost btn-small" id="manDownloadBtn">⬇ Завантажити збережений</button>
+      ${currentProfile.role==='manager' ? `<button class="btn btn-ghost btn-small manager-only" id="manExportBtn">📥 Excel (внутрішній)</button>
+      <button class="btn btn-ghost btn-small manager-only" id="manExportFerryBtn">📥 Список для порому</button>` : ''}
+    </div>
   `;
 
   block.querySelectorAll('[data-role="manAddSelf"]').forEach(el=> el.addEventListener('click', async e=>{
