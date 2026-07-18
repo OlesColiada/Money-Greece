@@ -187,6 +187,15 @@
 
   /* Excursion cards */
   .exc-card{background:var(--card); border:1px solid var(--line); border-radius:14px; margin-bottom:16px; box-shadow:var(--shadow); overflow:hidden; animation: fadeInUp 0.3s ease both;}
+  .exc-head-summary{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:14px 16px; cursor:pointer; list-style:none; user-select:none;
+    font-family:'Fraunces',serif; font-weight:600; font-size:15.5px;
+  }
+  .exc-head-summary::-webkit-details-marker{display:none;}
+  .exc-head-summary::before{content:'▸'; margin-right:6px; color:var(--aegean); transition:transform 0.15s ease; display:inline-block;}
+  details[open] > .exc-head-summary::before{transform:rotate(90deg);}
+  .exc-title-text{flex:1;}
   .exc-head{display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line); background:var(--whitewash-2); flex-wrap:wrap;}
   .exc-name-select{font-weight:600; font-size:15px; min-width:150px; flex:1;}
   .field-group{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft);}
@@ -1483,6 +1492,7 @@ document.getElementById('excursionsSaveBtn').addEventListener('click', async ()=
 });
 document.getElementById('excursionsDownloadBtn').addEventListener('click', ()=> downloadXlsxSnapshot(`${currentTripId}/profitability/report_${tripFileTag(currentTripId)}.xlsx`));
 
+let excOpenState = {};
 function renderExcursions(){
   const wrap = document.getElementById('excursionsWrap');
   wrap.innerHTML = "";
@@ -1503,13 +1513,20 @@ function renderExcursions(){
 
   tripData.excursions.forEach(exc=>{
     const calc = calcExcursion(exc);
-    const card = document.createElement('div');
+    const card = document.createElement('details');
     card.className = 'exc-card';
+    card.open = !!excOpenState[exc.id];
     const nameOptions = EXCURSIONS.map(n=>`<option value="${n}" ${n===exc.name?'selected':''}>${n}</option>`).join('');
     const feeDiffers = Number(exc.guideFee) !== Number(exc.guideFeeDefault);
     const noGuideFee = NO_GUIDE_FEE_EXCURSIONS.includes(exc.name);
+    const displayName = exc.name==="Інше..." ? (exc.customName || "Інше") : exc.name;
+    const totalProfit = calc.rowResults.filter(r=>r.isGuide && !r.isTest).reduce((s,r)=>s+(Number(r.profit)||0),0);
 
     card.innerHTML = `
+      <summary class="exc-head-summary">
+        <span class="exc-title-text">${displayName}</span>
+        <span class="muted" style="font-size:12.5px;">${calc.totalPeople} чол · <span class="${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span></span>
+      </summary>
       <div class="exc-head">
         <select class="exc-name-select" data-role="excName">${nameOptions}</select>
         ${exc.name==="Інше..." ? `<input type="text" placeholder="Назва екскурсії" value="${exc.customName||''}" data-role="customName" style="min-width:120px;">` : ''}
@@ -1588,6 +1605,7 @@ function renderExcursions(){
       </div>
     `;
     wrap.appendChild(card);
+    card.addEventListener('toggle', ()=>{ excOpenState[exc.id] = card.open; });
 
     const tbody = card.querySelector('[data-role="rowsBody"]');
     calc.rowResults.forEach(r=>{
