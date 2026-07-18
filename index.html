@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html lang="uk">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0046)file:///C:/Users/38097/Downloads/index_95.html -->
+<html lang="uk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Прибутковість екскурсій - напрям Греція, 2026</title>
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="file:///C:/Users/38097/Downloads/manifest.json">
 <meta name="theme-color" content="#1c5a7a">
-<link rel="icon" href="icon-192_1.png">
+<link rel="icon" href="file:///C:/Users/38097/Downloads/icon-192_1.png">
 <!-- iOS "Add to Home Screen" support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Rich Tour">
-<link rel="apple-touch-icon" href="icon-192_1.png">
+<link rel="apple-touch-icon" href="file:///C:/Users/38097/Downloads/icon-192_1.png">
 <script>
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
@@ -19,9 +19,14 @@
     });
   }
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link href="./index_files/css2" rel="stylesheet">
 <style>
+  @keyframes fadeInUp{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+  @keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes toastIn{ from{ opacity:0; transform:translate(-50%,-10px); } to{ opacity:1; transform:translate(-50%,0); } }
+  @keyframes toastOut{ from{ opacity:1; transform:translate(-50%,0); } to{ opacity:0; transform:translate(-50%,-10px); } }
+  @keyframes modalPop{ from{ opacity:0; transform:scale(0.94); } to{ opacity:1; transform:scale(1); } }
   :root{
     --ink:#132a3a; --ink-soft:#3d5568;
     --aegean:#1c5a7a; --aegean-deep:#0f3a52;
@@ -41,7 +46,10 @@
     background:conic-gradient(from 200deg, var(--aegean), var(--aegean-deep) 40%, var(--ochre) 70%, var(--aegean));
     position:relative; box-shadow: inset 0 0 0 2px rgba(255,255,255,.35);}
   .brand-mark::after{content:"";position:absolute;inset:8px;border-radius:50%;background:var(--whitewash);}
-  .brand-logo{height:46px; width:auto; flex-shrink:0; border-radius:6px;}
+  @keyframes logoBreathe{ 0%,100%{ transform:scale(1) rotate(0deg); } 50%{ transform:scale(1.04) rotate(-1deg); } }
+  @keyframes logoWobble{ 0%,100%{ transform:rotate(0deg) scale(1.08); } 25%{ transform:rotate(-6deg) scale(1.08); } 75%{ transform:rotate(6deg) scale(1.08); } }
+  .brand-logo{height:46px; width:auto; flex-shrink:0; border-radius:6px; animation: logoBreathe 4s ease-in-out infinite; transition: transform 0.2s ease;}
+  .brand-logo:hover{animation: logoWobble 0.5s ease;}
   h1{font-family:'Fraunces',serif; font-weight:600; font-size:19px; margin:0; letter-spacing:.2px; line-height:1.25;}
   .subtitle{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
   .mode-toggle{margin-left:auto; display:flex; align-items:center; gap:8px;}
@@ -55,8 +63,19 @@
   .mode-toggle .btn.active-tab{background:var(--aegean); color:#fff; border-color:var(--aegean);}
 
   .section-tabs{display:flex; gap:8px; margin-bottom:18px;}
-  .section-tab{flex:1; text-align:center;}
+  .section-tab{flex:1; text-align:center; transition: box-shadow 0.15s ease, filter 0.15s ease;}
+  .section-tab:hover{box-shadow:0 3px 10px rgba(0,0,0,.12); filter:brightness(0.97);}
   .section-tab.active-tab{background:var(--ochre); color:#fff; border-color:var(--ochre);}
+  .section-tab.active-tab:hover{background:var(--ochre); color:#fff; border-color:var(--ochre);}
+
+  #tripPrepContent.tp-readonly{ position:relative; }
+  #tripPrepContent.tp-readonly button:not(.tp-view-only-ok),
+  #tripPrepContent.tp-readonly input:not(.tp-view-only-ok),
+  #tripPrepContent.tp-readonly select:not(.tp-view-only-ok),
+  #tripPrepContent.tp-readonly textarea:not(.tp-view-only-ok){
+    pointer-events:none !important; opacity:0.55; filter:grayscale(0.3);
+  }
+  #tripPrepContent.tp-readonly [onclick]:not(.tp-view-only-ok){ pointer-events:none !important; opacity:0.55; }
 
   .fin-row{display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #f0f0ea; flex-wrap:nowrap;}
   .fin-row:last-child{border-bottom:none;}
@@ -73,9 +92,9 @@
 
   .tourist-row{
     display:flex; align-items:center; gap:10px; padding:11px 4px; border-bottom:1px solid #eee;
-    cursor:pointer; background:#fff;
+    cursor:pointer; background:#fff; transition: background 0.15s ease, transform 0.1s ease;
   }
-  .tourist-row:hover{background:var(--whitewash-2);}
+  .tourist-row:hover{background:var(--whitewash-2); transform:translateX(2px);}
   .tourist-row .dot{width:11px; height:11px; border-radius:50%; background:transparent; flex-shrink:0;}
   .tourist-row.processed .dot{background:var(--good);}
   .tourist-row.processed .t-name{font-weight:700;}
@@ -129,14 +148,15 @@
     background:#fff; border-radius:8px; padding:8px 10px; color:var(--ink);
   }
   select:focus, input:focus{outline:2px solid var(--aegean); outline-offset:1px;}
-  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; border:none; border-radius:8px; padding:9px 14px; cursor:pointer;}
-  .btn:active{transform:translateY(1px);}
+  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; border:none; border-radius:8px; padding:9px 14px; cursor:pointer; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;}
+  .btn:active{transform:translateY(1px) scale(0.97);}
+  .btn:hover{box-shadow:0 3px 10px rgba(0,0,0,.08);}
   .btn-primary{background:var(--aegean); color:#fff;} .btn-primary:hover{background:var(--aegean-deep);}
   .btn-ghost{background:transparent; color:var(--aegean); border:1px solid var(--aegean);} .btn-ghost:hover{background:rgba(28,90,122,.06);}
   .btn-danger-ghost{background:transparent; color:var(--bad); border:1px solid #e3b8b8; font-size:12px; padding:6px 10px;}
   .btn-small{padding:6px 11px; font-size:12.5px;}
 
-  .step-block{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; box-shadow:var(--shadow);}
+  .step-block{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; box-shadow:var(--shadow); animation: fadeInUp 0.28s ease both;}
   .step-label{font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ochre); display:block; margin-bottom:8px;}
   .step-title{font-weight:600; font-size:15px; margin:0 0 10px;}
 
@@ -145,7 +165,9 @@
   .trip-chip{
     border:1px solid var(--line); border-radius:10px; padding:8px 12px; cursor:pointer; background:#fff;
     font-size:13px; display:flex; flex-direction:column; gap:2px; min-width:108px; text-align:center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
+  .trip-chip:hover{transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,.1);}
   .trip-chip.active{border-color:var(--aegean); background:rgba(28,90,122,.07); box-shadow:0 0 0 1.5px var(--aegean) inset;}
   .trip-chip .range{font-weight:600;}
   .trip-chip .status{font-size:10.5px; text-transform:uppercase; letter-spacing:.04em;}
@@ -163,7 +185,7 @@
   .guide-chip .bus-toggle{font-weight:400; font-size:11.5px; display:flex; align-items:center; gap:4px; opacity:.9;}
 
   /* Excursion cards */
-  .exc-card{background:var(--card); border:1px solid var(--line); border-radius:14px; margin-bottom:16px; box-shadow:var(--shadow); overflow:hidden;}
+  .exc-card{background:var(--card); border:1px solid var(--line); border-radius:14px; margin-bottom:16px; box-shadow:var(--shadow); overflow:hidden; animation: fadeInUp 0.3s ease both;}
   .exc-head{display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line); background:var(--whitewash-2); flex-wrap:wrap;}
   .exc-name-select{font-weight:600; font-size:15px; min-width:150px; flex:1;}
   .field-group{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft);}
@@ -284,6 +306,53 @@
     footer.savebar .logout-link{order:3;}
 
     .login-card{padding:24px 18px;}
+
+    /* ---- Список збору коштів: touch-friendly pass ---- */
+    .tourist-row{ padding:13px 6px; gap:10px; min-height:44px; }
+    .tourist-row .t-name{ font-size:15px; }
+    .tourist-row .dot{ width:13px; height:13px; }
+    .row-del{
+      min-width:40px; min-height:40px; font-size:19px;
+      display:flex; align-items:center; justify-content:center; border-radius:8px;
+    }
+    .row-del:active{ background:var(--whitewash-2); }
+
+    .age-hero{ padding:10px 0 18px; }
+    .age-hero .value{ font-size:32px; }
+
+    .exc-select-row{ padding:14px 0; gap:8px; }
+    .exc-select-name{ font-size:15px; min-width:0; flex:1 1 100%; order:1; }
+    .switch{ width:52px; height:30px; order:2; }
+    .switch .slider::before{ height:24px; width:24px; }
+    .switch input:checked + .slider::before{ transform:translateX(22px); }
+    .exc-price-label{ font-size:13.5px; order:3; }
+    .edit-toggle-btn{
+      min-width:40px; min-height:40px; font-size:19px; order:4;
+      display:flex; align-items:center; justify-content:center; border-radius:8px;
+    }
+    .edit-toggle-btn:active{ background:var(--whitewash-2); }
+
+    .exc-edit-panel{ padding:10px; gap:10px; }
+    .price-mode-btns{ width:100%; gap:6px; }
+    .price-mode-btn{ flex:1; font-size:12.5px; padding:8px 6px; min-height:38px; text-align:center; }
+    .price-display{ width:100%; text-align:left; font-size:15px; padding:8px 10px; }
+
+    /* ---- Прибутковість екскурсій: touch-friendly pass ---- */
+    .person-select{ min-width:100px; font-size:13px; padding:8px 9px; min-height:38px; }
+    .num-input{ width:58px; min-height:38px; font-size:15px; }
+    .num-input-wide{ width:82px; min-height:38px; font-size:15px; }
+    table.rows-table td, table.rows-table th{ padding:7px 5px; }
+    .settlement-note .btn{ margin-top:6px; }
+
+    /* ---- Фінансовий звіт: touch-friendly pass ---- */
+    .fin-row{ flex-wrap:wrap; gap:8px 6px; padding:10px 0; }
+    .fin-label-input{ flex:1 1 100%; font-size:16px; padding:9px 10px; min-height:40px; order:1; }
+    .fin-label{ flex:1 1 100%; order:1; font-size:14px; }
+    .fin-amount{ width:auto; flex:1 1 auto; font-size:16px; padding:9px 10px; min-height:40px; order:2; }
+    .fin-row .row-del{ order:3; }
+    .fin-row select{ order:1; flex:1 1 100%; }
+    .fin-row label{ order:2; }
+    .fin-total-row{ font-size:15px; }
   }
 
   /* ---------- Ported from the standalone hotel booking tool ---------- */
@@ -317,11 +386,11 @@
     z-index: 20;
     box-shadow: 0 0 0 4px #a855f7, 0 10px 24px rgba(0,0,0,.35) !important;
   }
-  .hb-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:400; padding:12px; }
-  .hb-modal-card{ background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:520px; width:100%; padding:20px; max-height:92vh; overflow-y:auto; }
+  .hb-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:400; padding:12px; animation: fadeIn 0.18s ease both; }
+  .hb-modal-card{ background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:520px; width:100%; padding:20px; max-height:92vh; overflow-y:auto; animation: modalPop 0.2s ease both; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="./index_files/supabase.min.js.download"></script>
+<script src="./index_files/xlsx.full.min.js.download"></script>
 <style>
   .login-overlay{
     position:fixed; inset:0; background:var(--whitewash); z-index:1000;
@@ -342,7 +411,7 @@
 </head>
 <body class="wave-bg">
 
-<div class="login-overlay" id="loginOverlay">
+<div class="login-overlay app-hidden" id="loginOverlay">
   <div class="login-card">
     <img src="data:image/jpeg;base64,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" alt="Rich Tour">
     <h2>Прибутковість екскурсій — Греція 2026</h2>
@@ -354,62 +423,121 @@
 </div>
 
 
-<header class="top app-hidden" id="appHeader">
+<header class="top" id="appHeader">
   <div class="brand-row">
     <img class="brand-logo" src="data:image/jpeg;base64,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" alt="Rich Tour">
     <div>
       <h1>Прибутковість екскурсій — напрям Греція, 2026</h1>
-      <div class="subtitle" id="tripSubtitle">Оберіть заїзд нижче</div>
+      <div class="subtitle" id="tripSubtitle">Заїзд 24/07-02/08</div>
     </div>
-    <div class="mode-toggle no-print">
-      <button class="btn btn-ghost" id="tabManagerBtn">Керівник напрямку</button>
-      <button class="btn btn-ghost" id="tabGuideBtn">Керівники в турі</button>
-    </div>
+  </div>
+
+  
+</header>
+
+<main class="" id="appMain">
+
+  <div class="section-tabs no-print">
+    <button class="btn btn-ghost section-tab manager-only" id="sectionTripPrepBtn">Документи до туру</button>
+    <button class="btn btn-ghost section-tab manager-only active-tab" id="sectionTourBtn">Поточний тур</button>
+    <button class="btn btn-ghost section-tab guide-only active-tab" id="sectionTouristsBtnDirect">Список збору коштів</button>
+    <button class="btn btn-ghost section-tab guide-only" id="sectionProfitBtnDirect">Прибутковість</button>
+    <button class="btn btn-ghost section-tab guide-only" id="sectionFinanceBtnDirect">Фінансовий звіт</button>
+    <button class="btn btn-ghost section-tab manager-only" id="sectionManagerReportBtn">Звіт керівника</button>
   </div>
 
   <div class="step-block no-print manager-only" id="managerTripPickBlock">
     <p class="step-title" style="margin:0 0 8px;">Заїзд</p>
-    <div class="trip-grid" id="tripGrid"></div>
+    <div class="trip-grid" id="tripGrid"><div class="trip-chip"><span class="range">10/07-19/07</span><span class="status status-current">Триває</span></div><div class="trip-chip"><span class="range">17/07-26/07</span><span class="status status-current">Триває</span></div></div>
   </div>
 
   <div class="step-block no-print guide-only" id="guideTripPickBlock" style="display:none; margin:0 0 16px;">
     <span class="step-label">Заїзд</span>
-    <select id="guideTripSelect" style="width:100%; max-width:340px;"></select>
-  </div>
-</header>
-
-<main class="app-hidden" id="appMain">
-
-  <div class="section-tabs no-print">
-    <button class="btn btn-ghost section-tab manager-only" id="sectionTripPrepBtn">Документи до туру</button>
-    <button class="btn btn-ghost section-tab active-tab" id="sectionTouristsBtn">Список збору коштів</button>
-    <button class="btn btn-ghost section-tab" id="sectionProfitBtn">Прибутковість</button>
-    <button class="btn btn-ghost section-tab" id="sectionFinanceBtn">Фінансовий звіт</button>
-    <button class="btn btn-ghost section-tab manager-only" id="sectionManagerReportBtn">Звіт керівника</button>
+    <select id="guideTripSelect" style="width:100%; max-width:340px;"><option value="trip_0">05/06-14/06 — Минув</option><option value="trip_1">12/06-21/06 — Минув</option><option value="trip_2">19/06-28/06 — Минув</option><option value="trip_3">26/06-05/07 — Минув</option><option value="trip_4">03/07-12/07 — Минув</option><option value="trip_5">10/07-19/07 — Триває</option><option value="trip_6">17/07-26/07 — Триває</option><option value="trip_7">24/07-02/08 — Заплановано</option><option value="trip_8">31/07-09/08 — Заплановано</option><option value="trip_9">07/08-16/08 — Заплановано</option><option value="trip_10">14/08-23/08 — Заплановано</option><option value="trip_11">21/08-30/08 — Заплановано</option><option value="trip_12">28/08-06/09 — Заплановано</option><option value="trip_13">04/09-13/09 — Заплановано</option><option value="trip_14">11/09-20/09 — Заплановано</option><option value="trip_15">18/09-27/09 — Заплановано</option></select>
   </div>
 
-  <div id="profitSection">
-
-  <div class="step-block no-print manager-only" id="guidesBlock" style="display:none;">
-    
-    <p class="step-title">Хто з гідів на цьому заїзді (завжди троє)</p>
-    <div class="guide-quickpick" id="guideQuickpick">
-      <button class="btn btn-ghost btn-small" id="pickGroup1">Галя · Ліда · Марта</button>
-      <button class="btn btn-ghost btn-small" id="pickGroup2">Іра · Таня · Мирослава</button>
-      <button class="btn btn-ghost btn-small" id="editGuidesBtn" style="display:none;">Змінити гідів</button>
+  <div id="tourSection" style="display: block;">
+    <div class="step-block manager-only" id="tourSectionGuidePick" style="display:none;">
+      <p class="step-title" style="margin:0 0 8px;">Група якого гіда</p>
+      <div class="guide-chips" id="tourSectionGuideChips"></div>
     </div>
-    <div class="guide-chips" id="guideChips"></div>
+    <div class="no-print manager-only" id="tourSectionSubnav" style="display: none; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;">
+      <button class="btn btn-ghost btn-small section-tab active-tab" id="sectionTouristsBtn">Список збору коштів</button>
+      <button class="btn btn-ghost btn-small section-tab" id="sectionProfitBtn">Прибутковість</button>
+      <button class="btn btn-ghost btn-small section-tab" id="sectionFinanceBtn">Фінансовий звіт</button>
+    </div>
+    <div class="step-block manager-only" id="tourSectionPlaceholder" style="display: block; text-align: center;">
+      <p class="report-note" style="margin:0;">👆 Обери тур зі списку вище, щоб побачити список збору коштів, прибутковість і фінзвіт по ньому.</p>
+    </div>
+
+  <div id="profitSection" style="display: none;">
+
+  <div class="step-block no-print manager-only" id="guidesBlock" style="display: block;">
+    <details>
+      <summary style="cursor:pointer; font-weight:700; font-size:15px;">Хто з гідів на цьому заїзді (завжди троє)</summary>
+      <div class="guide-quickpick" id="guideQuickpick" style="margin-top:8px;">
+        <button class="btn btn-ghost btn-small" id="pickGroup1" style="display: inline-block;">Галя · Ліда · Марта</button>
+        <button class="btn btn-ghost btn-small" id="pickGroup2" style="display: inline-block;">Іра · Таня · Мирослава</button>
+        <button class="btn btn-ghost btn-small" id="editGuidesBtn" style="display: none;">Змінити гідів</button>
+      </div>
+      <div class="guide-chips" id="guideChips"><label class="guide-chip">
+        <input type="checkbox" data-role="guideCheck">
+        <span>Галя</span>
+        
+      </label><label class="guide-chip">
+        <input type="checkbox" data-role="guideCheck">
+        <span>Ліда</span>
+        
+      </label><label class="guide-chip">
+        <input type="checkbox" data-role="guideCheck">
+        <span>Марта</span>
+        
+      </label><label class="guide-chip">
+        <input type="checkbox" data-role="guideCheck">
+        <span>Іра</span>
+        
+      </label><label class="guide-chip">
+        <input type="checkbox" data-role="guideCheck">
+        <span>Таня</span>
+        
+      </label><label class="guide-chip">
+        <input type="checkbox" data-role="guideCheck">
+        <span>Мирослава</span>
+        
+      </label></div>
+    </details>
   </div>
 
-  <div class="step-block no-print manager-only" id="excursionPickerBlock" style="display:none;">
+  <div class="step-block no-print manager-only" id="excursionPickerBlock" style="display: none;">
     
     <p class="step-title">Які екскурсії відбулися чи відбуваються цього заїзду?</p>
-    <div class="guide-chips" id="excursionPicker"></div>
+    <div class="guide-chips" id="excursionPicker"><button class="btn btn-ghost btn-small btn-primary" style="position: relative;">Скіатос (1)</button><button class="btn btn-ghost btn-small" style="position: relative;">+ Салоніки транс</button><button class="btn btn-ghost btn-small" style="position: relative;">+ Салоніки екск</button><button class="btn btn-ghost btn-small btn-primary" style="position: relative;">Едеса/Позар (1)</button><button class="btn btn-ghost btn-small" style="position: relative;">+ Олімп</button><button class="btn btn-ghost btn-small btn-primary" style="position: relative;">Метеори (2)</button><button class="btn btn-ghost btn-small" style="position: relative;">+ Халкідіки</button><button class="btn btn-ghost btn-small" style="position: relative;">+ Грязі</button><button class="btn btn-ghost btn-small" style="position: relative;">+ Афон</button><button class="btn btn-ghost btn-small" style="position: relative;">+ Корфу</button><button class="btn btn-ghost btn-small" style="position: relative;">+ Інше</button></div>
   </div>
 
-  <section class="step-block manager-only" id="touristRefBanner" style="display:none;"></section>
+  <section class="step-block manager-only" id="touristRefBanner" style="display: block;">
+    <p class="report-title" style="margin:0;">Список туристів vs Прибутковість (звірка)</p>
+    <p class="report-note" style="margin:2px 0 8px;">Порівняння даних зі "Список збору коштів" із тим, що вже введено в калькулятор прибутковості — по кожному гіду. Видно тільки тобі, не гідам.</p>
+    <p style="font-weight:700; margin:14px 0 6px;">Галя</p>
+      <div style="overflow-x:auto;">
+        <table class="report-table" style="font-size:12px;">
+          <thead><tr><th style="text-align:left;">Екскурсія</th><th>Тур.</th><th>Сума</th><th>У прибутковості</th></tr></thead>
+          <tbody><tr><td>Метеори</td><td>48</td><td>1&nbsp;730,00 €</td><td><span class="muted">ще не перенесено</span></td></tr><tr><td>Скіатос</td><td>48</td><td>2&nbsp;658,00 €</td><td><span class="muted">ще не перенесено</span></td></tr><tr><td>Едеса/Позар</td><td>9</td><td>340,00 €</td><td><span class="muted">ще не перенесено</span></td></tr></tbody>
+        </table>
+      </div><p style="font-weight:700; margin:14px 0 6px;">Ліда</p>
+      <div style="overflow-x:auto;">
+        <table class="report-table" style="font-size:12px;">
+          <thead><tr><th style="text-align:left;">Екскурсія</th><th>Тур.</th><th>Сума</th><th>У прибутковості</th></tr></thead>
+          <tbody><tr><td>Метеори</td><td>5</td><td>200,00 €</td><td><span class="muted">ще не перенесено</span></td></tr><tr><td>Скіатос</td><td>11</td><td>660,00 €</td><td><span class="muted">ще не перенесено</span></td></tr><tr><td>Едеса/Позар</td><td>2</td><td>80,00 €</td><td><span class="muted">ще не перенесено</span></td></tr></tbody>
+        </table>
+      </div>
+  </section>
 
-  <div id="excursionsWrap"></div>
+  <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+    <button class="btn btn-ghost btn-small" id="excursionsSaveBtn">💾 Зберегти</button>
+    <button class="btn btn-ghost btn-small" id="excursionsDownloadBtn">⬇ Завантажити збережений</button>
+  </div>
+
+  <div id="excursionsWrap"><div class="empty-state"><div class="glyph">🧭</div>Спочатку оберіть трьох гідів для цього заїзду.</div></div>
 
   <div class="no-print" style="margin-top:14px;">
     <button class="btn btn-primary" id="addExcursionBtn">+ Додати екскурсію</button>
@@ -419,7 +547,7 @@
     <p class="report-title">Зведений звіт по заїзду (на гіда)</p>
     <p class="report-note">Зібрано, витрати (з квитками для Скіатосу), прибуток і розподіл 10% / 90%, плюс чистий взаєморозрахунок із партнерами.</p>
     <div class="table-scroll">
-      <table class="report-table" id="tripReportTable"></table>
+      <table class="report-table" id="tripReportTable"><tbody><tr><td style="padding:16px;color:var(--ink-soft);">Немає даних.</td></tr></tbody></table>
     </div>
   </section>
 
@@ -429,7 +557,26 @@
     <p class="report-title">Загальна статистика за сезон</p>
     <p class="report-note">Сума по всіх 16 заїздах, з розбивкою по гідах.</p>
     <div class="table-scroll">
-      <table class="report-table" id="seasonReportTable"></table>
+      <table class="report-table" id="seasonReportTable">
+    <thead><tr><th style="text-align:left;">Гід</th><th>Зібрано</th><th>Затрати</th><th>Прибуток</th>
+      <th>Від партнерів (підтв.)</th><th>Партнерам (підтв.)</th><th>Довідково (не підтв.)</th><th>Чистий результат</th><th>Гід 10%</th><th>Офіс 90%</th></tr></thead>
+    <tbody><tr><td>Галя</td><td>8&nbsp;479,00</td><td>4&nbsp;519,05</td><td>3&nbsp;959,95</td>
+      <td>431,97</td><td>438,91</td><td class="muted">387,83</td><td>3&nbsp;953,01</td>
+      <td>395,99</td><td>3&nbsp;563,95</td></tr><tr><td>Ліда</td><td>3&nbsp;375,00</td><td>1&nbsp;937,80</td><td>1&nbsp;437,20</td>
+      <td>0,00</td><td>336,92</td><td class="muted">0,00</td><td>1&nbsp;100,27</td>
+      <td>143,72</td><td>1&nbsp;293,48</td></tr><tr><td>Марта</td><td>2&nbsp;615,00</td><td>1&nbsp;352,18</td><td>1&nbsp;262,82</td>
+      <td>0,00</td><td>0,00</td><td class="muted">0,00</td><td>1&nbsp;262,82</td>
+      <td>126,28</td><td>1&nbsp;136,54</td></tr><tr><td>Іра</td><td>1&nbsp;740,00</td><td>265,36</td><td>1&nbsp;474,64</td>
+      <td>0,00</td><td>0,00</td><td class="muted">-596,80</td><td>1&nbsp;474,64</td>
+      <td>147,46</td><td>1&nbsp;327,18</td></tr><tr><td>Мирослава</td><td>2&nbsp;791,00</td><td>2&nbsp;796,24</td><td>-5,24</td>
+      <td>0,00</td><td>0,00</td><td class="muted">0,00</td><td>-5,24</td>
+      <td>-0,52</td><td>-4,72</td></tr><tr><td>Таня</td><td>0,00</td><td>0,00</td><td>0,00</td>
+      <td>0,00</td><td>0,00</td><td class="muted">0,00</td><td>0,00</td>
+      <td>0,00</td><td>0,00</td></tr></tbody>
+    <tfoot><tr><td>Разом за сезон</td><td>19&nbsp;000,00</td><td>10&nbsp;870,63</td><td>8&nbsp;129,37</td>
+      <td>431,97</td><td>775,84</td><td class="muted">-208,97</td><td>7&nbsp;785,51</td>
+      <td>812,94</td><td>7&nbsp;316,43</td></tr></tfoot>
+  </table>
     </div>
   </section>
 
@@ -446,6 +593,10 @@
       <details>
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Статистика по екскурсіях</summary>
         <p class="report-note" style="margin:6px 0 0;">К-сть туристів і зібрана сума по кожній екскурсії (поточна група поточного заїзду).</p>
+        <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+          <button class="btn btn-ghost btn-small" id="touristStatsSaveBtn">💾 Зберегти</button>
+          <button class="btn btn-ghost btn-small" id="touristStatsDownloadBtn">⬇ Завантажити збережений</button>
+        </div>
         <div class="table-scroll" style="margin-top:10px;">
           <table class="report-table" id="touristStatsTable"></table>
         </div>
@@ -453,55 +604,66 @@
     </section>
 
     <div class="step-block no-print manager-only" id="addTouristBlock" style="display:none; margin-top:16px;">
-      <p class="step-title">Додати туриста</p>
-      <div class="subgrid">
-        <div class="field-group"><span>Ім'я:</span><input type="text" id="newTouristFirst" style="flex:1;"></div>
-        <div class="field-group"><span>Прізвище:</span><input type="text" id="newTouristLast" style="flex:1;"></div>
-      </div>
-      <div class="subgrid" style="margin-top:8px;">
-        <div class="field-group"><span>Дата народження:</span><input type="date" id="newTouristBirth"></div>
-        <div class="field-group"><span>Паспортні дані:</span><input type="text" id="newTouristPassport" placeholder="серія/номер, ким виданий..." style="flex:1;"></div>
-      </div>
-      <div class="field-group" style="margin-top:8px;">
-        <button class="btn btn-primary btn-small" id="addTouristBtn">+ Додати</button>
-      </div>
+      <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:15px;">➕ Додати туриста</summary>
+        <div class="subgrid" style="margin-top:8px;">
+          <div class="field-group"><span>Ім'я:</span><input type="text" id="newTouristFirst" style="flex:1;"></div>
+          <div class="field-group"><span>Прізвище:</span><input type="text" id="newTouristLast" style="flex:1;"></div>
+        </div>
+        <div class="subgrid" style="margin-top:8px;">
+          <div class="field-group"><span>Дата народження:</span><input type="date" id="newTouristBirth"></div>
+          <div class="field-group"><span>Паспортні дані:</span><input type="text" id="newTouristPassport" placeholder="серія/номер, ким виданий..." style="flex:1;"></div>
+        </div>
+        <div class="field-group" style="margin-top:8px;">
+          <button class="btn btn-primary btn-small" id="addTouristBtn">+ Додати</button>
+        </div>
 
-      <details style="margin-top:14px;" open>
-        <summary style="cursor:pointer; font-size:13px; font-weight:600; color:var(--ink);">📎 Завантажити файлом (Excel / CSV) — надійніше</summary>
-        <p class="report-note" style="margin-top:8px;">Файл повинен мати рівно <b>3 колонки в такому порядку</b>: <b>Прізвище Ім'я</b> (разом, в одній колонці), <b>Дата народження</b>, <b>Паспортні дані</b>. Перший рядок може бути заголовком (система сама визначить і пропустить його) або одразу даними. Дата — будь-який зрозумілий формат (2014-04-22, 22.04.2014, або звичайна дата-комірка з Excel).</p>
-        <input type="file" id="touristFileInput" accept=".csv,.xlsx,.xls" style="margin-top:6px;">
-        <div id="fileImportStatus" class="report-note" style="margin-top:6px;"></div>
-      </details>
+        <details style="margin-top:14px;">
+          <summary style="cursor:pointer; font-size:13px; font-weight:600; color:var(--ink);">📎 Завантажити файлом (Excel / CSV) — надійніше</summary>
+          <p class="report-note" style="margin-top:8px;">Файл повинен мати рівно <b>3 колонки в такому порядку</b>: <b>Прізвище Ім'я</b> (разом, в одній колонці), <b>Дата народження</b>, <b>Паспортні дані</b>. Перший рядок може бути заголовком (система сама визначить і пропустить його) або одразу даними. Дата — будь-який зрозумілий формат (2014-04-22, 22.04.2014, або звичайна дата-комірка з Excel).</p>
+          <input type="file" id="touristFileInput" accept=".csv,.xlsx,.xls" style="margin-top:6px;">
+          <div id="fileImportStatus" class="report-note" style="margin-top:6px;"></div>
+        </details>
 
-      <details style="margin-top:10px;">
-        <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft);">Або вставити текстом (без файлу)</summary>
-        <p class="report-note" style="margin-top:8px;">По одному туристу на рядок, розділювач — табуляція (як при копіюванні з таблиці) або крапка з комою, завжди в порядку: <code>Прізвище Ім'я [Tab] Дата народження [Tab] Паспортні дані</code></p>
-        <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Петренко Іван	1990-05-12	ФГ123456&#10;Іваненко Марія	2015-08-03	"></textarea>
-        <button class="btn btn-ghost btn-small" id="bulkAddTouristBtn" style="margin-top:6px;">Додати список</button>
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft);">Або вставити текстом (без файлу)</summary>
+          <p class="report-note" style="margin-top:8px;">По одному туристу на рядок, розділювач — табуляція (як при копіюванні з таблиці) або крапка з комою, завжди в порядку: <code>Прізвище Ім'я [Tab] Дата народження [Tab] Паспортні дані</code></p>
+          <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Петренко Іван	1990-05-12	ФГ123456
+Іваненко Марія	2015-08-03	"></textarea>
+          <button class="btn btn-ghost btn-small" id="bulkAddTouristBtn" style="margin-top:6px;">Додати список</button>
+        </details>
       </details>
     </div>
 
     <div class="step-block no-print guide-only" id="addExtraTouristBlock" style="display:none; margin-top:16px;">
-      <p class="step-title">Додати туриста поза групою</p>
-      <p class="report-note">Для людей, яких немає в основному списку (наприклад, приєдналися вже в турі). Позначається рожевим кольором у списку.</p>
-      <div class="subgrid">
-        <div class="field-group"><span>Ім'я:</span><input type="text" id="newExtraTouristFirst" style="flex:1;"></div>
-        <div class="field-group"><span>Прізвище:</span><input type="text" id="newExtraTouristLast" style="flex:1;"></div>
+      <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:15px;">➕ Додати туриста поза групою</summary>
+        <p class="report-note" style="margin-top:8px;">Для людей, яких немає в основному списку (наприклад, приєдналися вже в турі). Позначається рожевим кольором у списку.</p>
+        <div class="subgrid">
+          <div class="field-group"><span>Ім'я:</span><input type="text" id="newExtraTouristFirst" style="flex:1;"></div>
+          <div class="field-group"><span>Прізвище:</span><input type="text" id="newExtraTouristLast" style="flex:1;"></div>
+        </div>
+        <div class="subgrid" style="margin-top:8px;">
+          <div class="field-group"><span>Дата народження:</span><input type="date" id="newExtraTouristBirth"></div>
+          <div class="field-group"><span>Паспортні дані:</span><input type="text" id="newExtraTouristPassport" placeholder="серія/номер..." style="flex:1;"></div>
+        </div>
+        <div class="field-group" style="margin-top:8px;">
+          <button class="btn btn-primary btn-small" id="addExtraTouristBtn">+ Додати</button>
       </div>
-      <div class="subgrid" style="margin-top:8px;">
-        <div class="field-group"><span>Дата народження:</span><input type="date" id="newExtraTouristBirth"></div>
-        <div class="field-group"><span>Паспортні дані:</span><input type="text" id="newExtraTouristPassport" placeholder="серія/номер..." style="flex:1;"></div>
-      </div>
-      <div class="field-group" style="margin-top:8px;">
-        <button class="btn btn-primary btn-small" id="addExtraTouristBtn">+ Додати</button>
-      </div>
+      </details>
     </div>
 
     <div class="step-block" id="touristListBlock" style="margin-top:16px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <p class="step-title" style="margin:0;">Туристи</p>
-        <button class="btn btn-danger-ghost no-print manager-only" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn btn-primary btn-small no-print" id="touristListSyncBtn">🔄 Підтягнути з базового списку</button>
+          <button class="btn btn-ghost btn-small no-print" id="touristListSaveBtn">💾 Зберегти</button>
+          <button class="btn btn-ghost btn-small no-print" id="touristListDownloadBtn">⬇ Завантажити збережений</button>
+          <button class="btn btn-danger-ghost no-print manager-only" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
+        </div>
       </div>
+      <p class="report-note" style="margin-top:4px;">Основа списку вже є в "Документи до туру" (базовий файл + розселення + автобуси) — тисни "🔄 Підтягнути", щоб не вносити людей вдруге. Додасть лише тих, кого ще нема в цьому списку; кого вручну прибереш звідси — назад сам не з'явиться.</p>
       <div id="touristListWrap"></div>
     </div>
 
@@ -538,12 +700,104 @@
 
   </div>
 
+  </div>
+
   <div id="managerReportSection" style="display:none;">
     <div class="step-block" id="managerReportBlock"></div>
   </div>
 
-  <div id="tripPrepSection" style="display:none;">
-    <div class="step-block" id="tripPrepBlock"></div>
+  <div id="tripPrepSection" style="display: none;">
+    <div class="step-block" id="tripPrepBlock"><div style="padding:8px 14px; background:var(--ochre); color:#fff; border-radius:10px; font-weight:700; text-align:center; font-size:14px; margin-bottom:12px;">
+    📅 Заїзд: 24/07-02/08
+  </div>
+  <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">
+    <button class="btn btn-ghost btn-small tp-view-only-ok active-tab" data-tpview="overview">Огляд і імпорт</button>
+    <button class="btn btn-ghost btn-small tp-view-only-ok " data-tpview="rooms">Готель</button>
+    <button class="btn btn-ghost btn-small tp-view-only-ok " data-tpview="buses">Автобуси</button>
+    <button class="btn btn-ghost btn-small tp-view-only-ok " data-tpview="docs">Документи</button>
+  </div>
+  <div id="tripPrepContent" class="">
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:15px;">📤 Завантажити базові файли (окремо по готелях)</summary>
+        <p class="report-note" style="margin-top:8px;">Excel зі списком туристів (Номер заявки, ПІБ, Дата народження, Паспорт, Агенція, оплата, коментар, і за бажанням — Місце посадки, Телефон, Пов'язана заявка). Кожен файл перезаписує список саме того готелю, не чіпаючи другий.</p>
+        <p class="report-note">Система сама розпізнає, які заявки — одна компанія: за колонкою <b>"Connected"</b> (код групи типу "к1", "к2"), за об'єднаними клітинками у файлі, за згадками "#номер" у коментарі, або за колонкою "Пов'язана заявка". Якщо десь помилилась — постав галочки й об'єднай вручну, або натисни ✕ біля номера заявки в таблиці, щоб роз'єднати.</p>
+        <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:8px;">
+          <div>
+            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">🏨 Hotel Konstantin 3*</label>
+            <input type="file" accept=".xlsx,.xls" id="tripPrepFileInputKonstantin">
+          </div>
+          <div>
+            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">🏨 Great Aleksander 3*</label>
+            <input type="file" accept=".xlsx,.xls" id="tripPrepFileInputGreat">
+          </div>
+        </div>
+        <div id="tripPrepImportStatus" class="report-note" style="margin-top:6px;"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+          <button class="btn btn-danger-ghost btn-small" id="tpClearKonstantinBtn">🗑️ Очистити список Konstantin</button>
+          <button class="btn btn-danger-ghost btn-small" id="tpClearGreatBtn">🗑️ Очистити список Great Aleksander</button>
+          <button class="btn btn-danger-ghost btn-small" id="tpClearTouristsBtn">🗑️ Очистити обидва</button>
+        </div>
+      </details>
+    </div>
+
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:15px;">➕ Додати туриста вручну (власний заїзд)</summary>
+        <p class="report-note" style="margin-top:8px;">Для людей поза базовим файлом — наприклад власні тури без окремої агенції. Якщо вкажеш номер заявки, який уже є в списку — людина приєднається до тієї ж групи/готелю (наприклад, якщо в завантаженому файлі когось бракує).</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+          <div><label style="display:block; font-size:11px; font-weight:600;">Ім'я Прізвище</label><input type="text" id="tpManualFullName" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Дата народження</label><input type="date" id="tpManualBirth" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Паспорт</label><input type="text" id="tpManualPassport" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:110px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Номер заявки</label><input type="text" id="tpManualBooking" placeholder="напр. #ВЛАСНИЙ1" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:120px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Готель</label>
+            <select id="tpManualHotel" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;">
+              <option value="konstantin">Hotel Konstantin 3*</option>
+              <option value="greataleksander">Great Aleksander 3*</option>
+            </select>
+          </div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Місто посадки</label><input type="text" id="tpManualCity" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:110px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Телефон</label><input type="text" id="tpManualPhone" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:130px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Страхівка (€)</label><input type="text" inputmode="decimal" id="tpManualInsurance" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:90px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Платні місця (€)</label><input type="text" inputmode="decimal" id="tpManualPaidSeats" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:100px;"></div>
+          <button class="btn btn-primary btn-small" id="tpAddManualTouristBtn">+ Додати</button>
+        </div>
+      </details>
+    </div>
+    <p class="report-note">Якщо дві чи більше заявок насправді одна компанія (у файлі позначено кольором/смугою, а не текстом у коментарі) — постав галочки навпроти них (в одній з таблиць нижче) і натисни "Об'єднати".</p>
+    <div class="no-print" style="margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-small" id="tpMergeGroupsBtn">🔗 Об'єднати вибрані групи</button>
+      <button class="btn btn-ghost btn-small" id="tpMoveHotelBtn">🔄 Перенести вибрані в інший готель</button>
+    </div>
+    <div class="step-block no-print" style="margin-bottom:14px; background:#eff6ff; border-color:#93c5fd;">
+      <p class="step-title" style="margin:0 0 6px;">🔗 Швидке об'єднання (за номерами заявок)</p>
+      <p class="report-note">Впиши номери заявок, які треба об'єднати в одну компанію, через кому чи пробіл — не треба шукати їх у списку нижче.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px;">
+        <input type="text" id="tpQuickMergeInput" placeholder="напр. 7623, 9049, 8042" style="flex:1; min-width:220px; padding:8px 10px; border:2px solid var(--line); border-radius:8px;">
+        <button class="btn btn-primary btn-small" id="tpQuickMergeBtn">Об'єднати</button>
+      </div>
+    </div>
+    
+      <p class="report-title">🏨 Hotel Konstantin 3* — груп: 0, туристів: 0</p>
+      <div class="table-scroll">
+        <table class="report-table" style="font-size:12px; margin-bottom:20px;">
+          <thead><tr><th class="no-print"></th><th style="text-align:left;">Заявка</th><th style="text-align:left;">ПІБ</th><th>К-ть</th><th style="text-align:left;">Агенція</th><th style="text-align:left;">Місто</th><th>Автобус</th><th>Борг</th></tr></thead>
+          <tbody><tr><td colspan="8" class="muted">Ще нічого не завантажено.</td></tr></tbody>
+        </table>
+      </div>
+    
+      <p class="report-title">🏨 Great Aleksander 3* — груп: 0, туристів: 0</p>
+      <div class="table-scroll">
+        <table class="report-table" style="font-size:12px; margin-bottom:20px;">
+          <thead><tr><th class="no-print"></th><th style="text-align:left;">Заявка</th><th style="text-align:left;">ПІБ</th><th>К-ть</th><th style="text-align:left;">Агенція</th><th style="text-align:left;">Місто</th><th>Автобус</th><th>Борг</th></tr></thead>
+          <tbody><tr><td colspan="8" class="muted">Ще нічого не завантажено.</td></tr></tbody>
+        </table>
+      </div>
+    
+  </div>
+  <div class="no-print" style="position:sticky; bottom:0; margin-top:20px; padding:10px 14px; background:var(--ochre); color:#fff; border-radius:10px; font-weight:700; text-align:center; font-size:14px; box-shadow:0 -2px 8px rgba(0,0,0,.15);">
+    📅 Заїзд: 24/07-02/08
+  </div></div>
   </div>
 
 </main>
@@ -674,8 +928,8 @@
     <div id="hbWizardGroupCard" style="margin-bottom:12px;"></div>
 
     <div style="display:flex; gap:6px; margin-bottom:10px;">
-      <button id="hbWizardTabHotelBtn" onclick="hbWizardSwitchTab('hotel')" class="btn btn-small" style="flex:1;">🏨 Структура готелю</button>
-      <button id="hbWizardTabGroupBtn" onclick="hbWizardSwitchTab('group')" class="btn btn-small" style="flex:1;">👥 Список групи</button>
+      <button id="hbWizardTabHotelBtn" onclick="hbWizardSwitchTab(&#39;hotel&#39;)" class="btn btn-small" style="flex:1;">🏨 Структура готелю</button>
+      <button id="hbWizardTabGroupBtn" onclick="hbWizardSwitchTab(&#39;group&#39;)" class="btn btn-small" style="flex:1;">👥 Список групи</button>
     </div>
 
     <div id="hbWizardTabHotel">
@@ -702,9 +956,11 @@
   </div>
 </div>
 
-<footer class="savebar no-print app-hidden" id="appFooter">
-  <span class="save-status" id="saveStatus">—</span>
+<footer class="savebar no-print" id="appFooter">
+  <span class="save-status" id="saveStatus">Оновлено · 21:14:08</span>
   <button class="btn btn-ghost btn-small manager-only" id="printBtn">🖨 Друк зведеного звіту</button>
+  <button class="logout-link manager-only" id="tabGuideBtn" title="Переглянути застосунок як гід (тестовий перегляд)">Перегляд як гід</button>
+  <button class="logout-link app-hidden" id="tabManagerBtn">Керівник напрямку</button>
   <button class="logout-link" id="changePasswordBtn">Змінити пароль</button>
   <button class="logout-link" id="logoutBtn">Вийти</button>
 </footer>
@@ -983,13 +1239,21 @@ async function rtGuideWrite(type, table, payload, matchOrOptions){
 }
 
 async function fetchTrips(){
+  const cacheKey = 'tripsList';
   const { data, error } = await sb.from('trips').select('id,label,start_date,end_date').order('start_date');
-  if(error){ console.error(error); setStatus("Помилка завантаження заїздів"); return []; }
-  return data.map(t=>({ id:t.id, label:t.label, start:new Date(t.start_date+"T00:00:00"), end:new Date(t.end_date+"T23:59:59") }));
+  if(error){
+    console.error(error); setStatus("Помилка завантаження заїздів");
+    const cached = getOfflineCache(cacheKey);
+    if(cached) return cached.data.map(t=>({...t, start:new Date(t.start), end:new Date(t.end)}));
+    return [];
+  }
+  const result = data.map(t=>({ id:t.id, label:t.label, start:new Date(t.start_date+"T00:00:00"), end:new Date(t.end_date+"T23:59:59") }));
+  cacheOffline(cacheKey, result);
+  return result;
 }
 
 function rowFromDb(r){
-  return { id:r.id, personType:r.person_type, person:r.person, customPartnerName:r.custom_partner_name||"", chol:r.chol, zibrano:r.zibrano, quitky:r.quitky };
+  return { id:r.id, personType:r.person_type, person:r.person, customPartnerName:r.custom_partner_name||"", chol:r.chol, zibrano:r.zibrano, quitky:r.quitky, isTest: !!r.is_test };
 }
 function excFromDb(e, rows){
   return {
@@ -1070,7 +1334,8 @@ function rowPersonLabel(row){
 }
 
 function calcExcursion(exc){
-  const totalPeople = exc.rows.reduce((s,r)=> s + (Number(r.chol)||0), 0);
+  const realRows = (exc.rows||[]).filter(r=>!r.isTest);
+  const totalPeople = realRows.reduce((s,r)=> s + (Number(r.chol)||0), 0);
   const busPayment = (Number(exc.busRate)||0) * (Number(exc.km)||0);
   const noGuideFee = NO_GUIDE_FEE_EXCURSIONS.includes(exc.name);
   const sharedCost = busPayment + (noGuideFee ? 0 : (Number(exc.guideFee)||0)); // tickets excluded from split, per spec
@@ -1095,8 +1360,11 @@ function calcExcursion(exc){
     return { ...r, chol, share, quitky, totalCost, isGuide, profit, gInc, oInc, settlement, label: rowPersonLabel(r) };
   });
 
-  const partnerShareTotal = rowResults.filter(r=>!r.isGuide).reduce((s,r)=> s + r.settlement, 0);
-  const guideShareTotal = rowResults.filter(r=>r.isGuide).reduce((s,r)=> s + r.share, 0);
+  // Test-account rows (shadow guide testing the app) are shown in the table but never feed
+  // into anyone else's real settlement/profit totals below.
+  const realRowResults = rowResults.filter(r=>!r.isTest);
+  const partnerShareTotal = realRowResults.filter(r=>!r.isGuide).reduce((s,r)=> s + r.settlement, 0);
+  const guideShareTotal = realRowResults.filter(r=>r.isGuide).reduce((s,r)=> s + r.share, 0);
   // Own bus: other partners riding along owe us their share (partnerShareTotal).
   // Partner's bus: we owe the bus-owning partner only for OUR OWN participants' share
   // (other partner groups on that same bus settle with the bus owner directly, not with us).
@@ -1151,20 +1419,30 @@ function parseDecimalInput(str){
 function renderTripGrid(){
   const grid = document.getElementById('tripGrid');
   grid.innerHTML = "";
-  TRIPS_DEF.forEach(def=>{
+  const inTourGroup = ['profit','tourists','finance'].includes(currentSection);
+  const tripsToShow = inTourGroup ? TRIPS_DEF.filter(d=> tripStatus(d).text === 'Триває') : TRIPS_DEF;
+  if(inTourGroup && !tripsToShow.length){
+    grid.innerHTML = `<p class="report-note">Немає турів, що зараз тривають.</p>`;
+  }
+  tripsToShow.forEach(def=>{
     const st = tripStatus(def);
     const chip = document.createElement('div');
-    chip.className = 'trip-chip' + (def.id===currentTripId ? ' active' : '');
+    chip.className = 'trip-chip' + (def.id===currentTripId && tourSectionTripChosen ? ' active' : '');
     chip.innerHTML = `<span class="range">${def.label}</span><span class="status ${st.cls}">${st.text}</span>`;
     chip.addEventListener('click', async ()=>{
-      if(def.id === currentTripId) return;
+      if(def.id === currentTripId && tourSectionTripChosen) return;
       currentTripId = def.id;
+      tripPrepManualPick = true;
+      tourSectionTripChosen = true;
+      tourSectionGuideChosen = false;
+      currentTourGuideName = null;
       setStatus("Завантаження…");
       if(!state.trips[currentTripId]) await loadTripData(currentTripId);
       const td = getTripData(currentTripId);
       guidesEditMode = td.guides.length < 3;
       touristGuideFilter = null; openTouristId = null; financeGuideFilter = null;
       renderAll();
+      renderSectionTabs();
       if(currentSection==='tourists'){ await loadTourists(); renderTouristSection(); }
       if(currentSection==='finance'){ await renderFinanceSection(); }
       if(currentSection==='managerReport'){ await renderManagerReportSection(); }
@@ -1313,6 +1591,37 @@ function renderExcursionPicker(){
   });
 }
 
+function buildProfitabilityRows(){
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const tripData = getTripData(currentTripId);
+  const rows = [['Прибутковість екскурсій', def?def.label:'']];
+  (tripData.excursions||[]).forEach(exc=>{
+    if(exc.isTest) return; // shouldn't happen at excursion level, but stay safe
+    const calc = calcExcursion(exc);
+    rows.push([]);
+    rows.push([exc.name==='Інше...' ? exc.customName : exc.name]);
+    rows.push(['Гід/партнер','Чол','Зібрано €', calc.ticketsApply?'Квитки €':'', 'Затрати €','Прибуток/Розрахунок €']);
+    calc.rowResults.filter(r=>!r.isTest).forEach(r=>{
+      rows.push([r.label, r.chol, r.isGuide?fmt(r.zibrano):'', calc.ticketsApply?fmt(r.quitky):'', fmt(r.totalCost), r.isGuide?fmt(r.profit):fmt(r.settlement)]);
+    });
+  });
+  return rows;
+}
+document.getElementById('excursionsSaveBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('excursionsSaveBtn');
+  btn.disabled = true; btn.textContent = 'Зберігаю…';
+  try{
+    const rows = buildProfitabilityRows();
+    const path = `${currentTripId}/profitability/report_${tripFileTag(currentTripId)}.xlsx`;
+    const error = await saveXlsxSnapshot(path, rows, 'Прибутковість');
+    if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+    else alert('Прибутковість екскурсій збережено в сховище.');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Зберегти';
+  }
+});
+document.getElementById('excursionsDownloadBtn').addEventListener('click', ()=> downloadXlsxSnapshot(`${currentTripId}/profitability/report_${tripFileTag(currentTripId)}.xlsx`));
+
 function renderExcursions(){
   const wrap = document.getElementById('excursionsWrap');
   wrap.innerHTML = "";
@@ -1436,6 +1745,7 @@ function renderExcursions(){
       const amountsEditable = editable && hasPerson;
       tr.innerHTML = `
         <td><select class="person-select" data-role="person" style="background:${hasPerson?personColor(r):'#c9cdbe'}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, exc.rows.filter(other=>other.id!==r.id && other.personType==='guide').map(other=>other.person))}</select>
+          ${r.isTest ? `<div style="font-size:10px; color:#b45309; font-weight:700; margin-top:2px;">🧪 ТЕСТ — не враховується в реальних розрахунках</div>` : ''}
           ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" value="${r.customPartnerName||''}" data-role="customPartnerName" style="margin-top:4px; width:110px;" ${editable?'':'disabled'}>` : ''}
           ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" data-role="fillFromTourists" title="Заповнити чол/суму з даних гіда в списку туристів" style="display:block; margin-top:4px; font-size:11px;">📋 зі списку туристів</button>` : ''}
         </td>
@@ -1719,7 +2029,8 @@ async function upsertRow(tripId, excId, row){
   const { error } = await sb.from('excursion_rows').upsert({
     id: row.id, excursion_id: excId, trip_id: tripId,
     person_type: row.personType, person: row.person, custom_partner_name: row.customPartnerName,
-    chol: Number(row.chol)||0, zibrano: Number(row.zibrano)||0, quitky: Number(row.quitky)||0
+    chol: Number(row.chol)||0, zibrano: Number(row.zibrano)||0, quitky: Number(row.quitky)||0,
+    is_test: !!(currentProfile && currentProfile.is_test_account)
   });
   setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
   if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
@@ -1876,10 +2187,84 @@ const MODE_KEY = "richtour_view_mode";
 
 function applyMode(mode){
   document.body.classList.toggle('guide-mode', mode === 'guide');
-  document.getElementById('tabManagerBtn').classList.toggle('active-tab', mode !== 'guide');
-  document.getElementById('tabGuideBtn').classList.toggle('active-tab', mode === 'guide');
+  if(currentProfile && currentProfile.role === 'manager'){
+    document.getElementById('tabGuideBtn').classList.toggle('app-hidden', mode === 'guide');
+    document.getElementById('tabManagerBtn').classList.toggle('app-hidden', mode !== 'guide');
+  }
+  if(mode === 'guide' && !['profit','tourists','finance'].includes(currentSection)){
+    currentSection = 'tourists';
+  }
   renderAll();
+  if(mode === 'manager'){
+    renderSectionTabs();
+    if(currentSection === 'tripPrep') renderTripPrepSection();
+    checkFinanceSubmissions();
+  } else {
+    renderSectionTabs();
+    if(currentSection==='tourists') loadTourists().then(renderTouristSection);
+    if(currentSection==='finance') renderFinanceSection();
+  }
 }
+
+async function checkFinanceSubmissions(){
+  if(!currentProfile || currentProfile.role !== 'manager') return;
+  const { data, error } = await sb.from('financial_reports').select('trip_id,guide_name,submitted_at').eq('submitted', true).eq('manager_seen', false);
+  if(error || !data) return;
+  renderFinanceNotifyBadge(data);
+}
+
+function renderFinanceNotifyBadge(reports){
+  let badge = document.getElementById('financeNotifyBadge');
+  if(!reports.length){ if(badge) badge.remove(); return; }
+  if(!badge){
+    badge = document.createElement('div');
+    badge.id = 'financeNotifyBadge';
+    badge.style.cssText = 'position:fixed; bottom:14px; left:14px; z-index:600; background:#15803d; color:#fff; padding:8px 14px; border-radius:999px; font-size:12.5px; font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.2); cursor:pointer;';
+    document.body.appendChild(badge);
+  }
+  badge.textContent = `📥 ${reports.length} фінзвіт${reports.length===1?'':'и'} готов${reports.length===1?'ий':'і'} — тисни, щоб переглянути`;
+  badge.onclick = ()=> showFinanceNotifyList(reports);
+}
+
+function showFinanceNotifyList(reports){
+  let panel = document.getElementById('financeNotifyPanel');
+  if(panel) panel.remove();
+  panel = document.createElement('div');
+  panel.id = 'financeNotifyPanel';
+  panel.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:700; display:flex; align-items:center; justify-content:center; padding:20px;';
+  const itemsHtml = reports.map(r=>{
+    const def = TRIPS_DEF.find(d=>d.id===r.trip_id);
+    const label = def ? def.label : r.trip_id;
+    const time = r.submitted_at ? new Date(r.submitted_at).toLocaleString('uk-UA') : '';
+    return `<div style="padding:10px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+      <div><b>${r.guide_name}</b> (${label})<div class="muted" style="font-size:12px;">${time}</div></div>
+      <button class="btn btn-ghost btn-small" data-role="finNotifyDownload" data-trip="${r.trip_id}" data-guide="${r.guide_name}">⬇ Завантажити</button>
+    </div>`;
+  }).join('');
+  panel.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:480px; width:100%; max-height:80vh; overflow-y:auto;">
+    <p class="report-title" style="margin-top:0;">📥 Готові фінзвіти</p>
+    ${itemsHtml}
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn btn-primary btn-small" id="finNotifyMarkSeenBtn" style="flex:1;">Позначити всі переглянутими</button>
+      <button class="btn btn-ghost btn-small" id="finNotifyCloseBtn">Закрити</button>
+    </div>
+  </div>`;
+  document.body.appendChild(panel);
+  panel.querySelectorAll('[data-role="finNotifyDownload"]').forEach(btn=> btn.addEventListener('click', async ()=>{
+    const path = `${btn.dataset.trip}/finance-report/${btn.dataset.guide}/report_${tripFileTag(btn.dataset.trip)}.xlsx`;
+    const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+    if(error){ alert('Немає збереженої версії цього звіту — гід ще не зберігав/відправляв його з цим оновленням.'); return; }
+    window.open(data.signedUrl, '_blank');
+  }));
+  document.getElementById('finNotifyCloseBtn').addEventListener('click', ()=> panel.remove());
+  document.getElementById('finNotifyMarkSeenBtn').addEventListener('click', async ()=>{
+    await Promise.all(reports.map(r=> sb.from('financial_reports').update({manager_seen:true}).eq('trip_id',r.trip_id).eq('guide_name',r.guide_name)));
+    panel.remove();
+    checkFinanceSubmissions();
+  });
+}
+setInterval(()=>{ if(currentProfile && currentProfile.role==='manager') checkFinanceSubmissions(); }, 60000);
+
 document.getElementById('tabManagerBtn').addEventListener('click', ()=>{
   if(currentProfile.role !== 'manager') return; // hidden for guides anyway; RLS blocks regardless
   localStorage.setItem(MODE_KEY,'manager'); applyMode('manager');
@@ -1917,6 +2302,13 @@ document.getElementById('guideTripSelect').addEventListener('change', async e=>{
 });
 
 /* ---------- Auth / login ---------- */
+function revealApp(){
+  document.getElementById('loginOverlay').classList.add('app-hidden');
+  document.getElementById('appHeader').classList.remove('app-hidden');
+  document.getElementById('appMain').classList.remove('app-hidden');
+  document.getElementById('appFooter').classList.remove('app-hidden');
+}
+
 async function afterAuthSuccess(){
   const { data:{ user } } = await sb.auth.getUser();
   if(!user) return;
@@ -1927,6 +2319,27 @@ async function afterAuthSuccess(){
     return;
   }
   currentProfile = profile;
+
+  // Instant paint from local cache (if any) while the real network calls are still in flight.
+  const cachedTripsList = getOfflineCache('tripsList');
+  if(cachedTripsList && cachedTripsList.data.length){
+    TRIPS_DEF = cachedTripsList.data.map(t=>({...t, start:new Date(t.start), end:new Date(t.end)}));
+    const activeDef = TRIPS_DEF.find(d=> tripStatus(d).text === 'Триває') || TRIPS_DEF[0];
+    currentTripId = activeDef.id;
+    const cachedTrip = getOfflineCache('trip:'+currentTripId);
+    if(cachedTrip){
+      state.trips[currentTripId] = cachedTrip.data;
+      guidesEditMode = getTripData(currentTripId).guides.length < 3;
+      if(currentProfile.role === 'guide'){
+        document.getElementById('tabManagerBtn').classList.add('app-hidden');
+        document.getElementById('tabGuideBtn').classList.add('app-hidden');
+        applyMode('guide');
+      } else {
+        applyMode(localStorage.getItem(MODE_KEY) === 'guide' ? 'guide' : 'manager');
+      }
+      revealApp();
+    }
+  }
 
   TRIPS_DEF = await fetchTrips();
   if(TRIPS_DEF.length){
@@ -1940,16 +2353,13 @@ async function afterAuthSuccess(){
 
   if(currentProfile.role === 'guide'){
     document.getElementById('tabManagerBtn').classList.add('app-hidden');
+    document.getElementById('tabGuideBtn').classList.add('app-hidden');
     applyMode('guide');
   } else {
-    document.getElementById('tabManagerBtn').classList.remove('app-hidden');
     applyMode(localStorage.getItem(MODE_KEY) === 'guide' ? 'guide' : 'manager');
   }
 
-  document.getElementById('loginOverlay').classList.add('app-hidden');
-  document.getElementById('appHeader').classList.remove('app-hidden');
-  document.getElementById('appMain').classList.remove('app-hidden');
-  document.getElementById('appFooter').classList.remove('app-hidden');
+  revealApp();
 }
 
 async function doLogin(){
@@ -1997,7 +2407,10 @@ document.getElementById('savePasswordBtn').addEventListener('click', async ()=>{
 /* ============================================================
    TOURIST COLLECTION LIST MODULE
    ============================================================ */
-let currentSection = 'profit'; // 'profit' | 'tourists'
+let currentSection = 'tripPrep'; // 'profit' | 'tourists' | 'finance' | 'managerReport' | 'tripPrep'
+let tourSectionTripChosen = false;
+let tourSectionGuideChosen = false;
+let currentTourGuideName = null;
 let touristGuideFilter = null; // for manager: which guide's group is being viewed
 let touristData = { tourists: [], selectionsByTourist: {} }; // cache for current (trip, guideFilter)
 let openTouristId = null;
@@ -2013,6 +2426,11 @@ async function loadTourists(){
   touristData = { tourists: [], selectionsByTourist: {} };
   if(!currentTripId || !guideName) return;
   const cacheKey = 'tourists:'+currentTripId+':'+guideName;
+  const cached = getOfflineCache(cacheKey);
+  if(cached){
+    touristData = cached.data;
+    renderTouristSection();
+  }
   const { data: tourists, error: tErr } = await sb.from('tourists').select('*')
     .eq('trip_id', currentTripId).eq('guide_name', guideName).order('created_at');
   if(tErr){
@@ -2066,20 +2484,72 @@ function touristIsProcessed(touristId){
   return sels.some(s=>s.going);
 }
 
+function renderTourSectionGuideChips(){
+  const wrap = document.getElementById('tourSectionGuideChips');
+  const td = getTripData(currentTripId);
+  wrap.innerHTML = '';
+  if(!td.guides.length){ wrap.innerHTML = `<p class="report-note">Спочатку признач гідів цього заїзду у вкладці "Прибутковість".</p>`; return; }
+  td.guides.forEach(g=>{
+    const chip = document.createElement('button');
+    const isActive = tourSectionGuideChosen && currentTourGuideName === g.name;
+    chip.className = 'btn btn-ghost btn-small' + (isActive ? ' active-tab' : '');
+    if(isActive){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
+    chip.textContent = `Заїзд: ${TRIPS_DEF.find(d=>d.id===currentTripId)?.label || ''} ${g.name}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
+    chip.addEventListener('click', ()=>{
+      currentTourGuideName = g.name;
+      touristGuideFilter = g.name;
+      financeGuideFilter = g.name;
+      tourSectionGuideChosen = true;
+      renderSectionTabs();
+      if(currentSection==='tourists'){ loadTourists().then(renderTouristSection); }
+      if(currentSection==='finance'){ renderFinanceSection(); }
+    });
+    wrap.appendChild(chip);
+  });
+}
+
 function renderSectionTabs(){
+  const inTourGroup = ['profit','tourists','finance'].includes(currentSection);
+  const isManager = currentProfile && currentProfile.role==='manager';
+  const needsTripPick = inTourGroup && isManager && !tourSectionTripChosen;
+  const showGuidePick = inTourGroup && isManager && tourSectionTripChosen;
+  const needsPick = needsTripPick || (showGuidePick && !tourSectionGuideChosen);
+  document.getElementById('sectionTourBtn').classList.toggle('active-tab', inTourGroup);
   document.getElementById('sectionProfitBtn').classList.toggle('active-tab', currentSection==='profit');
   document.getElementById('sectionTouristsBtn').classList.toggle('active-tab', currentSection==='tourists');
+  document.getElementById('sectionTouristsBtnDirect').classList.toggle('active-tab', currentSection==='tourists');
+  document.getElementById('sectionProfitBtnDirect').classList.toggle('active-tab', currentSection==='profit');
+  document.getElementById('sectionFinanceBtnDirect').classList.toggle('active-tab', currentSection==='finance');
   document.getElementById('sectionFinanceBtn').classList.toggle('active-tab', currentSection==='finance');
   document.getElementById('sectionManagerReportBtn').classList.toggle('active-tab', currentSection==='managerReport');
   document.getElementById('sectionTripPrepBtn').classList.toggle('active-tab', currentSection==='tripPrep');
-  document.getElementById('profitSection').style.display = currentSection==='profit' ? 'block' : 'none';
-  document.getElementById('touristSection').style.display = currentSection==='tourists' ? 'block' : 'none';
-  document.getElementById('financeSection').style.display = currentSection==='finance' ? 'block' : 'none';
+  document.getElementById('tourSection').style.display = inTourGroup ? 'block' : 'none';
+  document.getElementById('tourSectionPlaceholder').style.display = needsTripPick ? 'block' : 'none';
+  document.getElementById('tourSectionGuidePick').style.display = showGuidePick ? 'block' : 'none';
+  if(showGuidePick) renderTourSectionGuideChips();
+  document.getElementById('tourSectionSubnav').style.display = needsPick ? 'none' : 'flex';
+  document.getElementById('profitSection').style.display = (currentSection==='profit' && !needsPick) ? 'block' : 'none';
+  document.getElementById('touristSection').style.display = (currentSection==='tourists' && !needsPick) ? 'block' : 'none';
+  document.getElementById('financeSection').style.display = (currentSection==='finance' && !needsPick) ? 'block' : 'none';
   document.getElementById('managerReportSection').style.display = currentSection==='managerReport' ? 'block' : 'none';
   document.getElementById('tripPrepSection').style.display = currentSection==='tripPrep' ? 'block' : 'none';
+  if(inTourGroup) updateTourSectionBanner();
 }
-document.getElementById('sectionProfitBtn').addEventListener('click', ()=>{ currentSection='profit'; renderSectionTabs(); });
-document.getElementById('sectionTouristsBtn').addEventListener('click', async ()=>{
+
+function updateTourSectionBanner(){
+  const banner = document.getElementById('tourSectionBanner');
+  if(!banner) return;
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  banner.textContent = `📅 Заїзд: ${def ? def.label : 'не обрано'}`;
+}
+document.getElementById('sectionTourBtn').addEventListener('click', ()=>{
+  const wasOutside = !['profit','tourists','finance'].includes(currentSection);
+  if(wasOutside){ currentSection = 'tourists'; tourSectionTripChosen = false; tourSectionGuideChosen = false; }
+  renderTripGrid();
+  renderSectionTabs();
+});
+async function switchToProfitSection(){ currentSection='profit'; renderSectionTabs(); }
+async function switchToTouristsSection(){
   currentSection='tourists'; renderSectionTabs();
   if(currentProfile.role==='manager' && !touristGuideFilter){
     const td = getTripData(currentTripId);
@@ -2087,28 +2557,41 @@ document.getElementById('sectionTouristsBtn').addEventListener('click', async ()
   }
   await loadTourists();
   renderTouristSection();
-});
-document.getElementById('sectionFinanceBtn').addEventListener('click', async ()=>{
+}
+async function switchToFinanceSection(){
   currentSection='finance'; renderSectionTabs();
   if(currentProfile.role==='manager' && !financeGuideFilter){
     const td = getTripData(currentTripId);
     financeGuideFilter = td.guides[0]?.name || null;
   }
   await renderFinanceSection();
-});
+}
+document.getElementById('sectionProfitBtn').addEventListener('click', switchToProfitSection);
+document.getElementById('sectionTouristsBtn').addEventListener('click', switchToTouristsSection);
+document.getElementById('sectionFinanceBtn').addEventListener('click', switchToFinanceSection);
+document.getElementById('sectionProfitBtnDirect').addEventListener('click', switchToProfitSection);
+document.getElementById('sectionTouristsBtnDirect').addEventListener('click', switchToTouristsSection);
+document.getElementById('sectionFinanceBtnDirect').addEventListener('click', switchToFinanceSection);
 document.getElementById('sectionManagerReportBtn').addEventListener('click', async ()=>{
-  currentSection='managerReport'; renderSectionTabs();
+  currentSection='managerReport'; renderTripGrid(); renderSectionTabs();
   await renderManagerReportSection();
 });
 document.getElementById('sectionTripPrepBtn').addEventListener('click', async ()=>{
-  currentSection='tripPrep'; renderSectionTabs();
+  currentSection='tripPrep'; renderTripGrid(); renderSectionTabs();
   await renderTripPrepSection();
 });
 
 function renderGuideFilterChips(){
+  updateTourSectionBanner();
+  const block = document.getElementById('guideFilterBlock');
+  block.style.display='none';
+  return;
+}
+function renderGuideFilterChipsOld(){
   const block = document.getElementById('guideFilterBlock');
   if(currentProfile.role !== 'manager'){ block.style.display='none'; return; }
   const td = getTripData(currentTripId);
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
   if(!td.guides.length){ block.style.display='none'; return; }
   block.style.display='block';
   const wrap = document.getElementById('guideFilterChips');
@@ -2117,10 +2600,11 @@ function renderGuideFilterChips(){
     const chip = document.createElement('button');
     chip.className = 'btn btn-ghost btn-small' + (touristGuideFilter===g.name ? ' active-tab' : '');
     if(touristGuideFilter===g.name){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
-    chip.textContent = g.name + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
+    chip.textContent = `Заїзд: ${def.label} ${g.name}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
     chip.addEventListener('click', async ()=>{ touristGuideFilter = g.name; openTouristId=null; await loadTourists(); renderTouristSection(); });
     wrap.appendChild(chip);
   });
+  updateTourSectionBanner();
 }
 
 function renderTouristList(){
@@ -2533,6 +3017,92 @@ function renderTouristSection(){
   scheduleTouristSeasonStats();
   renderSkiatosManifest();
 }
+document.getElementById('touristStatsSaveBtn').addEventListener('click', async ()=>{
+  const guideName = activeTouristGuideName();
+  if(!guideName){ alert('Оберіть гіда вище.'); return; }
+  const btn = document.getElementById('touristStatsSaveBtn');
+  btn.disabled = true; btn.textContent = 'Зберігаю…';
+  try{
+    const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+    const stats = {};
+    TOURIST_PRICE_LIST.forEach(p=> stats[p.name] = { count:0, sum:0 });
+    Object.values(touristData.selectionsByTourist).forEach(sels=>{
+      sels.forEach(s=>{ if(s.going && !s.cancelled){ stats[s.excursion_name].count++; stats[s.excursion_name].sum += Number(s.price)||0; } });
+    });
+    const rows = [['Статистика по екскурсіях', def?def.label:'', guideName], [], ['Екскурсія','Туристів','Сума €']];
+    TOURIST_PRICE_LIST.forEach(p=> rows.push([p.name, stats[p.name].count, fmt(stats[p.name].sum)]));
+    const path = `${currentTripId}/tourist-stats/${guideName}/report_${tripFileTag(currentTripId)}.xlsx`;
+    const error = await saveXlsxSnapshot(path, rows, 'Статистика');
+    if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+    else alert('Статистику збережено в сховище.');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Зберегти';
+  }
+});
+document.getElementById('touristStatsDownloadBtn').addEventListener('click', ()=>{
+  const guideName = activeTouristGuideName();
+  if(!guideName){ alert('Оберіть гіда вище.'); return; }
+  downloadXlsxSnapshot(`${currentTripId}/tourist-stats/${guideName}/report_${tripFileTag(currentTripId)}.xlsx`);
+});
+document.getElementById('touristListSyncBtn').addEventListener('click', async ()=>{
+  const guideName = activeTouristGuideName();
+  if(!guideName){ alert('Оберіть гіда вище.'); return; }
+  const btn = document.getElementById('touristListSyncBtn');
+  btn.disabled = true; btn.textContent = 'Підтягую…';
+  try{
+    const { data: baseTourists, error } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', currentTripId).eq('assigned_bus', guideName);
+    if(error){ alert('Не вдалося завантажити базовий список: ' + friendlyErrorMessage(error)); return; }
+    if(!baseTourists || !baseTourists.length){ alert(`У "Документи до туру" ще немає людей, призначених на автобус гіда "${guideName}". Спочатку розподіли їх там (вкладка "Автобуси").`); return; }
+    const existingNames = new Set(touristData.tourists.map(t=>(t.last_name+' '+t.first_name).trim().toLowerCase()));
+    const toInsert = [];
+    baseTourists.forEach(t=>{
+      const fullName = (t.full_name||'').trim();
+      if(!fullName) return;
+      const parts = fullName.split(/\s+/);
+      const lastName = parts[0] || '';
+      const firstName = parts.slice(1).join(' ') || '';
+      const key = (lastName+' '+firstName).trim().toLowerCase();
+      if(existingNames.has(key)) return; // already in the list, don't duplicate
+      toInsert.push({ trip_id: currentTripId, guide_name: guideName, first_name: firstName, last_name: lastName, birth_date: t.birth_date||null, passport_data: t.passport||'' });
+    });
+    if(!toInsert.length){ hbShowToast('Усі вже додані — новеньких немає.'); return; }
+    const { error: insErr } = await sb.from('tourists').insert(toInsert);
+    if(insErr){ alert('Не вдалося додати: ' + friendlyErrorMessage(insErr)); return; }
+    await loadTourists();
+    renderTouristSection();
+    hbShowToast(`✅ Додано ${toInsert.length} чол. з базового списку`);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔄 Підтягнути з базового списку';
+  }
+});
+document.getElementById('touristListSaveBtn').addEventListener('click', async ()=>{
+  const guideName = activeTouristGuideName();
+  if(!guideName){ alert('Оберіть гіда вище.'); return; }
+  const btn = document.getElementById('touristListSaveBtn');
+  btn.disabled = true; btn.textContent = 'Зберігаю…';
+  try{
+    const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+    const rows = [['Список туристів', def?def.label:'', guideName], [], ['ПІБ','Вік','Оплачено','Екскурсії']];
+    touristData.tourists.forEach(t=>{
+      const age = def ? calcAgeAtTrip(t.birth_date, def.start) : null;
+      const sels = (touristData.selectionsByTourist[t.id]||[]).filter(s=>s.going && !s.cancelled);
+      const allPaid = sels.length>0 && sels.every(s=>s.paid);
+      const excList = sels.map(s=>`${s.excursion_name} (${fmt(Number(s.price)||0)}€${s.paid?', оплачено':''})`).join('; ');
+      rows.push([(t.last_name+' '+t.first_name).toUpperCase(), age===null?'':age, allPaid?'так':'ні', excList]);
+    });
+    const path = `${currentTripId}/tourist-list/${guideName}/report_${tripFileTag(currentTripId)}.xlsx`;
+    const error = await saveXlsxSnapshot(path, rows, 'Туристи');
+    if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+    else alert('Список туристів збережено в сховище.');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Зберегти';
+  }
+});
+document.getElementById('touristListDownloadBtn').addEventListener('click', ()=>{
+  const guideName = activeTouristGuideName();
+  if(!guideName){ alert('Оберіть гіда вище.'); return; }
+  downloadXlsxSnapshot(`${currentTripId}/tourist-list/${guideName}/report_${tripFileTag(currentTripId)}.xlsx`);
+});
 document.getElementById('clearTouristListBtn').addEventListener('click', async ()=>{
   const guideName = activeTouristGuideName();
   if(!guideName || !touristData.tourists.length) return;
@@ -2744,7 +3314,7 @@ async function loadFinanceReport(tripId, guideName){
     renderOfflineBanner();
   }
   if(data){
-    const report = { trip_id: tripId, guide_name: guideName, handed_over: data.handed_over||0, entries: data.entries||[] };
+    const report = { trip_id: tripId, guide_name: guideName, handed_over: data.handed_over||0, entries: data.entries||[], submitted: !!data.submitted, submitted_at: data.submitted_at||null };
     cacheOffline(cacheKey, report);
     return report;
   }
@@ -2756,7 +3326,7 @@ async function loadFinanceReport(tripId, guideName){
     if(e.label==='Відсоток') entry.amount = Math.round((perGuide.guideIncome||0)*100)/100;
     return entry;
   });
-  const freshReport = { trip_id: tripId, guide_name: guideName, handed_over: 0, entries: manual };
+  const freshReport = { trip_id: tripId, guide_name: guideName, handed_over: 0, entries: manual, submitted:false, submitted_at:null };
   cacheOffline(cacheKey, freshReport);
   return freshReport;
 }
@@ -2771,10 +3341,17 @@ async function saveFinanceReport(report){
 }
 
 function renderFinanceGuideFilterChips(){
+  updateTourSectionBanner();
+  const blockEl = document.getElementById('financeGuideFilterBlock');
+  blockEl.style.display='none';
+  return;
+}
+function renderFinanceGuideFilterChipsOld(){
   const wrap = document.getElementById('financeGuideFilterChips');
   const blockEl = document.getElementById('financeGuideFilterBlock');
   if(currentProfile.role !== 'manager'){ blockEl.style.display='none'; return; }
   const td = getTripData(currentTripId);
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
   if(!td.guides.length){ blockEl.style.display='none'; return; }
   blockEl.style.display='block';
   wrap.innerHTML = '';
@@ -2782,10 +3359,11 @@ function renderFinanceGuideFilterChips(){
     const chip = document.createElement('button');
     chip.className = 'btn btn-ghost btn-small';
     if(financeGuideFilter===g.name){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
-    chip.textContent = g.name + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
+    chip.textContent = `Заїзд: ${def.label} ${g.name}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
     chip.addEventListener('click', async ()=>{ financeGuideFilter=g.name; await renderFinanceSection(); });
     wrap.appendChild(chip);
   });
+  updateTourSectionBanner();
 }
 
 let financeRerenderTimer;
@@ -2794,6 +3372,44 @@ function debouncedFinanceRerender(report){
   clearTimeout(financeRerenderTimer);
   pendingFinanceReport = report;
   financeRerenderTimer = setTimeout(()=> renderFinanceReport(report), 2500);
+}
+
+async function saveFinanceReportToStorage(report, received, paid, totalReceived, totalPaid, balance, handedOver, def, silent){
+  const btn = document.getElementById('finSaveToStorageBtn');
+  if(btn && !silent){ btn.disabled = true; btn.textContent = 'Зберігаю…'; }
+  try{
+    const rows = [];
+    rows.push(['Фінансовий звіт', def?def.label:'']);
+    rows.push(['Керівник туру', report.guide_name]);
+    rows.push([]);
+    rows.push(['ОТРИМАВ']);
+    received.forEach(e=> rows.push([e.label, fmt(Number(e.amount)||0)+' €']));
+    rows.push(['Разом отримано', fmt(totalReceived)+' €']);
+    rows.push([]);
+    rows.push(['ВИДАТКИ']);
+    paid.forEach(e=> rows.push([e.label, fmt(Number(e.amount)||0)+' €']));
+    rows.push(['Разом видатків', fmt(totalPaid)+' €']);
+    rows.push([]);
+    rows.push(['Баланс', fmt(balance)+' €']);
+    rows.push(['Здано менеджеру', fmt(handedOver)+' €']);
+    rows.push(['Розбіжність', fmt(handedOver-balance)+' €']);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Фінзвіт');
+    const wbBinary = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+    const blob = new Blob([wbBinary], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const path = `${report.trip_id}/finance-report/${report.guide_name}/report_${tripFileTag(report.trip_id)}.xlsx`;
+    const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, blob, { upsert:true });
+    if(error){ if(!silent) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return false; }
+    if(!silent) alert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити збережений" — з будь-якого пристрою, включно з менеджером.');
+    return true;
+  } catch(err){
+    console.error(err);
+    if(!silent) alert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
+    return false;
+  } finally {
+    if(btn && !silent){ btn.disabled = false; btn.textContent = '💾 Зберегти звіт'; }
+  }
 }
 
 function renderFinanceReport(report){
@@ -2842,6 +3458,8 @@ function renderFinanceReport(report){
         <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${report.guide_name}${substituteNote}</p>
       </div>
       <button class="btn btn-ghost btn-small no-print" id="finPrintBtn">🖨 Друк</button>
+      <button class="btn btn-ghost btn-small no-print" id="finSaveToStorageBtn">💾 Зберегти звіт</button>
+      <button class="btn btn-ghost btn-small no-print" id="finDownloadSavedBtn">⬇ Завантажити збережений</button>
     </div>
 
     ${suggestions.length ? `<div class="no-print" style="margin-top:12px; background:var(--whitewash-2); border-radius:8px; padding:8px 10px;">
@@ -2876,7 +3494,31 @@ function renderFinanceReport(report){
           : `<p class="profit-pos" style="font-size:13px; margin-top:6px;">✓ Здано збігається з балансом</p>`
       }
     </div>
+    <div class="no-print guide-only" style="margin-top:18px; text-align:center;">
+      <button class="btn ${report.submitted?'btn-ghost':'btn-primary'}" id="finSubmitBtn" ${report.submitted?'disabled':''} style="width:100%; padding:14px;">
+        ${report.submitted ? `✅ Відправлено${report.submitted_at ? ' · '+new Date(report.submitted_at).toLocaleString('uk-UA') : ''}` : '📤 Відправити менеджеру'}
+      </button>
+    </div>
   `;
+
+  const submitBtn = document.getElementById('finSubmitBtn');
+  if(submitBtn && !report.submitted) submitBtn.addEventListener('click', async ()=>{
+    if(!confirm('Відправити фінансовий звіт менеджеру? Після цього менеджер побачить, що звіт готовий.')) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Відправляю…';
+    // Snapshot the current numbers into storage so the manager always has the exact
+    // version that was submitted, even if the guide keeps editing afterward.
+    if(navigator.onLine) await saveFinanceReportToStorage(report, received, paid, totalReceived, totalPaid, balance, handedOver, def, true);
+    const { error, queued } = await rtGuideWrite('update', 'financial_reports',
+      { submitted: true, submitted_at: new Date().toISOString(), manager_seen: false },
+      { trip_id: report.trip_id, guide_name: report.guide_name }
+    );
+    if(error){ alert(friendlyErrorMessage(error)); submitBtn.disabled=false; submitBtn.textContent='📤 Відправити менеджеру'; return; }
+    report.submitted = true;
+    report.submitted_at = new Date().toISOString();
+    if(queued) hbShowToast('💾 Відправлення збережено локально — надійде менеджеру, коли з\'явиться інтернет');
+    renderFinanceReport(report);
+  });
 
   block.querySelectorAll('[data-role="finAmount"]').forEach(el=> el.addEventListener('input', e=>{
     const idx = Number(e.target.dataset.idx);
@@ -2942,6 +3584,13 @@ function renderFinanceReport(report){
     debouncedFinanceRerender(report);
   });
   document.getElementById('finPrintBtn').addEventListener('click', ()=> window.print());
+  document.getElementById('finSaveToStorageBtn').addEventListener('click', ()=> saveFinanceReportToStorage(report, received, paid, totalReceived, totalPaid, balance, handedOver, def));
+  document.getElementById('finDownloadSavedBtn').addEventListener('click', async ()=>{
+    const path = `${report.trip_id}/finance-report/${report.guide_name}/report_${tripFileTag(report.trip_id)}.xlsx`;
+    const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
+    if(error){ alert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти звіт").'); return; }
+    window.open(data.signedUrl, '_blank');
+  });
 }
 
 async function renderFinanceSection(){
@@ -2950,6 +3599,9 @@ async function renderFinanceSection(){
   const block = document.getElementById('financeReportBlock');
   if(!guideName){ block.innerHTML = `<p class="report-note">Оберіть гіда вище.</p>`; return; }
   if(!currentTripId){ block.innerHTML = `<p class="report-note">Оберіть заїзд.</p>`; return; }
+  const cacheKey = 'financeReport:'+currentTripId+':'+guideName;
+  const cached = getOfflineCache(cacheKey);
+  if(cached) renderFinanceReport(cached.data);
   const report = await loadFinanceReport(currentTripId, guideName);
   renderFinanceReport(report);
 }
@@ -2958,6 +3610,49 @@ async function renderFinanceSection(){
    MANAGER'S OWN REPORT TO SUPERIORS (per trip, manager-only)
    ============================================================ */
 const STORAGE_BUCKET = 'reports';
+
+function tripFileTag(tripId){
+  const def = TRIPS_DEF.find(d=>d.id===tripId);
+  const label = def ? def.label : tripId;
+  return String(label).replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g,'') || 'trip';
+}
+
+async function saveXlsxSnapshot(storagePath, rows, sheetName){
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0,31));
+  const wbBinary = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  const blob = new Blob([wbBinary], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const { error } = await sb.storage.from(STORAGE_BUCKET).upload(storagePath, blob, { upsert:true });
+  return error;
+}
+async function downloadXlsxSnapshot(storagePath, notFoundMsg){
+  const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(storagePath, 3600);
+  if(error){ alert(notFoundMsg || 'Ще немає збереженої версії — спочатку натисни "💾 Зберегти".'); return; }
+  window.open(data.signedUrl, '_blank');
+}
+function saveDownloadButtonsHtml(idPrefix){
+  return `<button class="btn btn-ghost btn-small no-print" id="${idPrefix}SaveBtn">💾 Зберегти</button>
+    <button class="btn btn-ghost btn-small no-print" id="${idPrefix}DownloadBtn">⬇ Завантажити збережений</button>`;
+}
+function wireSaveDownloadButtons(idPrefix, storagePath, buildRowsFn, sheetName){
+  const saveBtn = document.getElementById(idPrefix+'SaveBtn');
+  const downloadBtn = document.getElementById(idPrefix+'DownloadBtn');
+  if(saveBtn) saveBtn.addEventListener('click', async ()=>{
+    saveBtn.disabled = true; saveBtn.textContent = 'Зберігаю…';
+    try{
+      const rows = buildRowsFn();
+      const error = await saveXlsxSnapshot(storagePath, rows, sheetName);
+      if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+      else alert('Збережено в сховище. Тепер можна завантажити кнопкою "⬇ Завантажити збережений" з будь-якого пристрою.');
+    } catch(err){
+      console.error(err); alert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
+    } finally {
+      saveBtn.disabled = false; saveBtn.textContent = '💾 Зберегти';
+    }
+  });
+  if(downloadBtn) downloadBtn.addEventListener('click', ()=> downloadXlsxSnapshot(storagePath));
+}
 
 async function uploadReportFile(file, pathPrefix){
   const extMatch = file.name.match(/\.[^.\\/]+$/);
@@ -3398,7 +4093,7 @@ function renderManagerReport(report, officeTotal, missing){
       XLSX.utils.book_append_sheet(wb, ws, 'Звіт керівника');
       const wbBinary = XLSX.write(wb, { bookType:'xlsx', type:'array' });
       const blob = new Blob([wbBinary], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const path = `${report.trip_id}/manager-report/report.xlsx`;
+      const path = `${report.trip_id}/manager-report/report_${tripFileTag(report.trip_id)}.xlsx`;
       const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, blob, { upsert:true });
       if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); }
       else { alert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити збережений" — з будь-якого пристрою.'); }
@@ -3410,7 +4105,7 @@ function renderManagerReport(report, officeTotal, missing){
     }
   });
   document.getElementById('mrDownloadSavedBtn').addEventListener('click', async ()=>{
-    const path = `${report.trip_id}/manager-report/report.xlsx`;
+    const path = `${report.trip_id}/manager-report/report_${tripFileTag(report.trip_id)}.xlsx`;
     const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
     if(error){ alert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти в сховище").'); return; }
     window.open(data.signedUrl, '_blank');
@@ -3591,7 +4286,7 @@ async function deleteManifestExtra(extraId){
   if(error) alert('Не вдалося видалити: ' + friendlyErrorMessage(error));
 }
 
-function exportSkiatosManifestToExcel(tripLabel, groups, drivers){
+function buildSkiatosManifestRows(groups, drivers){
   const rows = [['Прізвище Ім\'я', 'Вік/категорія', 'Паспорт', 'Гід', 'Ціна (€)']];
   let grand = 0;
   Object.keys(groups).sort().forEach(g=>{
@@ -3605,6 +4300,10 @@ function exportSkiatosManifestToExcel(tripLabel, groups, drivers){
     rows.push([r.name, 'водій', r.passport||'', '', 'водій']);
   });
   rows.push(['', '', '', 'РАЗОМ', fmt(grand)]);
+  return rows;
+}
+function exportSkiatosManifestToExcel(tripLabel, groups, drivers){
+  const rows = buildSkiatosManifestRows(groups, drivers);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Скіатос');
@@ -3703,10 +4402,12 @@ async function renderSkiatosManifest(){
   block.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <p class="report-note" style="margin:0;">Розрахунок за тарифами катера (27€ дорослий, 0-5 безкоштовно, 6-11 → 15€, 12-16 → 20€). Гіди їдуть безкоштовно.</p>
-      ${currentProfile.role==='manager' ? `<div class="no-print manager-only" style="display:flex; gap:6px;">
-        <button class="btn btn-ghost btn-small" id="manExportBtn">📥 Excel (внутрішній)</button>
-        <button class="btn btn-ghost btn-small" id="manExportFerryBtn">📥 Список для порому</button>
-      </div>` : ''}
+      <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-small" id="manSaveBtn">💾 Зберегти</button>
+        <button class="btn btn-ghost btn-small" id="manDownloadBtn">⬇ Завантажити збережений</button>
+        ${currentProfile.role==='manager' ? `<button class="btn btn-ghost btn-small manager-only" id="manExportBtn">📥 Excel (внутрішній)</button>
+        <button class="btn btn-ghost btn-small manager-only" id="manExportFerryBtn">📥 Список для порому</button>` : ''}
+      </div>
     </div>
     <div style="margin-top:10px;">${bodyHtml || '<p class="report-note">Ще ніхто не записаний на Скіатос.</p>'}</div>
     ${driversHtml}
@@ -3741,6 +4442,20 @@ async function renderSkiatosManifest(){
   if(exportBtn) exportBtn.addEventListener('click', ()=> exportSkiatosManifestToExcel(def?def.label:currentTripId, groups, drivers));
   const exportFerryBtn = document.getElementById('manExportFerryBtn');
   if(exportFerryBtn) exportFerryBtn.addEventListener('click', ()=> exportFerryManifestToExcel(def?def.label:currentTripId, groups, drivers));
+  document.getElementById('manSaveBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('manSaveBtn');
+    btn.disabled = true; btn.textContent = 'Зберігаю…';
+    try{
+      const rows = buildSkiatosManifestRows(groups, drivers);
+      const path = `${currentTripId}/skiatos-list/report_${tripFileTag(currentTripId)}.xlsx`;
+      const error = await saveXlsxSnapshot(path, rows, 'Скіатос');
+      if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+      else alert('Список на Скіатос збережено в сховище.');
+    } finally {
+      btn.disabled = false; btn.textContent = '💾 Зберегти';
+    }
+  });
+  document.getElementById('manDownloadBtn').addEventListener('click', ()=> downloadXlsxSnapshot(`${currentTripId}/skiatos-list/report_${tripFileTag(currentTripId)}.xlsx`));
   const addDriverBtn = document.getElementById('manAddDriverBtn');
   if(addDriverBtn) addDriverBtn.addEventListener('click', async ()=>{
     const first = document.getElementById('manDriverFirst').value.trim();
@@ -3776,11 +4491,18 @@ function findHeaderKey(headers, candidates){
 }
 
 async function loadTripPrepData(tripId){
+  const cacheKey = 'tripPrep:'+tripId;
   const { data: tourists, error:e1 } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', tripId).order('row_order');
   const { data: rooms, error:e2 } = await sb.from('trip_prep_rooms').select('*').eq('trip_id', tripId);
   if(e1) console.error(e1);
   if(e2) console.error(e2);
-  return { tourists: tourists||[], rooms: rooms||[] };
+  if(e1 && e2){
+    const cached = getOfflineCache(cacheKey);
+    if(cached) return cached.data;
+  }
+  const result = { tourists: tourists||[], rooms: rooms||[] };
+  cacheOffline(cacheKey, result);
+  return result;
 }
 
 function tripPrepGroups(){
@@ -3820,6 +4542,8 @@ async function importTripPrepFile(file, tripId, targetHotel){
   const keyPhone = findHeaderKey(headers, ['Телефон']);
   const keyLinkedBooking = findHeaderKey(headers, ["Пов'язана заявка", "Пов'язані заявки", 'Компанія', 'Одна компанія']);
   const keyConnected = findHeaderKey(headers, ['Connected', "З'єднано", 'Група']);
+  const keySv = findHeaderKey(headers, ['SV']);
+  const keyPriceChangeReason = findHeaderKey(headers, ['Причина зміни ціни']);
 
   if(!keyName){ alert('Не знайшов колонку з ПІБ (очікую заголовок типу "Прізвище та ім\'я"). Перевір файл.'); return false; }
 
@@ -3846,6 +4570,8 @@ async function importTripPrepFile(file, tripId, targetHotel){
       agency: keyAgency ? String(r[keyAgency]||'').trim() : '',
       insurance: keyInsurance ? parseDecimalInput(r[keyInsurance]) : 0,
       paid_seats: keyPaidSeats ? parseDecimalInput(r[keyPaidSeats]) : 0,
+      sv_wish: keySv ? String(r[keySv]||'').trim() : '',
+      price_change_reason: keyPriceChangeReason ? String(r[keyPriceChangeReason]||'').trim() : '',
       tariff: keyTariff ? parseDecimalInput(r[keyTariff]) : 0,
       tour_fee: keyTourFee ? parseDecimalInput(r[keyTourFee]) : 0,
       commission: keyCommission ? parseDecimalInput(r[keyCommission]) : 0,
@@ -3944,13 +4670,14 @@ async function unassignGroupFromBus(groupKey){
   if(error) alert('Не вдалося скасувати: '+friendlyErrorMessage(error));
 }
 
+let tripPrepManualPick = false;
 async function renderTripPrepSection(){
   const block = document.getElementById('tripPrepBlock');
   let def = currentTripId ? TRIPS_DEF.find(d=>d.id===currentTripId) : null;
-  if(!def || new Date() >= def.start){
-    const nextUpcoming = TRIPS_DEF.find(d=> new Date() < d.start);
+  if(!def || !tripPrepManualPick){
+    const nextUpcoming = TRIPS_DEF.find(d=> new Date() < d.start) || def || TRIPS_DEF[0];
     if(!nextUpcoming){
-      block.innerHTML = `<p class="report-note">Немає запланованих майбутніх заїздів.</p>`;
+      block.innerHTML = `<p class="report-note">Немає доступних заїздів.</p>`;
       return;
     }
     currentTripId = nextUpcoming.id;
@@ -3958,6 +4685,13 @@ async function renderTripPrepSection(){
     renderAll();
   }
   block.innerHTML = `<p class="report-note">Завантаження…</p>`;
+  const tripPrepCacheKey = 'tripPrep:'+currentTripId;
+  const tripPrepCached = getOfflineCache(tripPrepCacheKey);
+  if(tripPrepCached){
+    tripPrepData = tripPrepCached.data;
+    if(!state.trips[currentTripId]){ /* trip def not loaded yet — brief wait, rare case, no instant paint here */ }
+    else renderTripPrepView();
+  }
   if(!state.trips[currentTripId]) await loadTripData(currentTripId);
   tripPrepData = await loadTripPrepData(currentTripId);
   renderTripPrepView();
@@ -3965,13 +4699,23 @@ async function renderTripPrepSection(){
 
 function renderTripPrepView(){
   const block = document.getElementById('tripPrepBlock');
-  const navHtml = `<div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">
-    <button class="btn btn-ghost btn-small ${tripPrepView==='overview'?'active-tab':''}" data-tpview="overview">Огляд і імпорт</button>
-    <button class="btn btn-ghost btn-small ${tripPrepView==='rooms'?'active-tab':''}" data-tpview="rooms">Готель</button>
-    <button class="btn btn-ghost btn-small ${tripPrepView==='buses'?'active-tab':''}" data-tpview="buses">Автобуси</button>
-    <button class="btn btn-ghost btn-small ${tripPrepView==='docs'?'active-tab':''}" data-tpview="docs">Документи</button>
+  const def = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const isCompleted = def && new Date() > def.end;
+  const lockThisView = isCompleted && tripPrepView !== 'docs';
+  const topBanner = `<div style="padding:8px 14px; background:${lockThisView?'#7c2d12':'var(--ochre)'}; color:#fff; border-radius:10px; font-weight:700; text-align:center; font-size:14px; margin-bottom:12px;">
+    📅 Заїзд: ${def ? def.label : 'не обрано'}${lockThisView ? ' · 🔒 заїзд завершено — тільки перегляд' : ''}
+  </div>`;
+  const navHtml = `${topBanner}
+  <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">
+    <button class="btn btn-ghost btn-small tp-view-only-ok ${tripPrepView==='overview'?'active-tab':''}" data-tpview="overview">Огляд і імпорт</button>
+    <button class="btn btn-ghost btn-small tp-view-only-ok ${tripPrepView==='rooms'?'active-tab':''}" data-tpview="rooms">Готель</button>
+    <button class="btn btn-ghost btn-small tp-view-only-ok ${tripPrepView==='buses'?'active-tab':''}" data-tpview="buses">Автобуси</button>
+    <button class="btn btn-ghost btn-small tp-view-only-ok ${tripPrepView==='docs'?'active-tab':''}" data-tpview="docs">Документи</button>
   </div>
-  <div id="tripPrepContent"></div>`;
+  <div id="tripPrepContent" class="${lockThisView?'tp-readonly':''}"></div>
+  <div class="no-print" style="position:sticky; bottom:0; margin-top:20px; padding:10px 14px; background:${lockThisView?'#7c2d12':'var(--ochre)'}; color:#fff; border-radius:10px; font-weight:700; text-align:center; font-size:14px; box-shadow:0 -2px 8px rgba(0,0,0,.15);">
+    📅 Заїзд: ${def ? def.label : 'не обрано'}${lockThisView ? ' · 🔒 тільки перегляд' : ''}
+  </div>`;
   block.innerHTML = navHtml;
   block.querySelectorAll('[data-tpview]').forEach(el=> el.addEventListener('click', ()=>{ tripPrepView = el.dataset.tpview; renderTripPrepView(); }));
   if(tripPrepView==='overview') renderTripPrepOverview();
@@ -4025,52 +4769,64 @@ function renderTripPrepOverview(){
 
   content.innerHTML = `
     <div class="step-block no-print" style="margin-bottom:14px;">
-      <p class="step-title">Завантажити базові файли (окремо по готелях)</p>
-      <p class="report-note">Excel зі списком туристів (Номер заявки, ПІБ, Дата народження, Паспорт, Агенція, оплата, коментар, і за бажанням — Місце посадки, Телефон, Пов'язана заявка). Кожен файл перезаписує список саме того готелю, не чіпаючи другий.</p>
-      <p class="report-note">Система сама розпізнає, які заявки — одна компанія: за колонкою <b>"Connected"</b> (код групи типу "к1", "к2"), за об'єднаними клітинками у файлі, за згадками "#номер" у коментарі, або за колонкою "Пов'язана заявка". Якщо десь помилилась — постав галочки й об'єднай вручну, або натисни ✕ біля номера заявки в таблиці, щоб роз'єднати.</p>
-      <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:8px;">
-        <div>
-          <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">🏨 Hotel Konstantin 3*</label>
-          <input type="file" accept=".xlsx,.xls" id="tripPrepFileInputKonstantin">
+      <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:15px;">📤 Завантажити базові файли (окремо по готелях)</summary>
+        <p class="report-note" style="margin-top:8px;">Excel зі списком туристів (Номер заявки, ПІБ, Дата народження, Паспорт, Агенція, оплата, коментар, і за бажанням — Місце посадки, Телефон, Пов'язана заявка). Кожен файл перезаписує список саме того готелю, не чіпаючи другий.</p>
+        <p class="report-note">Система сама розпізнає, які заявки — одна компанія: за колонкою <b>"Connected"</b> (код групи типу "к1", "к2"), за об'єднаними клітинками у файлі, за згадками "#номер" у коментарі, або за колонкою "Пов'язана заявка". Якщо десь помилилась — постав галочки й об'єднай вручну, або натисни ✕ біля номера заявки в таблиці, щоб роз'єднати.</p>
+        <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:8px;">
+          <div>
+            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">🏨 Hotel Konstantin 3*</label>
+            <input type="file" accept=".xlsx,.xls" id="tripPrepFileInputKonstantin">
+          </div>
+          <div>
+            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">🏨 Great Aleksander 3*</label>
+            <input type="file" accept=".xlsx,.xls" id="tripPrepFileInputGreat">
+          </div>
         </div>
-        <div>
-          <label style="font-weight:600; font-size:13px; display:block; margin-bottom:4px;">🏨 Great Aleksander 3*</label>
-          <input type="file" accept=".xlsx,.xls" id="tripPrepFileInputGreat">
+        <div id="tripPrepImportStatus" class="report-note" style="margin-top:6px;"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+          <button class="btn btn-danger-ghost btn-small" id="tpClearKonstantinBtn">🗑️ Очистити список Konstantin</button>
+          <button class="btn btn-danger-ghost btn-small" id="tpClearGreatBtn">🗑️ Очистити список Great Aleksander</button>
+          <button class="btn btn-danger-ghost btn-small" id="tpClearTouristsBtn">🗑️ Очистити обидва</button>
         </div>
-      </div>
-      <div id="tripPrepImportStatus" class="report-note" style="margin-top:6px;"></div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-        <button class="btn btn-danger-ghost btn-small" id="tpClearKonstantinBtn">🗑️ Очистити список Konstantin</button>
-        <button class="btn btn-danger-ghost btn-small" id="tpClearGreatBtn">🗑️ Очистити список Great Aleksander</button>
-        <button class="btn btn-danger-ghost btn-small" id="tpClearTouristsBtn">🗑️ Очистити обидва</button>
-      </div>
+      </details>
     </div>
 
     <div class="step-block no-print" style="margin-bottom:14px;">
-      <p class="step-title">Додати туриста вручну (власний заїзд)</p>
-      <p class="report-note">Для людей поза базовим файлом — наприклад власні тури без окремої агенції. Якщо вкажеш номер заявки, який уже є в списку — людина приєднається до тієї ж групи/готелю (наприклад, якщо в завантаженому файлі когось бракує).</p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
-        <div><label style="display:block; font-size:11px; font-weight:600;">Ім'я Прізвище</label><input type="text" id="tpManualFullName" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
-        <div><label style="display:block; font-size:11px; font-weight:600;">Дата народження</label><input type="date" id="tpManualBirth" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
-        <div><label style="display:block; font-size:11px; font-weight:600;">Паспорт</label><input type="text" id="tpManualPassport" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:110px;"></div>
-        <div><label style="display:block; font-size:11px; font-weight:600;">Номер заявки</label><input type="text" id="tpManualBooking" placeholder="напр. #ВЛАСНИЙ1" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:120px;"></div>
-        <div><label style="display:block; font-size:11px; font-weight:600;">Готель</label>
-          <select id="tpManualHotel" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;">
-            <option value="konstantin">Hotel Konstantin 3*</option>
-            <option value="greataleksander">Great Aleksander 3*</option>
-          </select>
+      <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:15px;">➕ Додати туриста вручну (власний заїзд)</summary>
+        <p class="report-note" style="margin-top:8px;">Для людей поза базовим файлом — наприклад власні тури без окремої агенції. Якщо вкажеш номер заявки, який уже є в списку — людина приєднається до тієї ж групи/готелю (наприклад, якщо в завантаженому файлі когось бракує).</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+          <div><label style="display:block; font-size:11px; font-weight:600;">Ім'я Прізвище</label><input type="text" id="tpManualFullName" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Дата народження</label><input type="date" id="tpManualBirth" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Паспорт</label><input type="text" id="tpManualPassport" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:110px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Номер заявки</label><input type="text" id="tpManualBooking" placeholder="напр. #ВЛАСНИЙ1" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:120px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Готель</label>
+            <select id="tpManualHotel" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;">
+              <option value="konstantin">Hotel Konstantin 3*</option>
+              <option value="greataleksander">Great Aleksander 3*</option>
+            </select>
+          </div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Місто посадки</label><input type="text" id="tpManualCity" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:110px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Телефон</label><input type="text" id="tpManualPhone" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:130px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Страхівка (€)</label><input type="text" inputmode="decimal" id="tpManualInsurance" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:90px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Платні місця (€)</label><input type="text" inputmode="decimal" id="tpManualPaidSeats" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:100px;"></div>
+          <button class="btn btn-primary btn-small" id="tpAddManualTouristBtn">+ Додати</button>
         </div>
-        <div><label style="display:block; font-size:11px; font-weight:600;">Місто посадки</label><input type="text" id="tpManualCity" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:110px;"></div>
-        <div><label style="display:block; font-size:11px; font-weight:600;">Телефон</label><input type="text" id="tpManualPhone" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:130px;"></div>
-        <div><label style="display:block; font-size:11px; font-weight:600;">Страхівка (€)</label><input type="text" inputmode="decimal" id="tpManualInsurance" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:90px;"></div>
-        <div><label style="display:block; font-size:11px; font-weight:600;">Платні місця (€)</label><input type="text" inputmode="decimal" id="tpManualPaidSeats" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:100px;"></div>
-        <button class="btn btn-primary btn-small" id="tpAddManualTouristBtn">+ Додати</button>
-      </div>
+      </details>
     </div>
     <p class="report-note">Якщо дві чи більше заявок насправді одна компанія (у файлі позначено кольором/смугою, а не текстом у коментарі) — постав галочки навпроти них (в одній з таблиць нижче) і натисни "Об'єднати".</p>
     <div class="no-print" style="margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap;">
       <button class="btn btn-ghost btn-small" id="tpMergeGroupsBtn">🔗 Об'єднати вибрані групи</button>
       <button class="btn btn-ghost btn-small" id="tpMoveHotelBtn">🔄 Перенести вибрані в інший готель</button>
+    </div>
+    <div class="step-block no-print" style="margin-bottom:14px; background:#eff6ff; border-color:#93c5fd;">
+      <p class="step-title" style="margin:0 0 6px;">🔗 Швидке об'єднання (за номерами заявок)</p>
+      <p class="report-note">Впиши номери заявок, які треба об'єднати в одну компанію, через кому чи пробіл — не треба шукати їх у списку нижче.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:6px;">
+        <input type="text" id="tpQuickMergeInput" placeholder="напр. 7623, 9049, 8042" style="flex:1; min-width:220px; padding:8px 10px; border:2px solid var(--line); border-radius:8px;">
+        <button class="btn btn-primary btn-small" id="tpQuickMergeBtn">Об'єднати</button>
+      </div>
     </div>
     ${buildTableHtml('🏨 Hotel Konstantin 3*', konstantinKeys)}
     ${buildTableHtml('🏨 Great Aleksander 3*', greatKeys)}
@@ -4170,6 +4926,24 @@ function renderTripPrepOverview(){
     if(error){ alert('Не вдалося об\'єднати: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
+  });
+  document.getElementById('tpQuickMergeBtn').addEventListener('click', async ()=>{
+    const raw = document.getElementById('tpQuickMergeInput').value.trim();
+    if(!raw) return;
+    const numbers = raw.split(/[,\s]+/).map(s=>s.replace(/^#/,'').trim()).filter(Boolean);
+    if(numbers.length < 2){ alert('Впиши щонайменше два номери заявок, розділені комою чи пробілом.'); return; }
+    const matched = tripPrepData.tourists.filter(t=> numbers.includes((t.booking_number||'').replace(/^#/,'')));
+    if(!matched.length){ alert('Не знайшов жодної заявки з такими номерами в цьому заїзді.'); return; }
+    const foundNumbers = [...new Set(matched.map(t=>(t.booking_number||'').replace(/^#/,'')))];
+    const missing = numbers.filter(n=>!foundNumbers.includes(n));
+    const newKey = matched[0].link_group || numbers[0];
+    const ids = matched.map(t=>t.id);
+    const { error } = await sb.from('trip_prep_tourists').update({ link_group: newKey }).in('id', ids);
+    if(error){ alert('Не вдалося об\'єднати: ' + friendlyErrorMessage(error)); return; }
+    document.getElementById('tpQuickMergeInput').value = '';
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepView();
+    hbShowToast(`✅ Об'єднано: №${foundNumbers.join(', №')}${missing.length ? ` (не знайдено: №${missing.join(', №')})` : ''}`);
   });
   document.getElementById('tpMoveHotelBtn').addEventListener('click', async ()=>{
     const checked = Array.from(content.querySelectorAll('.tp-group-cb:checked')).map(cb=>cb.dataset.group);
@@ -5374,6 +6148,12 @@ function hbGetAllRoomsForHotel(hotel){
 }
 
 // Parses free-text wishes from a comment (SV/sea view, side view, street, floor number)
+function groupWishText(members){
+  const comments = members.map(m=>m.comment).filter(Boolean);
+  const svWishes = members.filter(m=>m.sv_wish && m.sv_wish.trim()).map(()=>'SV море');
+  return [...comments, ...svWishes].join(' ');
+}
+
 function hbParseWish(comment){
   const wish = {};
   if(!comment) return wish;
@@ -5399,10 +6179,13 @@ function hbWishLabel(wish){
 
 function hbShowToast(message){
   const toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:500; background:#16a34a; color:#fff; font-weight:600; padding:12px 20px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.3); font-size:14px;';
+  toast.style.cssText = 'position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:500; background:#16a34a; color:#fff; font-weight:600; padding:12px 20px; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.3); font-size:14px; animation: toastIn 0.25s ease both;';
   toast.textContent = message;
   document.body.appendChild(toast);
-  setTimeout(()=> toast.remove(), 1400);
+  setTimeout(()=>{
+    toast.style.animation = 'toastOut 0.25s ease both';
+    setTimeout(()=> toast.remove(), 250);
+  }, 1400);
 }
 
 function hbAskYesNo(message){
@@ -5430,20 +6213,31 @@ function hbIsPeriodLocked(period){
   return new Date() >= def.start;
 }
 
-async function hbLoadBookings(){
-  const { data, error } = await sb.from('room_bookings').select('*');
-  if(error){ console.error(error); return; }
-  hbDatabase = {};
-  (data||[]).forEach(r=>{
-    if(!hbDatabase[r.hotel]) hbDatabase[r.hotel] = {};
-    if(!hbDatabase[r.hotel][r.period]) hbDatabase[r.hotel][r.period] = [];
-    let entry = hbDatabase[r.hotel][r.period].find(e=>e.number===r.room_number);
-    if(!entry){ entry = { number:r.room_number, shares:[] }; hbDatabase[r.hotel][r.period].push(entry); }
+function hbBuildDatabaseFromRows(rows){
+  const db = {};
+  (rows||[]).forEach(r=>{
+    if(!db[r.hotel]) db[r.hotel] = {};
+    if(!db[r.hotel][r.period]) db[r.hotel][r.period] = [];
+    let entry = db[r.hotel][r.period].find(e=>e.number===r.room_number);
+    if(!entry){ entry = { number:r.room_number, shares:[] }; db[r.hotel][r.period].push(entry); }
     entry.shares.push({
       requestNum: r.request_id, adults:r.adults, kids612:r.kids_612, kidsUnder6:r.kids_under6,
       total:r.total, extraBed: !!r.extra_bed, seeking: !!r.seeking_roommate, notes: r.notes||'', memberNames: r.member_names||[]
     });
   });
+  return db;
+}
+async function hbLoadBookings(){
+  const cacheKey = 'hbAllBookings';
+  const { data, error } = await sb.from('room_bookings').select('*');
+  if(error){
+    console.error(error);
+    const cached = getOfflineCache(cacheKey);
+    if(cached) hbDatabase = hbBuildDatabaseFromRows(cached.data);
+    return;
+  }
+  cacheOffline(cacheKey, data||[]);
+  hbDatabase = hbBuildDatabaseFromRows(data);
 }
 
 async function hbSaveShare(hotel, period, roomNum, share){
@@ -5562,9 +6356,16 @@ function hbSearchByRequest(){
 
 async function hbRenderRoomsView(){
   const content = document.getElementById('tripPrepContent');
-  content.innerHTML = `<p class="report-note">Завантаження…</p>`;
   const def = TRIPS_DEF.find(d=>d.id===currentTripId);
   hbCurrentPeriod = def ? def.label : '';
+
+  const cachedBookings = getOfflineCache('hbAllBookings');
+  if(cachedBookings){
+    hbDatabase = hbBuildDatabaseFromRows(cachedBookings.data);
+    hbRenderShell();
+  } else {
+    content.innerHTML = `<p class="report-note">Завантаження…</p>`;
+  }
   await hbLoadBookings();
   await hbLoadExtraRooms();
   await hbLoadLinkedRequests();
@@ -6710,7 +7511,7 @@ function hbDoubleBedPenalty(slot, groupSize, hasYoungChild){
   return (groupSize===3 && slot.hasDoubleBed && !hasYoungChild) ? 15 : 0;
 }
 function hbWizardComputeSuggestion(group){
-  const wish = hbParseWish(group.members.map(m=>m.comment).filter(Boolean).join(' '));
+  const wish = hbParseWish(groupWishText(group.members));
   const total = group.members.length;
   const hasYoungChild = hbGroupHasYoungChild(group, 10);
   const hotels = group.targetHotel ? [group.targetHotel] : ['konstantin','greataleksander'];
@@ -6829,7 +7630,7 @@ function hbModalSuggestLinkedRooms(){
   if(!demands.length){ infoEl.innerHTML = `<div style="margin-top:6px; font-size:12px; color:#15803d;">✅ Усі пов'язані заявки вже розселені.</div>`; return; }
 
   const wizardDef = TRIPS_DEF.find(d=>d.id===currentTripId);
-  const wish = hbParseWish(groupMembers.map(m=>m.comment).filter(Boolean).join(' '));
+  const wish = hbParseWish(groupWishText(groupMembers));
   const hasYoungChild = groupMembers.some(m=>{ const age = m.birth_date && wizardDef ? calcAgeAtTrip(m.birth_date, wizardDef.start) : null; return age!==null && age<10; });
   const hotelsToTry = targetHotel ? [targetHotel] : ['konstantin','greataleksander'];
   const plan = hbComputeAllocationPlan(demands, wish, hasYoungChild, hotelsToTry);
@@ -6915,7 +7716,7 @@ function hbComputeAllocationPlan(demands, wish, hasYoungChild, hotelsToTry){
 
 function hbWizardSuggestFamily(){
   const group = hbWizardGroups[hbWizardIndex];
-  const familyWish = hbParseWish(group.members.map(m=>m.comment).filter(Boolean).join(' '));
+  const familyWish = hbParseWish(groupWishText(group.members));
   const hasYoungChild = hbGroupHasYoungChild(group, 10);
   hbWizardInitGroupState(group);
   const demands = Object.keys(hbWizardSubRemaining)
@@ -7239,5 +8040,6 @@ document.addEventListener('blur', function(e){
   if(session) await afterAuthSuccess();
 })();
 </script>
-</body>
-</html>
+
+
+</body></html>
