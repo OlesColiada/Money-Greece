@@ -87,6 +87,15 @@
   .fin-section-title{font-weight:700; margin:16px 0 4px;}
   .fin-total-row{display:flex; justify-content:space-between; font-weight:700; padding-top:8px; border-top:1px solid var(--line); margin-top:6px;}
 
+  .fin-card{ border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--whitewash); margin-bottom:8px; animation: fadeInUp 0.2s ease both; }
+  .fin-card-top{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .fin-card-top .fin-label-input{ flex:1; font-size:14.5px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  .fin-card-fields{ display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+  .fin-card-fields label{ display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:var(--ink-soft); flex:1; min-width:110px; }
+  .fin-card-fields .fin-amount{ width:100%; box-sizing:border-box; font-size:16px; padding:8px 10px; }
+  .fin-card-fields select{ padding:8px 10px; border:2px solid var(--line); border-radius:8px; }
+  .fin-card-checkbox{ flex-direction:row !important; align-items:center !important; gap:6px !important; font-weight:600 !important; color:var(--ink) !important; }
+
   /* No spinner arrows on any number field — easy to type on phone and laptop alike */
   input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
   input[type=number]{-moz-appearance:textfield;}
@@ -1605,7 +1614,14 @@ function renderExcursions(){
       </div>
     `;
     wrap.appendChild(card);
-    card.addEventListener('toggle', ()=>{ excOpenState[exc.id] = card.open; });
+    card.addEventListener('toggle', ()=>{
+      excOpenState[exc.id] = card.open;
+      if(card.open){
+        wrap.querySelectorAll('details.exc-card').forEach(other=>{
+          if(other !== card && other.open) other.open = false;
+        });
+      }
+    });
 
     const tbody = card.querySelector('[data-role="rowsBody"]');
     calc.rowResults.forEach(r=>{
@@ -3361,19 +3377,27 @@ function renderFinanceReport(report){
     const isPerDiem = e.label==='Добові' || e.label==='Добові супроводжуючого';
     const isHotel = e.label==='Готель';
     const isPercent = e.label==='Відсоток';
-    return `<div class="fin-row">
-      <input type="text" class="fin-label-input" data-role="finLabel" data-idx="${idx}" value="${e.label}">
-      ${isPerDiem ? `<label style="display:flex; align-items:center; gap:4px; font-size:11.5px; color:var(--ink-soft); white-space:nowrap; flex-shrink:0;">
-          <input type="checkbox" data-role="finKpi" data-idx="${idx}" ${e.kpi?'checked':''}> KPI виконано
-        </label>` : ''}
-      ${isHotel ? `<select data-role="finHotel" data-idx="${idx}" style="flex-shrink:0; max-width:150px;">
-          <option value="" ${!e.hotel?'selected':''}>— обрати —</option>
-          <option value="Konstantin 3*" ${e.hotel==='Konstantin 3*'?'selected':''}>Konstantin 3*</option>
-          <option value="Great Aleksander 3*" ${e.hotel==='Great Aleksander 3*'?'selected':''}>Great Aleksander 3*</option>
-        </select>` : ''}
-      ${isPercent ? `<button class="edit-toggle-btn no-print" data-role="finRefreshPercent" data-idx="${idx}" title="Підтягнути суму комісії з прибутковості" style="font-size:11px; flex-shrink:0;">🔄</button>` : ''}
-      <input type="text" inputmode="decimal" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem?'disabled title="Змінюється чекбоксом KPI"':''}> €
-      <button class="row-del no-print" data-role="finDelete" data-idx="${idx}" title="Видалити пункт">✕</button>
+    return `<div class="fin-card">
+      <div class="fin-card-top">
+        <input type="text" class="fin-label-input" data-role="finLabel" data-idx="${idx}" value="${e.label}">
+        <button class="row-del no-print" data-role="finDelete" data-idx="${idx}" title="Видалити пункт">✕</button>
+      </div>
+      <div class="fin-card-fields">
+        ${isPerDiem ? `<label class="fin-card-checkbox">
+            <input type="checkbox" data-role="finKpi" data-idx="${idx}" ${e.kpi?'checked':''}> KPI виконано
+          </label>` : ''}
+        ${isHotel ? `<label>Готель<select data-role="finHotel" data-idx="${idx}">
+            <option value="" ${!e.hotel?'selected':''}>— обрати —</option>
+            <option value="Konstantin 3*" ${e.hotel==='Konstantin 3*'?'selected':''}>Konstantin 3*</option>
+            <option value="Great Aleksander 3*" ${e.hotel==='Great Aleksander 3*'?'selected':''}>Great Aleksander 3*</option>
+          </select></label>` : ''}
+        <label>Сума €
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input type="text" inputmode="decimal" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem?'disabled title="Змінюється чекбоксом KPI"':''}>
+            ${isPercent ? `<button class="edit-toggle-btn no-print" data-role="finRefreshPercent" data-idx="${idx}" title="Підтягнути суму комісії з прибутковості">🔄</button>` : ''}
+          </div>
+        </label>
+      </div>
     </div>`;
   };
 
