@@ -9,6 +9,7 @@
 <link rel="icon" href="icon-192_1.png">
 <!-- iOS "Add to Home Screen" support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Rich Tour">
 <link rel="apple-touch-icon" href="icon-192_1.png">
@@ -68,14 +69,14 @@
   .section-tab.active-tab{background:var(--ochre); color:#fff; border-color:var(--ochre);}
   .section-tab.active-tab:hover{background:var(--ochre); color:#fff; border-color:var(--ochre);}
 
-  #tripPrepContent.tp-readonly{ position:relative; }
-  #tripPrepContent.tp-readonly button:not(.tp-view-only-ok),
-  #tripPrepContent.tp-readonly input:not(.tp-view-only-ok),
-  #tripPrepContent.tp-readonly select:not(.tp-view-only-ok),
-  #tripPrepContent.tp-readonly textarea:not(.tp-view-only-ok){
+  .tp-readonly{ position:relative; }
+  .tp-readonly button:not(.tp-view-only-ok),
+  .tp-readonly input:not(.tp-view-only-ok),
+  .tp-readonly select:not(.tp-view-only-ok),
+  .tp-readonly textarea:not(.tp-view-only-ok){
     pointer-events:none !important; opacity:0.55; filter:grayscale(0.3);
   }
-  #tripPrepContent.tp-readonly [onclick]:not(.tp-view-only-ok){ pointer-events:none !important; opacity:0.55; }
+  .tp-readonly [onclick]:not(.tp-view-only-ok){ pointer-events:none !important; opacity:0.55; }
 
   .fin-row{display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #f0f0ea; flex-wrap:nowrap;}
   .fin-row:last-child{border-bottom:none;}
@@ -206,6 +207,16 @@
   table.rows-table tr:last-child td{border-bottom:none;}
   .num-input{width:68px; text-align:right;}
   .num-input-wide{width:92px;}
+
+  .rows-cards{ display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+  .row-card{ border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--whitewash); animation: fadeInUp 0.2s ease both; }
+  .row-card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px; }
+  .row-card-top .person-select{ width:100%; }
+  .row-card-fields{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .row-card-fields label{ display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:var(--ink-soft); flex:1; min-width:78px; }
+  .row-card-fields input{ width:100%; box-sizing:border-box; }
+  .row-card-result{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding-top:8px; border-top:1px dashed var(--line); font-size:14.5px; font-weight:700; flex-wrap:wrap; }
+  .row-card-split{ margin-top:6px; font-size:11.5px; }
   .person-select{border:none; border-radius:6px; padding:5px 9px; font-weight:600; font-size:12.5px; color:#fff; min-width:100px; cursor:pointer;}
   .row-del{background:none; border:none; color:#b0b6a6; cursor:pointer; font-size:16px; padding:0 4px;}
   .row-del:hover{color:var(--bad);}
@@ -451,7 +462,7 @@
     <div class="trip-grid" id="tripGrid"></div>
   </div>
 
-  <div class="step-block no-print guide-only" id="guideTripPickBlock" style="display:none; margin:0 0 16px;">
+  <div class="step-block no-print app-hidden" id="guideTripPickBlock" style="margin:0 0 16px;">
     <span class="step-label">Заїзд</span>
     <select id="guideTripSelect" style="width:100%; max-width:340px;"></select>
   </div>
@@ -525,7 +536,7 @@
 
   <div id="touristSection" style="display:none;">
 
-    <div class="step-block no-print manager-only" id="guideFilterBlock" style="display:none;">
+    <div class="step-block no-print" id="guideFilterBlock" style="display:none;">
       <p class="step-title">Група якого гіда</p>
       <div class="guide-chips" id="guideFilterChips"></div>
     </div>
@@ -631,7 +642,7 @@
 
   <div id="financeSection" style="display:none;">
 
-    <div class="step-block no-print manager-only" id="financeGuideFilterBlock" style="display:none;">
+    <div class="step-block no-print" id="financeGuideFilterBlock" style="display:none;">
       <p class="step-title">Звіт якого гіда</p>
       <div class="guide-chips" id="financeGuideFilterChips"></div>
     </div>
@@ -1567,16 +1578,7 @@ function renderExcursions(){
           })()}
         </div>
 
-        <div class="table-scroll">
-        <table class="rows-table">
-          <thead><tr>
-            <th>Гід/партнер</th><th>Чол</th><th>Зібрано €</th>
-            ${calc.ticketsApply ? '<th>Квитки €</th>' : ''}
-            <th>Затрати €</th><th>Прибуток / Розрахунок</th><th>Гід 10%</th><th>Офіс 90%</th><th></th>
-          </tr></thead>
-          <tbody data-role="rowsBody"></tbody>
-        </table>
-        </div>
+        <div class="rows-cards" data-role="rowsBody"></div>
         <button class="btn btn-ghost btn-small add-row-btn no-print" data-role="addRow">+ Додати рядок</button>
 
         <div class="exc-summary">
@@ -1589,31 +1591,38 @@ function renderExcursions(){
 
     const tbody = card.querySelector('[data-role="rowsBody"]');
     calc.rowResults.forEach(r=>{
-      const tr = document.createElement('tr');
+      const tr = document.createElement('div');
+      tr.className = 'row-card';
       const editable = canEditRow(r);
       const hasPerson = !!r.person;
       const amountsEditable = editable && hasPerson;
-      tr.innerHTML = `
-        <td><select class="person-select" data-role="person" style="background:${hasPerson?personColor(r):'#c9cdbe'}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, exc.rows.filter(other=>other.id!==r.id && other.personType==='guide').map(other=>other.person))}</select>
-          ${r.isTest ? `<div style="font-size:10px; color:#b45309; font-weight:700; margin-top:2px;">🧪 ТЕСТ — не враховується в реальних розрахунках</div>` : ''}
-          ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" value="${r.customPartnerName||''}" data-role="customPartnerName" style="margin-top:4px; width:110px;" ${editable?'':'disabled'}>` : ''}
-          ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" data-role="fillFromTourists" title="Заповнити чол/суму з даних гіда в списку туристів" style="display:block; margin-top:4px; font-size:11px;">📋 зі списку туристів</button>` : ''}
-        </td>
-        <td><input type="text" inputmode="decimal" class="num-input" data-role="chol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></td>
-        <td>${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>
-        ${calc.ticketsApply ? `<td>${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input" data-role="quitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted">—</span>`}</td>` : ''}
-        <td class="muted">${hasPerson ? fmt(r.totalCost) : '—'}</td>
-        <td>${!hasPerson
+      const resultHtml = !hasPerson
             ? `<span class="muted">оберіть гіда/партнера</span>`
             : r.isGuide
               ? `<span class="${r.profit>=0?'profit-pos':'profit-neg'}">${fmt(r.profit)} €</span>`
               : (exc.busOwner==='own'
                   ? `<span class="muted">винен нам ${fmt(r.settlement)} €</span>`
-                  : `<span class="muted">розрахунок з партнером</span>`)}
-        </td>
-        <td class="muted">${hasPerson && r.isGuide ? fmt(r.gInc) : '—'}</td>
-        <td class="muted">${hasPerson && r.isGuide ? fmt(r.oInc) : '—'}</td>
-        <td class="no-print">${editable ? `<button class="row-del" data-role="delRow">✕</button>` : ''}</td>
+                  : `<span class="muted">розрахунок з партнером</span>`);
+      tr.innerHTML = `
+        <div class="row-card-top">
+          <div style="flex:1; min-width:0;">
+            <select class="person-select" data-role="person" style="background:${hasPerson?personColor(r):'#c9cdbe'}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, exc.rows.filter(other=>other.id!==r.id && other.personType==='guide').map(other=>other.person))}</select>
+            ${r.isTest ? `<div style="font-size:10px; color:#b45309; font-weight:700; margin-top:2px;">🧪 ТЕСТ — не враховується в реальних розрахунках</div>` : ''}
+            ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" value="${r.customPartnerName||''}" data-role="customPartnerName" style="margin-top:4px; width:100%; max-width:160px;" ${editable?'':'disabled'}>` : ''}
+            ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" data-role="fillFromTourists" title="Заповнити чол/суму з даних гіда в списку туристів" style="display:block; margin-top:4px; font-size:11px;">📋 зі списку туристів</button>` : ''}
+          </div>
+          ${editable ? `<button class="row-del no-print" data-role="delRow">✕</button>` : ''}
+        </div>
+        <div class="row-card-fields">
+          <label>Чол<input type="text" inputmode="decimal" class="num-input" data-role="chol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></label>
+          <label>Зібрано €${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted" style="display:block; padding:6px 0;">—</span>`}</label>
+          ${calc.ticketsApply ? `<label>Квитки €${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input" data-role="quitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted" style="display:block; padding:6px 0;">—</span>`}</label>` : ''}
+        </div>
+        <div class="row-card-result">
+          <span class="muted">Затрати: ${hasPerson ? fmt(r.totalCost)+' €' : '—'}</span>
+          <span>${resultHtml}</span>
+        </div>
+        ${hasPerson && r.isGuide ? `<div class="row-card-split muted">Гід 10%: ${fmt(r.gInc)} € · Офіс 90%: ${fmt(r.oInc)} €</div>` : ''}
       `;
       tbody.appendChild(tr);
 
@@ -2266,7 +2275,9 @@ let touristData = { tourists: [], selectionsByTourist: {} }; // cache for curren
 let openTouristId = null;
 let openEditPanels = new Set();
 
+let testAccountGuideFilter = null;
 function activeTouristGuideName(){
+  if(currentProfile.is_test_account) return testAccountGuideFilter || currentProfile.guide_name;
   if(currentProfile.role === 'guide') return currentProfile.guide_name;
   return touristGuideFilter;
 }
@@ -2434,8 +2445,32 @@ document.getElementById('sectionTripPrepBtn').addEventListener('click', async ()
 function renderGuideFilterChips(){
   updateTourSectionBanner();
   const block = document.getElementById('guideFilterBlock');
-  block.style.display='none';
-  return;
+  if(!currentProfile.is_test_account){ block.style.display='none'; return; }
+  const td = getTripData(currentTripId);
+  if(!td.guides.length){ block.style.display='none'; return; }
+  block.style.display='block';
+  block.querySelector('.step-title').textContent = 'Переглянути документи гіда (тестовий режим)';
+  const wrap = document.getElementById('guideFilterChips');
+  wrap.innerHTML = '';
+  [{name: currentProfile.guide_name}, ...td.guides].forEach(g=>{
+    const chip = document.createElement('button');
+    const active = activeTouristGuideName() === g.name;
+    chip.className = 'btn btn-ghost btn-small tp-view-only-ok';
+    if(active){ chip.style.background = guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor = guideColor(g.name); }
+    chip.textContent = g.name === currentProfile.guide_name ? `${g.name} (я сам)` : g.name;
+    chip.addEventListener('click', async ()=>{
+      testAccountGuideFilter = g.name;
+      openTouristId = null;
+      await loadTourists();
+      renderTouristSection();
+    });
+    wrap.appendChild(chip);
+  });
+  const note = block.querySelector('.tp-readonly-note') || (()=>{ const p=document.createElement('p'); p.className='report-note tp-readonly-note'; block.appendChild(p); return p; })();
+  note.textContent = activeTouristGuideName() === currentProfile.guide_name
+    ? 'Це твій власний тестовий список — тут можна редагувати вільно.'
+    : `⚠️ Переглядаєш реальні дані гіда "${activeTouristGuideName()}" — тут усе тільки для перегляду, щоб нічого випадково не змінити в них.`;
+  document.getElementById('touristSection').classList.toggle('tp-readonly', activeTouristGuideName() !== currentProfile.guide_name);
 }
 function renderGuideFilterChipsOld(){
   const block = document.getElementById('guideFilterBlock');
@@ -3117,6 +3152,7 @@ const DEFAULT_MANUAL_ENTRIES = [
 ];
 
 function activeFinanceGuideName(){
+  if(currentProfile.is_test_account) return testAccountGuideFilter || currentProfile.guide_name;
   if(currentProfile.role === 'guide') return currentProfile.guide_name;
   return financeGuideFilter;
 }
@@ -3193,8 +3229,30 @@ async function saveFinanceReport(report){
 function renderFinanceGuideFilterChips(){
   updateTourSectionBanner();
   const blockEl = document.getElementById('financeGuideFilterBlock');
-  blockEl.style.display='none';
-  return;
+  if(!currentProfile.is_test_account){ blockEl.style.display='none'; return; }
+  const td = getTripData(currentTripId);
+  if(!td.guides.length){ blockEl.style.display='none'; return; }
+  blockEl.style.display='block';
+  blockEl.querySelector('.step-title').textContent = 'Переглянути фінзвіт гіда (тестовий режим)';
+  const wrap = document.getElementById('financeGuideFilterChips');
+  wrap.innerHTML = '';
+  [{name: currentProfile.guide_name}, ...td.guides].forEach(g=>{
+    const chip = document.createElement('button');
+    const active = activeFinanceGuideName() === g.name;
+    chip.className = 'btn btn-ghost btn-small tp-view-only-ok';
+    if(active){ chip.style.background = guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor = guideColor(g.name); }
+    chip.textContent = g.name === currentProfile.guide_name ? `${g.name} (я сам)` : g.name;
+    chip.addEventListener('click', async ()=>{
+      testAccountGuideFilter = g.name;
+      await renderFinanceSection();
+    });
+    wrap.appendChild(chip);
+  });
+  const note = blockEl.querySelector('.tp-readonly-note') || (()=>{ const p=document.createElement('p'); p.className='report-note tp-readonly-note'; blockEl.appendChild(p); return p; })();
+  note.textContent = activeFinanceGuideName() === currentProfile.guide_name
+    ? 'Це твій власний тестовий звіт — тут можна редагувати вільно.'
+    : `⚠️ Переглядаєш реальний звіт гіда "${activeFinanceGuideName()}" — тут усе тільки для перегляду.`;
+  document.getElementById('financeSection').classList.toggle('tp-readonly', activeFinanceGuideName() !== currentProfile.guide_name);
 }
 function renderFinanceGuideFilterChipsOld(){
   const wrap = document.getElementById('financeGuideFilterChips');
