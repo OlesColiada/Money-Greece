@@ -516,7 +516,7 @@
     </details>
   </div>
 
-  <div class="step-block no-print manager-only" id="excursionPickerBlock" style="display:none;">
+  <div class="step-block no-print" id="excursionPickerBlock" style="display:none;">
     
     <p class="step-title">Які екскурсії відбулися чи відбуваються цього заїзду?</p>
     <div class="guide-chips" id="excursionPicker"></div>
@@ -1551,12 +1551,12 @@ function renderExcursions(){
       <summary class="exc-head-summary">
         <span class="exc-title-text">${displayName}</span>
         <span class="muted" style="font-size:12.5px;">${calc.totalPeople} чол · <span class="${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span></span>
-        <button class="btn btn-danger-ghost no-print manager-detail" data-role="delExcSummary" title="Видалити екскурсію" style="margin-left:8px; flex-shrink:0;">🗑️ Видалити екскурсію</button>
+        <button class="btn btn-danger-ghost no-print" data-role="delExcSummary" title="Видалити екскурсію" style="margin-left:8px; flex-shrink:0;">🗑️ Видалити екскурсію</button>
       </summary>
       <div class="exc-head">
         <select class="exc-name-select" data-role="excName">${nameOptions}</select>
         ${exc.name==="Інше..." ? `<input type="text" placeholder="Назва екскурсії" value="${exc.customName||''}" data-role="customName" style="min-width:120px;">` : ''}
-        <button class="btn btn-danger-ghost no-print manager-detail" data-role="delExc" style="margin-left:auto;">Видалити екскурсію</button>
+        <button class="btn btn-danger-ghost no-print" data-role="delExc" style="margin-left:auto;">Видалити екскурсію</button>
       </div>
       <div class="exc-body">
         <div class="subgrid">
