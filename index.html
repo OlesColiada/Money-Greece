@@ -1473,12 +1473,12 @@ function renderExcursionPicker(){
     chip.style.position = 'relative';
     chip.textContent = count ? `${name === "Інше..." ? "Інше" : name} (${count})` : `+ ${name === "Інше..." ? "Інше" : name}`;
     if(count) chip.classList.add('btn-primary');
-    chip.addEventListener('click', ()=>{
+    chip.addEventListener('click', async ()=>{
       if(count > 0 && !confirm(`Екскурсію "${name === "Інше..." ? "Інше" : name}" вже додано ${count} раз(и) цього заїзду.\n\nДодати ще одну (наприклад, якщо вона реально відбувається кілька разів)? Скасувати — якщо це просто повторний клік.`)) return;
       const exc = newExcursion(tripData.guides.map(g=>g.name), name);
       tripData.excursions.push(exc);
       renderAll();
-      upsertExcursion(currentTripId, exc);
+      await upsertExcursion(currentTripId, exc);
       exc.rows.forEach(r=> upsertRow(currentTripId, exc.id, r));
     });
     picker.appendChild(chip);
@@ -2085,14 +2085,14 @@ function deleteExcursion(excId, displayName){
   deleteExcursionDb(excId);
 }
 
-document.getElementById('addExcursionBtn').addEventListener('click', ()=>{
+document.getElementById('addExcursionBtn').addEventListener('click', async ()=>{
   if(!currentTripId) return;
   const tripData = getTripData(currentTripId);
   if(!tripData.guides.length) return;
   const exc = newExcursion(tripData.guides.map(g=>g.name));
   tripData.excursions.push(exc);
   renderAll();
-  upsertExcursion(currentTripId, exc);
+  await upsertExcursion(currentTripId, exc);
   exc.rows.forEach(r=> upsertRow(currentTripId, exc.id, r));
 });
 document.getElementById('printBtn').addEventListener('click', ()=> window.print());
