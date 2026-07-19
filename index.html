@@ -2654,7 +2654,7 @@ function renderTouristList(){
       <span class="t-name" style="flex:1;">${(t.last_name+' '+t.first_name).toUpperCase()}</span>
       ${age===null ? `<span class="profit-neg" style="font-size:11px;" title="Дата народження не вказана або не розпізналась — ціна за замовчуванням доросла">❓ дата?</span>` : `<span class="muted" style="font-size:11.5px;">${age} р.</span>`}
       ${allPaid ? `<span class="paid-badge">✓ оплачено</span>` : ''}
-      ${currentProfile.role==='manager' ? `<button class="row-del no-print" data-role="delTourist" data-id="${t.id}" title="Видалити туриста">✕</button>` : ''}
+      ${(currentProfile.role==='manager' || t.added_by_guide) ? `<button class="row-del no-print" data-role="delTourist" data-id="${t.id}" title="Видалити туриста">✕</button>` : ''}
     `;
     row.addEventListener('click', (e)=>{
       if(e.target.dataset.role==='delTourist') return;
@@ -2803,11 +2803,11 @@ function renderTouristDetail(){
     <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:4px;">
       <p class="report-title" style="margin:0;">${(t.last_name+' '+t.first_name).toUpperCase()}</p>
       <div style="display:flex; gap:6px;">
-        <button class="btn btn-danger-ghost btn-small no-print" id="deleteTouristBtn" title="Видалити туриста">🗑 Видалити</button>
+        ${t.added_by_guide ? `<button class="btn btn-danger-ghost btn-small no-print" id="deleteTouristBtn" title="Видалити туриста">🗑 Видалити</button>` : ''}
         <button class="btn btn-ghost btn-small no-print" id="closeTouristDetailBtn">✕ Закрити</button>
       </div>
     </div>
-    <details style="margin-bottom:10px;">
+    ${t.added_by_guide ? `<details style="margin-bottom:10px;">
       <summary style="cursor:pointer; font-size:12.5px; font-weight:600; color:var(--ink-soft);">✏️ Виправити ім'я / дату народження / паспорт</summary>
       <div class="subgrid" style="margin-top:8px;">
         <div class="field-group"><span>Ім'я:</span><input type="text" id="guideEditFirst" value="${t.first_name||''}" style="flex:1;"></div>
@@ -2818,7 +2818,7 @@ function renderTouristDetail(){
         <div class="field-group"><span>Паспортні дані:</span><input type="text" id="guideEditPassport" value="${t.passport_data||''}" style="flex:1;"></div>
       </div>
       <button class="btn btn-primary btn-small no-print" id="guideEditSaveBtn" style="margin-top:8px;">Зберегти</button>
-    </details>
+    </details>` : `<p class="report-note" style="margin-bottom:10px;">Ця людина — з основного списку (не додана тобою вручну), тому редагувати чи видаляти дані тут не можна. Якщо помітив помилку — повідом менеджера.</p>`}
     <div class="age-hero">
       <div class="label">Вік</div><div class="value">${age!==null ? age : '—'}</div>
     </div>
@@ -2846,7 +2846,8 @@ function renderTouristDetail(){
     await loadTourists();
     renderTouristSection();
   });
-  document.getElementById('guideEditSaveBtn').addEventListener('click', async ()=>{
+  const guideEditBtn = document.getElementById('guideEditSaveBtn');
+  if(guideEditBtn) guideEditBtn.addEventListener('click', async ()=>{
     const first = document.getElementById('guideEditFirst').value.trim();
     const last = document.getElementById('guideEditLast').value.trim();
     const birth = document.getElementById('guideEditBirth').value || null;
