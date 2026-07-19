@@ -1551,7 +1551,7 @@ function renderExcursions(){
       <summary class="exc-head-summary">
         <span class="exc-title-text">${displayName}</span>
         <span class="muted" style="font-size:12.5px;">${calc.totalPeople} чол · <span class="${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span></span>
-        <button class="row-del no-print manager-detail" data-role="delExcSummary" title="Видалити екскурсію" style="margin-left:8px;">✕</button>
+        <button class="btn btn-danger-ghost no-print manager-detail" data-role="delExcSummary" title="Видалити екскурсію" style="margin-left:8px; flex-shrink:0;">🗑️ Видалити екскурсію</button>
       </summary>
       <div class="exc-head">
         <select class="exc-name-select" data-role="excName">${nameOptions}</select>
