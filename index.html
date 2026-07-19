@@ -918,6 +918,8 @@ function ticketPriceForAge(age){
 
 const GUIDE_COLORS = {"Галя":"#7a2230","Ліда":"#274a72","Марта":"#6f9fc4","Іра":"#6fa383","Таня":"#c9a45c","Мирослава":"#d98a8a"};
 function guideColor(name){ return GUIDE_COLORS[name] || "#4a6b57"; }
+const GUIDE_DISPLAY_NAMES = { 'Іра': 'Ірен' };
+function guideDisplayName(name){ return GUIDE_DISPLAY_NAMES[name] || name; }
 
 const BUS_RATES = [1.4,1.5,1.6,1.7,1.8,1.9,2.0];
 const OWN_BUS_RATE = 1.6;
@@ -1337,6 +1339,10 @@ function renderTripGrid(){
       renderSectionTabs();
       if(currentSection==='tourists'){ await loadTourists(); renderTouristSection(); }
       if(currentSection==='finance'){ await renderFinanceSection(); }
+      if(currentSection==='profit' && !tripExcursionSignupsCache[currentTripId]){
+        tripExcursionSignupsCache[currentTripId] = await loadTripExcursionSignups(currentTripId);
+        renderExcursionPicker();
+      }
       if(currentSection==='managerReport'){ await renderManagerReportSection(); }
       if(currentSection==='tripPrep'){ await renderTripPrepSection(); }
     });
@@ -1364,7 +1370,7 @@ function renderGuidesBlock(){
       const chip = document.createElement('div');
       chip.className = 'guide-chip selected';
       chip.style.background = guideColor(g.name);
-      chip.innerHTML = `<span>${g.name}</span>
+      chip.innerHTML = `<span>${guideDisplayName(g.name)}</span>
         ${g.substituteNote ? `<span style="font-size:10px; opacity:.9;">(заміна: ${g.substituteNote})</span>` : ''}
         <span class="bus-toggle"><input type="checkbox" data-role="ownBus" ${g.ownBus?'checked':''}> наш автобус</span>
         <button type="button" data-role="editSub" style="background:none; border:none; color:#fff; opacity:.85; cursor:pointer; font-size:12px;" title="Позначити заміну гіда на цьому заїзді">✎ заміна</button>
@@ -1375,7 +1381,7 @@ function renderGuidesBlock(){
       });
       chip.querySelector('[data-role="editSub"]').addEventListener('click', (e)=>{
         e.stopPropagation();
-        const val = prompt(`Заміна на (ім'я і прізвище) для ${g.name} на цьому заїзді. Залиш порожнім, щоб прибрати нотатку:`, g.substituteNote||'');
+        const val = prompt(`Заміна на (ім'я і прізвище) для ${guideDisplayName(g.name)} на цьому заїзді. Залиш порожнім, щоб прибрати нотатку:`, g.substituteNote||'');
         if(val === null) return;
         g.substituteNote = val.trim();
         upsertGuide(currentTripId, g);
@@ -1394,7 +1400,7 @@ function renderGuidesBlock(){
       if(existing) chip.style.background = guideColor(name);
       chip.innerHTML = `
         <input type="checkbox" data-role="guideCheck" ${existing?'checked':''}>
-        <span>${name}</span>
+        <span>${guideDisplayName(name)}</span>
         ${existing ? `<span class="bus-toggle"><input type="checkbox" data-role="ownBus" ${existing.ownBus?'checked':''}> наш автобус</span>` : ''}
       `;
       chip.querySelector('[data-role="guideCheck"]').addEventListener('change', e=>{
@@ -1458,6 +1464,20 @@ function canEditRow(r){
   return true;
 }
 
+let tripExcursionSignupsCache = {};
+let excursionPickerShowAll = false;
+async function loadTripExcursionSignups(tripId){
+  const guideNames = getTripData(tripId).guides.map(g=>g.name);
+  if(!guideNames.length) return new Set();
+  const { data: tourists } = await sb.from('tourists').select('id').eq('trip_id', tripId).in('guide_name', guideNames);
+  const ids = (tourists||[]).map(t=>t.id);
+  if(!ids.length) return new Set();
+  const { data: sels } = await sb.from('tourist_excursion_selections').select('excursion_name,going,cancelled').in('tourist_id', ids);
+  const names = new Set();
+  (sels||[]).forEach(s=>{ if(s.going && !s.cancelled) names.add(s.excursion_name); });
+  return names;
+}
+
 function renderExcursionPicker(){
   const block = document.getElementById('excursionPickerBlock');
   if(!currentTripId){ block.style.display='none'; return; }
@@ -1466,7 +1486,13 @@ function renderExcursionPicker(){
   block.style.display='block';
   const picker = document.getElementById('excursionPicker');
   picker.innerHTML = "";
-  EXCURSIONS.filter(n=>n!=="Інше...").concat(["Інше..."]).forEach(name=>{
+  const allNames = EXCURSIONS.filter(n=>n!=="Інше...").concat(["Інше..."]);
+  const signups = tripExcursionSignupsCache[currentTripId];
+  // Show only excursions someone actually signed up for (plus any already added, plus "Інше...")
+  // — unless there are no signups yet, or the manager/guide asked to see everything.
+  const relevant = signups ? allNames.filter(n=> n==="Інше..." || signups.has(n) || tripData.excursions.some(e=>e.name===n)) : allNames;
+  const namesToShow = (excursionPickerShowAll || !signups || !relevant.length) ? allNames : relevant;
+  namesToShow.forEach(name=>{
     const count = tripData.excursions.filter(e=>e.name===name).length;
     const chip = document.createElement('button');
     chip.className = 'btn btn-ghost btn-small';
@@ -1483,6 +1509,14 @@ function renderExcursionPicker(){
     });
     picker.appendChild(chip);
   });
+  if(signups && relevant.length && relevant.length < allNames.length){
+    const toggle = document.createElement('button');
+    toggle.className = 'btn btn-ghost btn-small';
+    toggle.style.cssText = 'font-size:11.5px; opacity:0.75;';
+    toggle.textContent = excursionPickerShowAll ? '▲ Показати тільки ті, на які є записи' : `▼ Показати всі (${allNames.length})`;
+    toggle.addEventListener('click', ()=>{ excursionPickerShowAll = !excursionPickerShowAll; renderExcursionPicker(); });
+    picker.appendChild(toggle);
+  }
 }
 
 function buildProfitabilityRows(){
@@ -2435,7 +2469,7 @@ function renderTourSectionGuideChips(){
     const isActive = tourSectionGuideChosen && currentTourGuideName === g.name;
     chip.className = 'btn btn-ghost btn-small' + (isActive ? ' active-tab' : '');
     if(isActive){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
-    chip.textContent = `Заїзд: ${TRIPS_DEF.find(d=>d.id===currentTripId)?.label || ''} ${g.name}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
+    chip.textContent = `Заїзд: ${TRIPS_DEF.find(d=>d.id===currentTripId)?.label || ''} ${guideDisplayName(g.name)}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
     chip.addEventListener('click', ()=>{
       currentTourGuideName = g.name;
       touristGuideFilter = g.name;
@@ -2493,7 +2527,13 @@ document.getElementById('sectionTourBtn').addEventListener('click', ()=>{
   renderTripGrid();
   renderSectionTabs();
 });
-async function switchToProfitSection(){ currentSection='profit'; renderSectionTabs(); }
+async function switchToProfitSection(){
+  currentSection='profit'; renderSectionTabs();
+  if(currentTripId && !tripExcursionSignupsCache[currentTripId]){
+    tripExcursionSignupsCache[currentTripId] = await loadTripExcursionSignups(currentTripId);
+    if(currentSection==='profit') renderExcursionPicker();
+  }
+}
 async function switchToTouristsSection(){
   currentSection='tourists'; renderSectionTabs();
   if(currentProfile.role==='manager' && !touristGuideFilter){
@@ -2549,7 +2589,7 @@ function renderGuideFilterChips(){
     const active = activeTouristGuideName() === g.name;
     chip.className = 'btn btn-ghost btn-small tp-view-only-ok';
     if(active){ chip.style.background = guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor = guideColor(g.name); }
-    chip.textContent = g.name === currentProfile.guide_name ? `${g.name} (я сам)` : g.name;
+    chip.textContent = g.name === currentProfile.guide_name ? `${guideDisplayName(g.name)} (я сам)` : guideDisplayName(g.name);
     chip.addEventListener('click', async ()=>{
       testAccountGuideFilter = g.name;
       openTouristId = null;
@@ -2763,10 +2803,22 @@ function renderTouristDetail(){
     <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:4px;">
       <p class="report-title" style="margin:0;">${(t.last_name+' '+t.first_name).toUpperCase()}</p>
       <div style="display:flex; gap:6px;">
-        ${currentProfile.role==='manager' ? `<button class="btn btn-danger-ghost btn-small no-print" id="deleteTouristBtn" title="Видалити туриста">🗑 Видалити</button>` : ''}
+        <button class="btn btn-danger-ghost btn-small no-print" id="deleteTouristBtn" title="Видалити туриста">🗑 Видалити</button>
         <button class="btn btn-ghost btn-small no-print" id="closeTouristDetailBtn">✕ Закрити</button>
       </div>
     </div>
+    <details style="margin-bottom:10px;">
+      <summary style="cursor:pointer; font-size:12.5px; font-weight:600; color:var(--ink-soft);">✏️ Виправити ім'я / дату народження / паспорт</summary>
+      <div class="subgrid" style="margin-top:8px;">
+        <div class="field-group"><span>Ім'я:</span><input type="text" id="guideEditFirst" value="${t.first_name||''}" style="flex:1;"></div>
+        <div class="field-group"><span>Прізвище:</span><input type="text" id="guideEditLast" value="${t.last_name||''}" style="flex:1;"></div>
+      </div>
+      <div class="subgrid" style="margin-top:8px;">
+        <div class="field-group"><span>Дата народження:</span><input type="date" id="guideEditBirth" value="${t.birth_date||''}"></div>
+        <div class="field-group"><span>Паспортні дані:</span><input type="text" id="guideEditPassport" value="${t.passport_data||''}" style="flex:1;"></div>
+      </div>
+      <button class="btn btn-primary btn-small no-print" id="guideEditSaveBtn" style="margin-top:8px;">Зберегти</button>
+    </details>
     <div class="age-hero">
       <div class="label">Вік</div><div class="value">${age!==null ? age : '—'}</div>
     </div>
@@ -2793,6 +2845,17 @@ function renderTouristDetail(){
     openTouristId = null;
     await loadTourists();
     renderTouristSection();
+  });
+  document.getElementById('guideEditSaveBtn').addEventListener('click', async ()=>{
+    const first = document.getElementById('guideEditFirst').value.trim();
+    const last = document.getElementById('guideEditLast').value.trim();
+    const birth = document.getElementById('guideEditBirth').value || null;
+    const passport = document.getElementById('guideEditPassport').value.trim();
+    const { error } = await sb.from('tourists').update({ first_name:first, last_name:last, birth_date:birth, passport_data:passport }).eq('id', t.id);
+    if(error){ alert(friendlyErrorMessage(error)); return; }
+    await loadTourists();
+    renderTouristSection();
+    hbShowToast('✅ Дані оновлено');
   });
 
   block.querySelectorAll('[data-role="toggleEdit"]').forEach(el=> el.addEventListener('click', e=>{
@@ -3347,7 +3410,7 @@ function renderFinanceGuideFilterChips(){
     const active = activeFinanceGuideName() === g.name;
     chip.className = 'btn btn-ghost btn-small tp-view-only-ok';
     if(active){ chip.style.background = guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor = guideColor(g.name); }
-    chip.textContent = g.name === currentProfile.guide_name ? `${g.name} (я сам)` : g.name;
+    chip.textContent = g.name === currentProfile.guide_name ? `${guideDisplayName(g.name)} (я сам)` : guideDisplayName(g.name);
     chip.addEventListener('click', async ()=>{
       testAccountGuideFilter = g.name;
       await renderFinanceSection();
@@ -3478,7 +3541,7 @@ function renderFinanceReport(report){
   block.innerHTML = `
     <div>
       <p class="report-title" style="margin:0;">Фінансовий звіт</p>
-      <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${report.guide_name}${substituteNote}</p>
+      <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${guideDisplayName(report.guide_name)}${substituteNote}</p>
     </div>
 
     ${suggestions.length ? `<div class="no-print" style="margin-top:12px; background:var(--whitewash-2); border-radius:8px; padding:8px 10px;">
@@ -5835,7 +5898,7 @@ function renderBusSeatChart(busName){
 
   content.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <p class="report-title" style="margin:0;">🪑 Розсадка: ${busName}</p>
+      <p class="report-title" style="margin:0;">🪑 Розсадка: ${guideDisplayName(busName)}</p>
       <button class="btn btn-ghost btn-small no-print" id="tpBackToBusesBtn">← Назад до автобусів</button>
     </div>
     <div class="no-print" style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
@@ -6554,7 +6617,7 @@ async function renderTripPrepDocs(){
   } else {
     packagesWrap.innerHTML = tripDataForPackages.guides.map(g=>`
       <div class="fin-row" style="flex-wrap:wrap;">
-        <span class="fin-label" style="font-weight:700;">${g.name}</span>
+        <span class="fin-label" style="font-weight:700;">${guideDisplayName(g.name)}</span>
         <button class="btn btn-primary btn-small no-print" data-role="tpPkgPrepare" data-guide="${g.name}">🔧 Підготувати документи в тур</button>
         <button class="btn btn-ghost btn-small no-print" data-role="tpPkgPreview" data-guide="${g.name}">👁 Передивитись документи</button>
         <button class="btn btn-ghost btn-small no-print" data-role="tpPkgPrint" data-guide="${g.name}">🖨 Друк</button>
