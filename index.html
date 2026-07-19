@@ -420,6 +420,7 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
   .login-overlay{
     position:fixed; inset:0; background:var(--whitewash); z-index:1000;
@@ -473,6 +474,8 @@
     <button class="btn btn-ghost section-tab guide-only" id="sectionProfitBtnDirect">Прибутковість</button>
     <button class="btn btn-ghost section-tab guide-only" id="sectionFinanceBtnDirect">Фінансовий звіт</button>
     <button class="btn btn-ghost section-tab manager-only" id="sectionManagerReportBtn">Звіт керівника</button>
+    <button class="btn btn-ghost section-tab manager-only" id="sectionReportsBtn">Звіти</button>
+    <button class="btn btn-ghost section-tab manager-only" id="sectionStatsBtn">Статистика</button>
   </div>
 
   <div class="step-block no-print manager-only" id="managerTripPickBlock">
@@ -559,7 +562,7 @@
       <div class="guide-chips" id="guideFilterChips"></div>
     </div>
 
-    <section class="step-block" id="touristStatsSection">
+    <section class="step-block guide-only" id="touristStatsSection" style="display:none;">
       <details>
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Статистика по екскурсіях</summary>
         <p class="report-note" style="margin:6px 0 0;">К-сть туристів і зібрана сума по кожній екскурсії (поточна група поточного заїзду).</p>
@@ -675,6 +678,14 @@
 
   <div id="managerReportSection" style="display:none;">
     <div class="step-block" id="managerReportBlock"></div>
+  </div>
+
+  <div id="reportsSection" style="display:none;">
+    <div class="step-block" id="reportsBlock"></div>
+  </div>
+
+  <div id="statsSection" style="display:none;">
+    <div class="step-block" id="statsBlock"></div>
   </div>
 
   <div id="tripPrepSection" style="display:none;">
@@ -2206,6 +2217,27 @@ function revealApp(){
   document.getElementById('appFooter').classList.remove('app-hidden');
 }
 
+async function pickTripIdForCurrentUser(){
+  if(currentProfile.role === 'guide' && currentProfile.guide_name && !currentProfile.is_test_account){
+    const { data: myTripGuides, error } = await sb.from('trip_guides').select('trip_id').eq('guide_name', currentProfile.guide_name);
+    if(!error && myTripGuides){
+      const myTripIds = new Set(myTripGuides.map(r=>r.trip_id));
+      const myTrips = TRIPS_DEF.filter(d=> myTripIds.has(d.id));
+      if(myTrips.length){
+        const ongoing = myTrips.find(d=> tripStatus(d).text === 'Триває');
+        if(ongoing){ cacheOffline('myTripId:'+currentProfile.guide_name, ongoing.id); return ongoing.id; }
+        const upcoming = [...myTrips].sort((a,b)=>a.start-b.start).find(d=> tripStatus(d).text === 'Заплановано');
+        if(upcoming){ cacheOffline('myTripId:'+currentProfile.guide_name, upcoming.id); return upcoming.id; }
+        const mostRecent = [...myTrips].sort((a,b)=>b.start-a.start)[0];
+        cacheOffline('myTripId:'+currentProfile.guide_name, mostRecent.id);
+        return mostRecent.id;
+      }
+    }
+  }
+  const activeDef = TRIPS_DEF.find(d=> tripStatus(d).text === 'Триває') || TRIPS_DEF[0];
+  return activeDef ? activeDef.id : null;
+}
+
 async function afterAuthSuccess(){
   const { data:{ user } } = await sb.auth.getUser();
   if(!user) return;
@@ -2221,7 +2253,10 @@ async function afterAuthSuccess(){
   const cachedTripsList = getOfflineCache('tripsList');
   if(cachedTripsList && cachedTripsList.data.length){
     TRIPS_DEF = cachedTripsList.data.map(t=>({...t, start:new Date(t.start), end:new Date(t.end)}));
-    const activeDef = TRIPS_DEF.find(d=> tripStatus(d).text === 'Триває') || TRIPS_DEF[0];
+    const cachedMyTripId = (currentProfile.role==='guide' && currentProfile.guide_name) ? getOfflineCache('myTripId:'+currentProfile.guide_name) : null;
+    const activeDef = (cachedMyTripId && TRIPS_DEF.find(d=>d.id===cachedMyTripId.data))
+      ? TRIPS_DEF.find(d=>d.id===cachedMyTripId.data)
+      : (TRIPS_DEF.find(d=> tripStatus(d).text === 'Триває') || TRIPS_DEF[0]);
     currentTripId = activeDef.id;
     const cachedTrip = getOfflineCache('trip:'+currentTripId);
     if(cachedTrip){
@@ -2240,8 +2275,7 @@ async function afterAuthSuccess(){
 
   TRIPS_DEF = await fetchTrips();
   if(TRIPS_DEF.length){
-    const activeDef = TRIPS_DEF.find(d=> tripStatus(d).text === 'Триває') || TRIPS_DEF[0];
-    currentTripId = activeDef.id;
+    currentTripId = await pickTripIdForCurrentUser();
     await loadTripData(currentTripId);
     guidesEditMode = getTripData(currentTripId).guides.length < 3;
   } else {
@@ -2421,6 +2455,8 @@ function renderSectionTabs(){
   document.getElementById('sectionFinanceBtnDirect').classList.toggle('active-tab', currentSection==='finance');
   document.getElementById('sectionFinanceBtn').classList.toggle('active-tab', currentSection==='finance');
   document.getElementById('sectionManagerReportBtn').classList.toggle('active-tab', currentSection==='managerReport');
+  document.getElementById('sectionReportsBtn').classList.toggle('active-tab', currentSection==='reports');
+  document.getElementById('sectionStatsBtn').classList.toggle('active-tab', currentSection==='stats');
   document.getElementById('sectionTripPrepBtn').classList.toggle('active-tab', currentSection==='tripPrep');
   document.getElementById('tourSection').style.display = inTourGroup ? 'block' : 'none';
   document.getElementById('tourSectionPlaceholder').style.display = needsTripPick ? 'block' : 'none';
@@ -2431,6 +2467,8 @@ function renderSectionTabs(){
   document.getElementById('touristSection').style.display = (currentSection==='tourists' && !needsPick) ? 'block' : 'none';
   document.getElementById('financeSection').style.display = (currentSection==='finance' && !needsPick) ? 'block' : 'none';
   document.getElementById('managerReportSection').style.display = currentSection==='managerReport' ? 'block' : 'none';
+  document.getElementById('reportsSection').style.display = currentSection==='reports' ? 'block' : 'none';
+  document.getElementById('statsSection').style.display = currentSection==='stats' ? 'block' : 'none';
   document.getElementById('tripPrepSection').style.display = currentSection==='tripPrep' ? 'block' : 'none';
   if(inTourGroup) updateTourSectionBanner();
 }
@@ -2474,6 +2512,14 @@ document.getElementById('sectionFinanceBtnDirect').addEventListener('click', swi
 document.getElementById('sectionManagerReportBtn').addEventListener('click', async ()=>{
   currentSection='managerReport'; renderTripGrid(); renderSectionTabs();
   await renderManagerReportSection();
+});
+document.getElementById('sectionReportsBtn').addEventListener('click', async ()=>{
+  currentSection='reports'; renderTripGrid(); renderSectionTabs();
+  await renderReportsSection();
+});
+document.getElementById('sectionStatsBtn').addEventListener('click', async ()=>{
+  currentSection='stats'; renderTripGrid(); renderSectionTabs();
+  await renderStatsSection();
 });
 document.getElementById('sectionTripPrepBtn').addEventListener('click', async ()=>{
   currentSection='tripPrep'; renderTripGrid(); renderSectionTabs();
@@ -3834,6 +3880,192 @@ async function computeMissingPullSuggestions(tripId, report){
     if(!hasPerDiem) suggestions.push({ label:`Добові: ${g}`, amount:perDiemAmt, guide:g, sourceLabel:'Добові' });
   }
   return suggestions;
+}
+
+async function ensureAllTripsLoaded(){
+  const missing = TRIPS_DEF.filter(d=>!state.trips[d.id]);
+  await Promise.all(missing.map(d=>loadTripData(d.id)));
+}
+
+async function renderReportsSection(){
+  const block = document.getElementById('reportsBlock');
+  block.innerHTML = `<p class="report-note">Завантаження…</p>`;
+
+  const [{ data: allReports, error: repErr }] = await Promise.all([
+    sb.from('financial_reports').select('*'),
+    ensureAllTripsLoaded()
+  ]);
+  if(repErr) console.error(repErr);
+
+  // ---- Фінзвіти гідів по датам турів ----
+  const reportsByTrip = {};
+  (allReports||[]).forEach(r=>{
+    if(!reportsByTrip[r.trip_id]) reportsByTrip[r.trip_id] = [];
+    reportsByTrip[r.trip_id].push(r);
+  });
+  const tripsSorted = [...TRIPS_DEF].sort((a,b)=> b.start - a.start);
+  const financeHtml = tripsSorted.map(def=>{
+    const reports = reportsByTrip[def.id] || [];
+    const td = state.trips[def.id];
+    const guideNames = td ? td.guides.map(g=>g.name) : [];
+    if(!guideNames.length && !reports.length) return '';
+    const rowsHtml = guideNames.map(gName=>{
+      const r = reports.find(x=>x.guide_name===gName);
+      const status = r && r.submitted ? `✅ Здав${r.submitted_at ? ' · '+new Date(r.submitted_at).toLocaleDateString('uk-UA') : ''}` : (r ? '📝 Заповнює' : '— Не почав');
+      const handed = r ? fmt(r.handed_over||0)+' €' : '—';
+      return `<div class="fin-row">
+        <span class="fin-label">${gName}</span>
+        <span class="muted" style="font-size:12.5px;">${status}</span>
+        <span style="font-weight:700;">${handed}</span>
+        ${r ? `<button class="btn btn-ghost btn-small no-print" data-role="reportsDownloadFin" data-trip="${def.id}" data-guide="${gName}">⬇</button>` : ''}
+      </div>`;
+    }).join('');
+    return `<details style="margin-bottom:10px;">
+      <summary style="cursor:pointer; font-weight:700;">${def.label} <span class="muted" style="font-weight:400; font-size:12.5px;">(${tripStatus(def).text})</span></summary>
+      <div style="margin-top:8px;">${rowsHtml || '<p class="report-note">Гіди ще не призначені.</p>'}</div>
+    </details>`;
+  }).join('') || '<p class="report-note">Немає даних.</p>';
+
+  // ---- Зведена таблиця прибутковості по екскурсіям (весь сезон) ----
+  const byExcName = {};
+  TRIPS_DEF.forEach(def=>{
+    const td = state.trips[def.id];
+    if(!td) return;
+    (td.excursions||[]).forEach(exc=>{
+      const label = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+      if(!byExcName[label]) byExcName[label] = { count:0, people:0, collected:0, cost:0, profit:0, guideShare:0, officeShare:0 };
+      const calc = calcExcursion(exc);
+      const realRows = calc.rowResults.filter(r=>r.isGuide && !r.isTest);
+      if(!realRows.length) return;
+      byExcName[label].count++;
+      byExcName[label].people += calc.totalPeople;
+      realRows.forEach(r=>{
+        byExcName[label].collected += Number(r.zibrano)||0;
+        byExcName[label].cost += Number(r.totalCost)||0;
+        byExcName[label].profit += Number(r.profit)||0;
+        byExcName[label].guideShare += Number(r.gInc)||0;
+        byExcName[label].officeShare += Number(r.oInc)||0;
+      });
+    });
+  });
+  const excNames = Object.keys(byExcName).sort((a,b)=> byExcName[b].profit - byExcName[a].profit);
+  const seasonRows = excNames.map(name=>{
+    const s = byExcName[name];
+    return `<tr>
+      <td style="text-align:left;">${name}</td>
+      <td>${s.count}</td>
+      <td>${s.people}</td>
+      <td>${fmt(s.collected)}</td>
+      <td>${fmt(s.cost)}</td>
+      <td class="${s.profit>=0?'profit-pos':'profit-neg'}">${fmt(s.profit)}</td>
+      <td>${fmt(s.guideShare)}</td>
+      <td>${fmt(s.officeShare)}</td>
+    </tr>`;
+  }).join('');
+  const grandProfit = excNames.reduce((sum,n)=>sum+byExcName[n].profit,0);
+
+  block.innerHTML = `
+    <p class="report-title" style="margin:0;">Звіти</p>
+
+    <p class="fin-section-title">Фінзвіти гідів по датам турів</p>
+    <div id="reportsFinanceList">${financeHtml}</div>
+
+    <p class="fin-section-title">Зведена прибутковість по екскурсіям (весь сезон)</p>
+    <div class="table-scroll">
+      <table class="report-table">
+        <thead><tr><th style="text-align:left;">Екскурсія</th><th>Разів</th><th>Людей</th><th>Зібрано €</th><th>Затрати €</th><th>Прибуток €</th><th>Гід 10% €</th><th>Офіс 90% €</th></tr></thead>
+        <tbody>${seasonRows || '<tr><td colspan="8" class="muted">Немає даних.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="fin-total-row" style="margin-top:8px;"><span>Загальний прибуток за сезон</span><span>${fmt(grandProfit)} €</span></div>
+  `;
+
+  block.querySelectorAll('[data-role="reportsDownloadFin"]').forEach(btn=> btn.addEventListener('click', ()=>{
+    downloadXlsxSnapshot(`${btn.dataset.trip}/finance-report/${btn.dataset.guide}/report_${tripFileTag(btn.dataset.trip)}.xlsx`, 'Ще немає збереженої версії цього звіту.');
+  }));
+}
+
+async function renderStatsSection(){
+  const block = document.getElementById('statsBlock');
+  block.innerHTML = `<p class="report-note">Завантаження…</p>`;
+
+  await ensureAllTripsLoaded();
+  const { data: allTourists, error: tErr } = await sb.from('tourists').select('id,trip_id,guide_name');
+  if(tErr) console.error(tErr);
+  const touristIds = (allTourists||[]).map(t=>t.id);
+  let allSelections = [];
+  if(touristIds.length){
+    const { data: sels, error: sErr } = await sb.from('tourist_excursion_selections').select('*').in('tourist_id', touristIds);
+    if(sErr) console.error(sErr);
+    allSelections = sels || [];
+  }
+  const touristsByTrip = {};
+  (allTourists||[]).forEach(t=>{ if(!touristsByTrip[t.trip_id]) touristsByTrip[t.trip_id]=[]; touristsByTrip[t.trip_id].push(t); });
+  const selsByTouristId = {};
+  allSelections.forEach(s=>{ if(!selsByTouristId[s.tourist_id]) selsByTouristId[s.tourist_id]=[]; selsByTouristId[s.tourist_id].push(s); });
+
+  const tripsSorted = [...TRIPS_DEF].sort((a,b)=> b.start - a.start);
+  let seasonProfit=0, seasonCost=0, seasonCollected=0, seasonTourists=0;
+
+  const tripBlocksHtml = tripsSorted.map(def=>{
+    const td = state.trips[def.id];
+    if(!td) return '';
+    const tourists = touristsByTrip[def.id] || [];
+    const touristCount = tourists.length;
+
+    const excStats = {};
+    tourists.forEach(t=>{
+      (selsByTouristId[t.id]||[]).forEach(s=>{
+        if(!(s.going && !s.cancelled)) return;
+        if(!excStats[s.excursion_name]) excStats[s.excursion_name] = {count:0, sum:0};
+        excStats[s.excursion_name].count++;
+        excStats[s.excursion_name].sum += Number(s.price)||0;
+      });
+    });
+    const excRowsHtml = Object.keys(excStats).sort((a,b)=>excStats[b].count-excStats[a].count).map(name=>
+      `<tr><td style="text-align:left;">${name}</td><td>${excStats[name].count}</td><td>${fmt(excStats[name].sum)} €</td></tr>`
+    ).join('');
+
+    const perGuide = calcTripByGuide(td);
+    let tripProfit=0, tripCost=0, tripCollected=0;
+    Object.values(perGuide).forEach(g=>{ tripProfit+=g.profit||0; tripCost+=g.cost||0; tripCollected+=g.collected||0; });
+    seasonProfit += tripProfit; seasonCost += tripCost; seasonCollected += tripCollected; seasonTourists += touristCount;
+
+    return `<details style="margin-bottom:10px;">
+      <summary style="cursor:pointer; font-weight:700;">${def.label} <span class="muted" style="font-weight:400; font-size:12.5px;">(${tripStatus(def).text}) · ${touristCount} туристів · <span class="${tripProfit>=0?'profit-pos':'profit-neg'}">${fmt(tripProfit)} € прибутку</span></span></summary>
+      <div style="margin-top:8px;">
+        <div class="exc-summary">
+          <div class="stat"><span class="label">Туристів (у гідів)</span><span class="value">${touristCount}</span></div>
+          <div class="stat"><span class="label">Зібрано (Прибутковість)</span><span class="value">${fmt(tripCollected)} €</span></div>
+          <div class="stat"><span class="label">Затрати</span><span class="value">${fmt(tripCost)} €</span></div>
+          <div class="stat"><span class="label">Прибуток</span><span class="value">${fmt(tripProfit)} €</span></div>
+        </div>
+        ${excRowsHtml ? `<div class="table-scroll" style="margin-top:10px;">
+          <table class="report-table">
+            <thead><tr><th style="text-align:left;">Екскурсія</th><th>Туристів</th><th>Зібрано</th></tr></thead>
+            <tbody>${excRowsHtml}</tbody>
+          </table>
+        </div>` : '<p class="report-note" style="margin-top:8px;">Немає даних по екскурсіях туристів.</p>'}
+      </div>
+    </details>`;
+  }).join('') || '<p class="report-note">Немає даних.</p>';
+
+  block.innerHTML = `
+    <p class="report-title" style="margin:0;">Статистика</p>
+    <p class="report-note">По кожному заїзду — розгорни для деталей.</p>
+    <div style="margin-top:10px;">${tripBlocksHtml}</div>
+
+    <div class="step-block" style="margin-top:20px; background:var(--whitewash-2);">
+      <p class="report-title" style="margin:0;">Загальна статистика за сезон</p>
+      <div class="exc-summary" style="margin-top:10px;">
+        <div class="stat"><span class="label">Заїздів</span><span class="value">${tripsSorted.length}</span></div>
+        <div class="stat"><span class="label">Туристів всього</span><span class="value">${seasonTourists}</span></div>
+        <div class="stat"><span class="label">Зібрано всього</span><span class="value">${fmt(seasonCollected)} €</span></div>
+        <div class="stat"><span class="label">Затрати всього</span><span class="value">${fmt(seasonCost)} €</span></div>
+      </div>
+      <div class="fin-total-row" style="margin-top:10px;"><span>Прибуток за сезон (усі гіди)</span><span>${fmt(seasonProfit)} €</span></div>
+    </div>
+  `;
 }
 
 async function renderManagerReportSection(){
@@ -5674,6 +5906,20 @@ async function hbBusSeatClick(busName, seatNum){
 /* ---------- Reusable document export helpers (Excel / Word / PDF-via-print) ---------- */
 const RICHTOUR_LETTERHEAD = `ПП Агенція подорожей «Річ-Тур»<br>м.Львів вул. Антоновича 120<br>тел.: +380 (050) 370 41 12<br>E-mail: richtourfamily@gmail.com`;
 
+function docBuildExcelBlob(headers, rows, sheetName){
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  const wbOut = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  return new Blob([wbOut], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function docBuildWordBlob(title, bodyHtml){
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+    <head><meta charset="utf-8"><title>${title}</title></head>
+    <body style="font-family:Calibri, Arial, sans-serif;">${bodyHtml}</body></html>`;
+  return new Blob(['\ufeff', html], { type: 'application/msword' });
+}
+
 function docExportExcel(headers, rows, sheetName, filename){
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const wb = XLSX.utils.book_new();
@@ -5744,6 +5990,13 @@ async function renderTripPrepDocs(){
 
   content.innerHTML = `
     <p class="report-note">Документи будуються з поточного стану розселення (готель) й розподілу по автобусах.</p>
+
+    <div class="step-block" style="background:var(--whitewash-2); margin-bottom:16px;">
+      <p class="step-title" style="margin:0 0 8px;">📦 Пакет документів по гідах</p>
+      <p class="report-note" style="margin:0 0 10px;">Для кожного гіда — рум-лист, кордон, страхівки, збір коштів, місто посадки, боржники (де він відповідальний) та інфолист, зібрані з даних саме його групи.</p>
+      <div id="tpGuidePackagesWrap" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
     <div style="display:flex; flex-direction:column; gap:10px; align-items:flex-start; margin-top:10px;">
       <div><b>Рум-лист:</b>
         <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="konstantin" data-fmt="excel">📥 Konstantin — Excel</button>
@@ -6042,6 +6295,210 @@ async function renderTripPrepDocs(){
     if(docFmt==='word') docExportWord('Інфолист', busSections, `Інфолист_${tripLabel}.doc`);
     else docOpenPrintWindow('Інфолист', busSections);
   }));
+
+  // ---------- Per-guide document packages ----------
+  function buildRoomingRowsForGuide(guideName){
+    const rows = []; let n = 1;
+    ['konstantin','greataleksander'].forEach(hotelKey=>{
+      const hotelDb = (hbDatabase[hotelKey] && hbDatabase[hotelKey][period]) || [];
+      const allRooms = hbGetAllRoomsForHotel(hotelKey).sort((a,b)=>a.number-b.number);
+      allRooms.forEach(room=>{
+        const entry = hotelDb.find(e=>e.number===room.number);
+        if(!entry || !entry.shares.length) return;
+        entry.shares.forEach(sh=>{
+          const matched = (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===String(sh.requestNum) && t.assigned_bus===guideName);
+          matched.forEach(t=>{
+            const age = t.birth_date && def ? calcAgeAtTrip(t.birth_date, def.start) : '';
+            rows.push([n++, t.full_name, formatDateGreek(t.birth_date)||t.birth_date||'', t.passport||'', age, room.number, HB_HOTEL_STRUCTURE[hotelKey].name]);
+          });
+        });
+      });
+    });
+    return rows;
+  }
+  function buildInfoSheetForGuide(guideName){
+    const cfg = tripPrepBusSeatData.fullConfigs[guideName] || {};
+    return `
+      <div style="background:linear-gradient(90deg,#f97316,#ef4444); color:#fff; padding:14px 18px; border-radius:8px; margin-bottom:14px;">
+        <div style="font-size:20px; font-weight:bold;">Rich Tour</div>
+        <div style="font-size:12px;">Тури, багаті емоціями · (050) 370 41 12 · (067) 533 11 89 · rich-tour.com · м. Львів, вул. Антоновича, 120, офіс 101</div>
+      </div>
+      <h1 style="text-align:center;">ІНФОЛИСТ</h1>
+      <h2 style="text-align:center;">Море Греції</h2>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+        <tr><td style="border:1px solid #333; padding:6px; font-weight:bold; width:35%;">Дата туру</td><td style="border:1px solid #333; padding:6px;">${tripLabel}</td></tr>
+        <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Номер рейсу/групи</td><td style="border:1px solid #333; padding:6px;">${cfg.gr_slot||'—'}</td></tr>
+        <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Керівник групи</td><td style="border:1px solid #333; padding:6px;">${guideName}${cfg.guide_phone?' '+cfg.guide_phone:''}<br><i>(телефон активний в день виїзду)</i></td></tr>
+        <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Місце знаходження автобуса</td><td style="border:1px solid #333; padding:6px;">${cfg.meeting_point||'—'}</td></tr>
+        <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Час збору групи</td><td style="border:1px solid #333; padding:6px;">${cfg.gather_time||'—'}</td></tr>
+        <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Час відправлення автобуса</td><td style="border:1px solid #333; padding:6px;">${cfg.departure_time||'—'}</td></tr>
+        <tr><td style="border:1px solid #333; padding:6px; font-weight:bold;">Можливість приєднатись до автобуса</td><td style="border:1px solid #333; padding:6px; white-space:pre-line;">${cfg.pickup_points_text||'—'}</td></tr>
+        <tr><td colspan="2" style="border:1px solid #333; padding:6px; font-weight:bold; text-align:center;">Проживання: готель 3* (згідно заявки)<br>Konstantin 3* або Great Aleksander 3*</td></tr>
+        <tr><td colspan="2" style="border:1px solid #333; padding:6px; font-weight:bold; text-align:center;">Харчування: сніданки і вечері</td></tr>
+      </table>
+      ${INFOLIST_BOILERPLATE}`;
+  }
+  function buildGuidePackage(guideName){
+    const guideTourists = (tripPrepData.tourists||[]).filter(t=>t.assigned_bus===guideName);
+    let n;
+    n=1; const insuranceRows = guideTourists.map(t=>[n++, t.full_name, t.birth_date?formatDateDots(t.birth_date):'', t.passport||'']);
+    n=1; const excRows = guideTourists.map(t=>[n++, t.full_name,'','','','','','','','']);
+    const byCity = {};
+    guideTourists.forEach(t=>{ const city=t.pickup_city||'Не вказано'; if(!byCity[city]) byCity[city]=[]; byCity[city].push(t); });
+    const cityRows = [];
+    Object.keys(byCity).sort().forEach(city=> byCity[city].forEach(t=> cityRows.push([city, t.full_name, t.phone, guideName])));
+    const borderSection = buildBorderSections().find(s=>s.bus===guideName);
+    const debtorGroups = buildDebtorGroups().filter(g=>g.responsible===guideName);
+    const debtRows = debtorGroups.map(g=>[g.bookingNumbers.join(', '), g.names.join(', '), fmt(g.debt), debtNotesMap[g.gk]||'']);
+    return {
+      rooming: { headers:['№','ПІБ','Дата нар.','Паспорт','Вік','№ кімнати','Готель'], rows: buildRoomingRowsForGuide(guideName) },
+      border: { headers:['№ п.п.','ПІБ','Дата нар.','Паспорт'], rows: borderSection ? borderSection.rows : [] },
+      insurance: { headers:['№','ПІ','Дата нар.','Паспорт'], rows: insuranceRows },
+      excursions: { headers:['№','Name Surname','Халкідіки 40/25','Скіатос 60/45','Метеори 40/35','Салоніки 30/25','ТрансСалон 25/20','Транс. грязі 15/10','Едесса 40/30','Олімп 35/25'], rows: excRows },
+      city: { headers:['Місто посадки','ПІБ','Телефон','Автобус'], rows: cityRows },
+      debtors: { headers:['Заявка','ПІБ','Борг €','Нотатки'], rows: debtRows.length?debtRows:[['Боржників немає','','','']] },
+      infoSheetHtml: buildInfoSheetForGuide(guideName)
+    };
+  }
+
+  async function buildGuidePackageZipBlob(guideName){
+    const pkg = buildGuidePackage(guideName);
+    const zip = new JSZip();
+    zip.file('Рум-лист.xlsx', docBuildExcelBlob(pkg.rooming.headers, pkg.rooming.rows, 'Рум-лист'));
+    zip.file('Список на кордон.xlsx', docBuildExcelBlob(pkg.border.headers, pkg.border.rows, 'Кордон'));
+    zip.file('Страхівки.xlsx', docBuildExcelBlob(pkg.insurance.headers, pkg.insurance.rows, 'Страхівки'));
+    zip.file('Список на збір коштів.xlsx', docBuildExcelBlob(pkg.excursions.headers, pkg.excursions.rows, 'Збір коштів'));
+    zip.file('Список по містах посадки.xlsx', docBuildExcelBlob(pkg.city.headers, pkg.city.rows, 'Посадка'));
+    zip.file('Список боржників.xlsx', docBuildExcelBlob(pkg.debtors.headers, pkg.debtors.rows, 'Боржники'));
+    zip.file('Інфолист.doc', docBuildWordBlob('Інфолист', pkg.infoSheetHtml));
+    return await zip.generateAsync({ type:'blob' });
+  }
+  async function downloadGuidePackageZip(guideName){
+    const blob = await buildGuidePackageZipBlob(guideName);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Пакет_${guideName}_${tripFileTag(currentTripId)}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function validateGuidePackage(guideName){
+    const issues = [];
+    const guideTourists = (tripPrepData.tourists||[]).filter(t=>t.assigned_bus===guideName);
+    if(!guideTourists.length){ issues.push('Немає жодного туриста, призначеного на цей автобус.'); return issues; }
+    const noBirth = guideTourists.filter(t=>!t.birth_date);
+    if(noBirth.length) issues.push(`${noBirth.length} чол без дати народження.`);
+    const noPassport = guideTourists.filter(t=>!t.passport);
+    if(noPassport.length) issues.push(`${noPassport.length} чол без паспортних даних.`);
+    const noCity = guideTourists.filter(t=>!t.pickup_city);
+    if(noCity.length) issues.push(`${noCity.length} чол без міста посадки.`);
+    const cfg = tripPrepBusSeatData.fullConfigs[guideName] || {};
+    if(!cfg.gr_slot) issues.push('Не вказано GR-слот автобуса (вкладка "Автобуси").');
+    if(!cfg.meeting_point) issues.push('Не вказано місце збору.');
+    if(!cfg.gather_time) issues.push('Не вказано час збору.');
+    if(!cfg.departure_time) issues.push('Не вказано час відправлення.');
+    if(!cfg.guide_phone) issues.push('Не вказано телефон гіда.');
+    const roomedNames = new Set();
+    ['konstantin','greataleksander'].forEach(hotelKey=>{
+      const hotelDb = (hbDatabase[hotelKey] && hbDatabase[hotelKey][period]) || [];
+      hotelDb.forEach(entry=> entry.shares.forEach(sh=> (sh.memberNames||[]).forEach(n=> roomedNames.add(n))));
+    });
+    const notRoomed = guideTourists.filter(t=> roomedNames.size && !roomedNames.has(t.full_name));
+    if(roomedNames.size && notRoomed.length) issues.push(`${notRoomed.length} чол можуть бути ще не поселені в кімнату (перевір вкладку "Готель") — це орієнтовно, точна перевірка не завжди можлива для старих бронювань.`);
+    return issues;
+  }
+
+  async function prepareGuidePackage(guideName, btn){
+    const issues = validateGuidePackage(guideName);
+    if(issues.length){
+      const proceed = confirm(`Знайдено ${issues.length} застереження(нь) щодо даних гіда "${guideName}":\n\n${issues.map(i=>'• '+i).join('\n')}\n\nВсе одно підготувати документи?`);
+      if(!proceed) return;
+    }
+    const oldText = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Готую…';
+    try{
+      const blob = await buildGuidePackageZipBlob(guideName);
+      const storagePath = `${currentTripId}/guide-package/${guideName}/package_${tripFileTag(currentTripId)}.zip`;
+      const { error } = await sb.storage.from(STORAGE_BUCKET).upload(storagePath, blob, { upsert:true });
+      if(error){ alert('Документи згенеровано, але не вдалось зберегти в сховище: ' + friendlyErrorMessage(error)); return; }
+      hbShowToast(`✅ Документи для "${guideName}" підготовлено${issues.length ? ' (із застереженнями)' : ''}`);
+    } finally {
+      btn.disabled = false; btn.textContent = oldText;
+    }
+  }
+
+  function previewGuidePackage(guideName){
+    const pkg = buildGuidePackage(guideName);
+    let panel = document.getElementById('tpPkgPreviewPanel');
+    if(panel) panel.remove();
+    panel = document.createElement('div');
+    panel.id = 'tpPkgPreviewPanel';
+    panel.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:700; display:flex; align-items:center; justify-content:center; padding:20px;';
+    const docs = [
+      {key:'rooming', title:'Рум-лист'},
+      {key:'border', title:'Список на кордон'},
+      {key:'insurance', title:'Страхівки'},
+      {key:'excursions', title:'Список на збір коштів'},
+      {key:'city', title:'Список по містах посадки'},
+      {key:'debtors', title:'Список боржників'},
+    ];
+    const itemsHtml = docs.map(d=>`<div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px;">
+      <span>${d.title}</span>
+      <button class="btn btn-ghost btn-small" data-role="pkgPreviewOpen" data-key="${d.key}">👁 Переглянути</button>
+    </div>`).join('') + `<div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px;">
+      <span>Інфолист</span>
+      <button class="btn btn-ghost btn-small" id="pkgPreviewInfoSheetBtn">👁 Переглянути</button>
+    </div>`;
+    panel.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:420px; width:100%; max-height:80vh; overflow-y:auto;">
+      <p class="report-title" style="margin-top:0;">Документи — ${guideName}</p>
+      <p class="report-note">Відкриється у новій вкладці — там же можна зберегти як PDF (Друк → Зберегти як PDF).</p>
+      ${itemsHtml}
+      <button class="btn btn-ghost btn-small" id="pkgPreviewCloseBtn" style="width:100%; margin-top:6px;">Закрити</button>
+    </div>`;
+    document.body.appendChild(panel);
+    panel.querySelectorAll('[data-role="pkgPreviewOpen"]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const d = docs.find(x=>x.key===btn.dataset.key);
+      const data = pkg[d.key];
+      docOpenPrintWindow(d.title, `<h1>${d.title} — ${guideName}</h1>${docBuildTableHtml(data.headers, data.rows)}`);
+    }));
+    document.getElementById('pkgPreviewInfoSheetBtn').addEventListener('click', ()=>{
+      docOpenPrintWindow('Інфолист', pkg.infoSheetHtml);
+    });
+    document.getElementById('pkgPreviewCloseBtn').addEventListener('click', ()=> panel.remove());
+  }
+
+  function printGuidePackage(guideName){
+    const pkg = buildGuidePackage(guideName);
+    const pageBreak = `<div style="page-break-before:always;"></div>`;
+    const body = `
+      <h1>Рум-лист — ${guideName}</h1>${docBuildTableHtml(pkg.rooming.headers, pkg.rooming.rows)}
+      ${pageBreak}<h1>Список на кордон — ${guideName}</h1>${docBuildTableHtml(pkg.border.headers, pkg.border.rows)}
+      ${pageBreak}<h1>Страхівки — ${guideName}</h1>${docBuildTableHtml(pkg.insurance.headers, pkg.insurance.rows)}
+      ${pageBreak}<h1>Список на збір коштів — ${guideName}</h1>${docBuildTableHtml(pkg.excursions.headers, pkg.excursions.rows)}
+      ${pageBreak}<h1>Список по містах посадки — ${guideName}</h1>${docBuildTableHtml(pkg.city.headers, pkg.city.rows)}
+      ${pageBreak}<h1>Список боржників — ${guideName}</h1>${docBuildTableHtml(pkg.debtors.headers, pkg.debtors.rows)}
+      ${pageBreak}${pkg.infoSheetHtml}
+    `;
+    docOpenPrintWindow(`Пакет — ${guideName}`, body);
+  }
+
+  const packagesWrap = document.getElementById('tpGuidePackagesWrap');
+  const tripDataForPackages = getTripData(currentTripId);
+  if(!tripDataForPackages.guides.length){
+    packagesWrap.innerHTML = `<p class="report-note">Спочатку признач гідів цього заїзду у вкладці "Прибутковість".</p>`;
+  } else {
+    packagesWrap.innerHTML = tripDataForPackages.guides.map(g=>`
+      <div class="fin-row" style="flex-wrap:wrap;">
+        <span class="fin-label" style="font-weight:700;">${g.name}</span>
+        <button class="btn btn-primary btn-small no-print" data-role="tpPkgPrepare" data-guide="${g.name}">🔧 Підготувати документи в тур</button>
+        <button class="btn btn-ghost btn-small no-print" data-role="tpPkgPreview" data-guide="${g.name}">👁 Передивитись документи</button>
+        <button class="btn btn-ghost btn-small no-print" data-role="tpPkgPrint" data-guide="${g.name}">🖨 Друк</button>
+      </div>
+    `).join('');
+    packagesWrap.querySelectorAll('[data-role="tpPkgPrepare"]').forEach(btn=> btn.addEventListener('click', ()=> prepareGuidePackage(btn.dataset.guide, btn)));
+    packagesWrap.querySelectorAll('[data-role="tpPkgPreview"]').forEach(btn=> btn.addEventListener('click', ()=> previewGuidePackage(btn.dataset.guide)));
+    packagesWrap.querySelectorAll('[data-role="tpPkgPrint"]').forEach(btn=> btn.addEventListener('click', ()=> printGuidePackage(btn.dataset.guide)));
+  }
 }
 
 /* ============================================================
