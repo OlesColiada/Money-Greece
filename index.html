@@ -4598,6 +4598,16 @@ function formatDateGreek(isoDate){
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+function parseUkrDateInput(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/);
+  if(!m) return null;
+  const day = m[1].padStart(2,'0');
+  const month = m[2].padStart(2,'0');
+  const year = m[3];
+  return `${year}-${month}-${day}`;
+}
+
 function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides){
   const rows = [['№ п/п', 'Name Surname', 'Date of birth', 'Passport']];
   let n = 1;
@@ -4664,7 +4674,7 @@ async function renderSkiatosManifest(){
         </select>
         <input type="text" placeholder="Ім'я" id="manNewFirst_${g}" style="width:100px;">
         <input type="text" placeholder="Прізвище" id="manNewLast_${g}" style="width:100px;">
-        <input type="date" id="manNewBirth_${g}" style="width:130px;">
+        <input type="text" inputmode="numeric" placeholder="дд.мм.рррр" id="manNewBirth_${g}" style="width:110px;">
         <input type="text" placeholder="Паспорт" id="manNewPassport_${g}" style="width:100px;">
         <button class="btn btn-ghost btn-small" data-role="manAddExtra" data-guide="${g}">+ Додати людину</button>
       </div>` : ''}
@@ -4732,7 +4742,7 @@ async function renderSkiatosManifest(){
     const type = document.getElementById(`manNewType_${g}`).value;
     const first = document.getElementById(`manNewFirst_${g}`).value.trim();
     const last = document.getElementById(`manNewLast_${g}`).value.trim();
-    const birth = document.getElementById(`manNewBirth_${g}`).value;
+    const birth = parseUkrDateInput(document.getElementById(`manNewBirth_${g}`).value);
     const passport = document.getElementById(`manNewPassport_${g}`).value.trim();
     if(!first && !last) return;
     if(type==='guide') await addForeignGuideToManifest(currentTripId, first, last, birth||null, passport);
