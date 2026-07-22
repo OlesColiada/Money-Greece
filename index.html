@@ -55,11 +55,16 @@
   .subtitle{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
   .mode-toggle{margin-left:auto; display:flex; align-items:center; gap:8px;}
   .mode-toggle .btn{padding:7px 12px; font-size:12.5px;}
-  .manager-only{}
+  .manager-only{display:none;}
+  body.manager-mode .manager-only{display:revert;}
   body.guide-mode .manager-only{display:none !important;}
   .guide-only{display:none;}
   body.guide-mode .guide-only{display:block !important;}
+  .season-only{display:none;}
+  body.manager-mode .season-only{display:revert;}
   body.guide-mode .season-only{display:none !important;}
+  .manager-detail{display:none;}
+  body.manager-mode .manager-detail{display:revert;}
   body.guide-mode .manager-detail{display:none !important;}
   .mode-toggle .btn.active-tab{background:var(--aegean); color:#fff; border-color:var(--aegean);}
 
@@ -2095,6 +2100,7 @@ const MODE_KEY = "richtour_view_mode";
 
 function applyMode(mode){
   document.body.classList.toggle('guide-mode', mode === 'guide');
+  document.body.classList.toggle('manager-mode', mode !== 'guide');
   if(currentProfile && currentProfile.role === 'manager'){
     document.getElementById('tabGuideBtn').classList.toggle('app-hidden', mode === 'guide');
     document.getElementById('tabManagerBtn').classList.toggle('app-hidden', mode !== 'guide');
