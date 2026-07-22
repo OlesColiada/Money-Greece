@@ -4757,6 +4757,14 @@ async function renderSkiatosManifest(){
       <input type="text" inputmode="numeric" placeholder="дд.мм.рррр" id="extraNewBirth" data-role="birthMaskInput" maxlength="10" style="width:110px;">
       <input type="text" placeholder="Паспорт" id="extraNewPassport" style="width:100px;">
       <button class="btn btn-ghost btn-small" data-role="addExtraParticipant">+ Додати</button>
+    </div>
+    <div class="no-print" style="margin-top:8px;">
+      <button class="btn btn-ghost btn-small" data-role="toggleBulkExtra" type="button">➕ Додати список одразу (кілька людей)</button>
+      <div id="extraBulkPanel" style="display:none; margin-top:8px; gap:6px; flex-wrap:wrap; align-items:flex-start;">
+        <p class="muted" style="font-size:12px; margin:0 0 6px;">Обери оператора вище (в полі "— оператор —"), встав список по одному на рядок у форматі "Прізвище Ім'я", і додай усіх одразу — вік/паспорт потім донесеш вручну в таблиці.</p>
+        <textarea id="extraBulkNames" placeholder="Іваненко Іван&#10;Петренко Марія&#10;..." style="width:100%; max-width:420px; min-height:90px; padding:8px; border:2px solid var(--line); border-radius:8px; font-family:inherit;"></textarea>
+        <div style="margin-top:6px;"><button class="btn btn-ghost btn-small" data-role="addExtraBulk">+ Додати весь список</button></div>
+      </div>
     </div>` : ''}
     <p class="muted" style="font-size:12px; margin-top:4px;">Підсумок: ${fmt(extraSubtotal)} €</p>
   </div>`;
@@ -4866,7 +4874,7 @@ async function renderSkiatosManifest(){
       document.getElementById('extraNewPartnerCustom').style.display = e.target.value===CUSTOM_PARTNER_VALUE ? 'inline-block' : 'none';
     });
   }
-  const addExtraBtn = document.getElementById('addExtraParticipant');
+  const addExtraBtn = document.querySelector('[data-role="addExtraParticipant"]');
   if(addExtraBtn) addExtraBtn.addEventListener('click', async ()=>{
     const type = document.getElementById('extraNewType').value;
     const first = document.getElementById('extraNewFirst').value.trim();
@@ -4885,6 +4893,29 @@ async function renderSkiatosManifest(){
     if(type==='guide') await addForeignGuideToManifest(currentTripId, attributedGuide, first, last, birth||null, passport);
     else if(type==='driver') await addDriverToManifest(currentTripId, attributedGuide, first, last, birth||null, passport);
     else await addExtraPersonToManifest(currentTripId, attributedGuide, first, last, birth||null, passport, partnerName);
+    renderSkiatosManifest();
+  });
+  const bulkToggle = document.querySelector('[data-role="toggleBulkExtra"]');
+  if(bulkToggle) bulkToggle.addEventListener('click', ()=>{
+    const panel = document.getElementById('extraBulkPanel');
+    panel.style.display = panel.style.display==='none' ? 'flex' : 'none';
+    panel.style.flexDirection = 'column';
+  });
+  const addBulkBtn = document.querySelector('[data-role="addExtraBulk"]');
+  if(addBulkBtn) addBulkBtn.addEventListener('click', async ()=>{
+    const partnerSel = document.getElementById('extraNewPartner').value;
+    const partnerName = partnerSel===CUSTOM_PARTNER_VALUE ? document.getElementById('extraNewPartnerCustom').value.trim() : partnerSel;
+    if(!partnerName){ alert('Спершу обери оператора вгорі (в полі "— оператор —").'); return; }
+    const attributedGuide = currentProfile.role==='guide' ? currentProfile.guide_name : (getTripData(currentTripId).guides[0]?.name || '');
+    if(!attributedGuide){ alert('Не вдалося визначити гіда для запису.'); return; }
+    const lines = document.getElementById('extraBulkNames').value.split('\n').map(l=>l.trim()).filter(Boolean);
+    if(!lines.length){ alert('Список порожній.'); return; }
+    for(const line of lines){
+      const parts = line.split(/\s+/);
+      const last = parts[0] || '';
+      const first = parts.slice(1).join(' ') || '';
+      await addExtraPersonToManifest(currentTripId, attributedGuide, first, last, null, '', partnerName);
+    }
     renderSkiatosManifest();
   });
   block.querySelectorAll('[data-role="manEditPrice"]').forEach(el=> el.addEventListener('input', e=>{
