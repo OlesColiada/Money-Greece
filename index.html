@@ -4841,7 +4841,7 @@ async function renderSkiatosManifest(){
     const last = document.getElementById(`manNewLast_${g}`).value.trim();
     const birth = parseUkrDateInput(document.getElementById(`manNewBirth_${g}`).value);
     const passport = document.getElementById(`manNewPassport_${g}`).value.trim();
-    if(!first && !last) return;
+    if(!first && !last){ alert('Введіть ім\'я або прізвище.'); return; }
     if(type==='guide') await addForeignGuideToManifest(currentTripId, g, first, last, birth||null, passport);
     else if(type==='driver') await addDriverToManifest(currentTripId, g, first, last, birth||null, passport);
     else if(type==='partner'){
@@ -4873,16 +4873,18 @@ async function renderSkiatosManifest(){
     const last = document.getElementById('extraNewLast').value.trim();
     const birth = parseUkrDateInput(document.getElementById('extraNewBirth').value);
     const passport = document.getElementById('extraNewPassport').value.trim();
-    if(!first && !last) return;
+    if(!first && !last){ alert('Введіть ім\'я або прізвище.'); return; }
+    let partnerName = '';
+    if(type==='partner' || type==='tourist'){
+      const partnerSel = document.getElementById('extraNewPartner').value;
+      partnerName = partnerSel===CUSTOM_PARTNER_VALUE ? document.getElementById('extraNewPartnerCustom').value.trim() : partnerSel;
+      if(!partnerName){ alert('Вкажіть партнера/оператора зі списку (або "+ Новий партнер...").'); return; }
+    }
     const attributedGuide = currentProfile.role==='guide' ? currentProfile.guide_name : (getTripData(currentTripId).guides[0]?.name || '');
+    if(!attributedGuide){ alert('Не вдалося визначити гіда для запису (спробуйте додати через таблицю конкретного гіда вище).'); return; }
     if(type==='guide') await addForeignGuideToManifest(currentTripId, attributedGuide, first, last, birth||null, passport);
     else if(type==='driver') await addDriverToManifest(currentTripId, attributedGuide, first, last, birth||null, passport);
-    else {
-      const partnerSel = document.getElementById('extraNewPartner').value;
-      const partnerName = partnerSel===CUSTOM_PARTNER_VALUE ? document.getElementById('extraNewPartnerCustom').value.trim() : partnerSel;
-      if(!partnerName){ alert('Вкажіть партнера/оператора.'); return; }
-      await addExtraPersonToManifest(currentTripId, attributedGuide, first, last, birth||null, passport, partnerName);
-    }
+    else await addExtraPersonToManifest(currentTripId, attributedGuide, first, last, birth||null, passport, partnerName);
     renderSkiatosManifest();
   });
   block.querySelectorAll('[data-role="manEditPrice"]').forEach(el=> el.addEventListener('input', e=>{
