@@ -632,7 +632,7 @@
     </div>
 
     <section class="step-block" id="touristListBlock" style="margin-top:16px;">
-      <details id="touristListDetails" open>
+      <details id="touristListDetails" class="top-accordion" open>
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Туристи</summary>
         <div style="margin-top:10px;">
           <div style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -652,7 +652,7 @@
     <div class="step-block" id="touristDetailBlock" style="display:none; margin-top:16px;"></div>
 
     <section class="step-block" id="skiatosManifestSection" style="margin-top:16px;">
-      <details id="skiatosManifestDetails">
+      <details id="skiatosManifestDetails" class="top-accordion">
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Список на Скіатос</summary>
         <div id="skiatosManifestBlock" style="margin-top:10px;"></div>
       </details>
@@ -2528,6 +2528,9 @@ document.getElementById('goToSkiatosBtn').addEventListener('click', async ()=>{
   if(details) details.open = true;
   document.getElementById('skiatosManifestSection')?.scrollIntoView({behavior:'smooth', block:'start'});
 });
+document.querySelectorAll('details.top-accordion').forEach(d=> d.addEventListener('toggle', ()=>{
+  if(d.open) document.querySelectorAll('details.top-accordion').forEach(other=>{ if(other!==d) other.open = false; });
+}));
 document.getElementById('sectionManagerReportBtn').addEventListener('click', async ()=>{
   currentSection='managerReport'; renderTripGrid(); renderSectionTabs();
   await renderManagerReportSection();
@@ -4496,25 +4499,45 @@ function buildSkiatosManifestGroups(tripId, data){
   });
   const drivers = [];
   const foreignGuides = [];
+  const partnerGroups = {};
   data.extras.forEach(e=>{
     const name = `${e.last_name} ${e.first_name}`.trim();
     if(e.entry_type==='driver'){ drivers.push({ kind:'driver', name, price:0, id:e.id, extra:e, passport: e.passport_data||'',
       firstName: e.first_name||'', lastName: e.last_name||'', birthDate: e.birth_date||'' }); return; }
     if(e.entry_type==='guide_foreign'){ foreignGuides.push({ kind:'guide', name, price:0, id:e.id, extra:e, passport: e.passport_data||'',
       firstName: e.first_name||'', lastName: e.last_name||'', birthDate: e.birth_date||'' }); return; }
-    const g = e.guide_name;
-    if(!groups[g]) groups[g] = [];
     if(e.entry_type==='guide_self'){
+      const g = e.guide_name;
+      if(!groups[g]) groups[g] = [];
       const fullName = (e.last_name || e.first_name) ? `${e.last_name} ${e.first_name}`.trim() : g;
       groups[g].push({ kind:'guide', name:fullName, price:0, id:e.id, extra:e, passport: e.passport_data||'',
         firstName: e.first_name||'', lastName: e.last_name||'', birthDate: e.birth_date||'' });
+      return;
+    }
+    // entry_type === 'extra_person'
+    const age = e.birth_date && def ? calcAgeAtTrip(e.birth_date, def.skiatosDate || def.start) : null;
+    const row = { kind:'extra', name, age, price:Number(e.price)||0, id:e.id, extra:e, passport: e.passport_data||'',
+      firstName: e.first_name||'', lastName: e.last_name||'', birthDate: e.birth_date||'' };
+    if(e.partner_operator){
+      if(!partnerGroups[e.partner_operator]) partnerGroups[e.partner_operator] = [];
+      partnerGroups[e.partner_operator].push(row);
     } else {
-      const age = e.birth_date && def ? calcAgeAtTrip(e.birth_date, def.skiatosDate || def.start) : null;
-      groups[g].push({ kind:'extra', name, age, price:Number(e.price)||0, id:e.id, extra:e, passport: e.passport_data||'',
-        firstName: e.first_name||'', lastName: e.last_name||'', birthDate: e.birth_date||'' });
+      const g = e.guide_name;
+      if(!groups[g]) groups[g] = [];
+      groups[g].push(row);
     }
   });
-  return { groups, drivers, foreignGuides };
+  // Stable alphabetical order everywhere (DB queries have no guaranteed order) — guide row pinned first.
+  const byName = (a,b)=> a.name.localeCompare(b.name, 'uk');
+  Object.keys(groups).forEach(g=>{
+    const guideRows = groups[g].filter(r=>r.kind==='guide');
+    const rest = groups[g].filter(r=>r.kind!=='guide').sort(byName);
+    groups[g] = [...guideRows, ...rest];
+  });
+  Object.keys(partnerGroups).forEach(p=> partnerGroups[p].sort(byName));
+  drivers.sort(byName);
+  foreignGuides.sort(byName);
+  return { groups, partnerGroups, drivers, foreignGuides };
 }
 
 const GUIDE_FULL_NAME_MAP = {
@@ -4543,14 +4566,14 @@ async function addGuideSelfToManifest(tripId, guideName){
   });
   if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
 }
-async function addExtraPersonToManifest(tripId, guideName, firstName, lastName, birthDate, passport){
+async function addExtraPersonToManifest(tripId, guideName, firstName, lastName, birthDate, passport, partnerOperator){
   const def = TRIPS_DEF.find(d=>d.id===tripId);
   const age = birthDate && def ? calcAgeAtTrip(birthDate, def.skiatosDate || def.start) : null;
   const price = ticketPriceForAge(age);
   const { error } = await sb.from('skiatos_manifest_extras').insert({
     trip_id: tripId, guide_name: guideName, entry_type:'extra_person',
     first_name:firstName, last_name:lastName, birth_date: birthDate||null, price, price_mode:'standard',
-    passport_data: passport||''
+    passport_data: passport||'', partner_operator: partnerOperator||null
   });
   if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
 }
@@ -4577,14 +4600,21 @@ async function deleteManifestExtra(extraId){
   if(error) alert('Не вдалося видалити: ' + friendlyErrorMessage(error));
 }
 
-function buildSkiatosManifestRows(groups, drivers, foreignGuides){
-  const rows = [['Прізвище Ім\'я', 'Вік/категорія', 'Паспорт', 'Гід', 'Ціна (€)']];
+function buildSkiatosManifestRows(groups, drivers, foreignGuides, partnerGroups){
+  const rows = [['Прізвище Ім\'я', 'Вік/категорія', 'Паспорт', 'Гід/Партнер', 'Ціна (€)']];
   let grand = 0;
   Object.keys(groups).sort().forEach(g=>{
     groups[g].forEach(r=>{
       const ageLabel = r.kind==='guide' ? 'guide' : (r.age!==undefined && r.age!==null ? r.age+' р.' : '—');
       rows.push([r.name, ageLabel, r.passport||'', g, r.kind==='guide' ? 'guide' : fmt(r.price)]);
       if(r.kind!=='guide') grand += r.price;
+    });
+  });
+  Object.keys(partnerGroups||{}).sort().forEach(p=>{
+    partnerGroups[p].forEach(r=>{
+      const ageLabel = r.age!==undefined && r.age!==null ? r.age+' р.' : '—';
+      rows.push([r.name, ageLabel, r.passport||'', '🅿️ '+p, fmt(r.price)]);
+      grand += r.price;
     });
   });
   (foreignGuides||[]).forEach(r=>{
@@ -4596,8 +4626,8 @@ function buildSkiatosManifestRows(groups, drivers, foreignGuides){
   rows.push(['', '', '', 'РАЗОМ', fmt(grand)]);
   return rows;
 }
-function exportSkiatosManifestToExcel(tripLabel, groups, drivers, foreignGuides){
-  const rows = buildSkiatosManifestRows(groups, drivers, foreignGuides);
+function exportSkiatosManifestToExcel(tripLabel, groups, drivers, foreignGuides, partnerGroups){
+  const rows = buildSkiatosManifestRows(groups, drivers, foreignGuides, partnerGroups);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Скіатос');
@@ -4628,11 +4658,16 @@ function formatUkrDateAsTyped(value){
   return digits.slice(0,2) + '.' + digits.slice(2,4) + '.' + digits.slice(4);
 }
 
-function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides){
+function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides, partnerGroups){
   const rows = [['№ п/п', 'Name Surname', 'Date of birth', 'Passport']];
   let n = 1;
   Object.keys(groups).sort().forEach(g=>{
     groups[g].forEach(r=>{
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
+    });
+  });
+  Object.keys(partnerGroups||{}).sort().forEach(p=>{
+    partnerGroups[p].forEach(r=>{
       rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
     });
   });
@@ -4654,7 +4689,7 @@ async function renderSkiatosManifest(){
   if(!currentTripId){ block.innerHTML=''; return; }
   const def = TRIPS_DEF.find(d=>d.id===currentTripId);
   const data = await loadSkiatosManifestData(currentTripId);
-  const { groups, drivers, foreignGuides } = buildSkiatosManifestGroups(currentTripId, data);
+  const { groups, partnerGroups, drivers, foreignGuides } = buildSkiatosManifestGroups(currentTripId, data);
   const guideNames = Object.keys(groups);
   if(!guideNames.length && !drivers.length && currentProfile.role==='guide'){
     // still show the "add myself" option even with nobody on the list yet
@@ -4675,7 +4710,7 @@ async function renderSkiatosManifest(){
       <table class="report-table" style="font-size:12.5px;">
         <thead><tr><th>№</th><th style="text-align:left;">Ім'я</th><th>Вік</th><th>Паспорт</th><th>Ціна</th><th></th></tr></thead>
         <tbody>
-          ${(()=>{ let n=0; return rows.map(r=>{ if(r.kind!=='guide') n++; return `<tr${r.kind==='guide' ? ' style="font-weight:700;"' : ''}>
+          ${(()=>{ let n=0; return rows.map(r=>{ if(r.kind!=='guide') n++; return `<tr style="${r.kind==='guide' ? 'font-weight:700;' : (r.kind==='extra' ? 'background:#fce8ee;' : '')}">
             <td class="muted">${r.kind==='guide' ? '—' : n}</td>
             <td style="text-align:left;">${r.name}${r.kind==='guide' ? ' guide' : ''}</td>
             <td>${r.kind==='guide' ? '—' : (r.age!==null && r.age!==undefined ? r.age+' р.' : '—')}</td>
@@ -4688,11 +4723,18 @@ async function renderSkiatosManifest(){
         </tbody>
       </table>
       ${canAdd ? `<div class="no-print" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-        <select id="manNewType_${g}" style="width:90px;">
+        <select id="manNewType_${g}" data-role="manNewTypeSelect" data-guide="${g}" style="width:110px;">
           <option value="tourist">Турист</option>
           <option value="guide">Гід</option>
           <option value="driver">Водій</option>
+          <option value="partner">Партн. група</option>
         </select>
+        <select id="manNewPartner_${g}" style="width:130px; display:none;">
+          <option value="">— оператор —</option>
+          ${PARTNERS_FIXED.map(p=>`<option value="${p}">${p}</option>`).join('')}
+          <option value="${CUSTOM_PARTNER_VALUE}">+ Новий партнер...</option>
+        </select>
+        <input type="text" placeholder="Назва партнера" id="manNewPartnerCustom_${g}" style="width:130px; display:none;">
         <input type="text" placeholder="Ім'я" id="manNewFirst_${g}" style="width:100px;">
         <input type="text" placeholder="Прізвище" id="manNewLast_${g}" style="width:100px;">
         <input type="text" inputmode="numeric" placeholder="дд.мм.рррр" id="manNewBirth_${g}" data-role="birthMaskInput" maxlength="10" style="width:110px;">
@@ -4708,6 +4750,34 @@ async function renderSkiatosManifest(){
   allGroupNames.sort();
   const bodyHtml = allGroupNames.map(groupHtml).join('');
 
+  const partnerGroupHtml = (p)=>{
+    const rows = partnerGroups[p] || [];
+    const subtotal = rows.reduce((s,r)=>s+r.price, 0);
+    grandTotal += subtotal;
+    return `<div style="margin-bottom:14px;">
+      <p style="font-weight:700; margin:0 0 4px;">🅿️ ${p}</p>
+      <table class="report-table" style="font-size:12.5px;">
+        <thead><tr><th>№</th><th style="text-align:left;">Ім'я</th><th>Вік</th><th>Паспорт</th><th>Ціна</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map((r,idx)=>`<tr>
+            <td class="muted">${idx+1}</td>
+            <td style="text-align:left;">${r.name}</td>
+            <td>${r.age!==null && r.age!==undefined ? r.age+' р.' : '—'}</td>
+            <td class="muted" style="font-size:11px;">${r.passport||'—'}</td>
+            <td><input type="text" inputmode="decimal" class="fin-amount" style="width:70px;" data-role="manEditPrice" data-id="${r.extra.id}" value="${r.price}"></td>
+            <td class="no-print"><button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button></td>
+          </tr>`).join('') || `<tr><td colspan="6" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}
+        </tbody>
+      </table>
+      <p class="muted" style="font-size:12px; margin-top:4px;">Підсумок групи: ${fmt(subtotal)} €</p>
+    </div>`;
+  };
+  const partnerGroupNames = Object.keys(partnerGroups).sort();
+  const partnerGroupsHtml = partnerGroupNames.length ? `<div style="margin-top:16px; border-top:1px dashed var(--line); padding-top:10px;">
+    <p class="muted" style="font-size:12px; margin:0 0 8px; text-transform:uppercase; letter-spacing:.03em;">Партнерські групи</p>
+    ${partnerGroupNames.map(partnerGroupHtml).join('')}
+  </div>` : '';
+
   const summaryHtml = currentProfile.role==='manager' ? `<div class="manager-only" style="margin-top:14px;">
     <p style="font-weight:700; margin:0 0 4px;">Підсумок по гідах (аналіз)</p>
     <table class="report-table" style="font-size:12.5px;">
@@ -4718,9 +4788,14 @@ async function renderSkiatosManifest(){
         const selfGoing = rows.some(r=>r.kind==='guide' && r.name===g);
         const sub = rows.filter(r=>r.kind!=='guide').reduce((s,r)=>s+r.price, 0);
         return `<tr><td style="text-align:left;">${g}</td><td>${people}</td><td>${selfGoing?'так':'ні'}</td><td>${fmt(sub)} €</td></tr>`;
-      }).join('') || `<tr><td colspan="4" class="muted" style="text-align:left;">Немає даних.</td></tr>`}</tbody>
+      }).join('') || `<tr><td colspan="4" class="muted" style="text-align:left;">Немає даних.</td></tr>`}
+      ${partnerGroupNames.map(p=>{
+        const rows = partnerGroups[p] || [];
+        const sub = rows.reduce((s,r)=>s+r.price, 0);
+        return `<tr><td style="text-align:left;">🅿️ ${p}</td><td>${rows.length}</td><td>—</td><td>${fmt(sub)} €</td></tr>`;
+      }).join('')}</tbody>
     </table>
-    <p class="muted" style="font-size:12px; margin-top:4px;">Гідів іншої компанії: ${foreignGuides.length} · Водіїв: ${drivers.length}</p>
+    <p class="muted" style="font-size:12px; margin-top:4px;">Гідів іншої компанії: ${foreignGuides.length} · Водіїв: ${drivers.length} · Партнерських груп: ${partnerGroupNames.length}</p>
   </div>` : '';
 
   const foreignGuidesHtml = `<div style="margin-top:10px;">
@@ -4748,6 +4823,7 @@ async function renderSkiatosManifest(){
     </div>
     <p class="report-note" style="margin:0;">Розрахунок за тарифами катера (27€ від 16 років, 0-5 безкоштовно, 6-11 → 15€, 12-15 → 20€). Гіди їдуть безкоштовно.</p>
     <div style="margin-top:10px;">${bodyHtml || '<p class="report-note">Ще ніхто не записаний на Скіатос.</p>'}</div>
+    ${partnerGroupsHtml}
     ${summaryHtml}
     ${foreignGuidesHtml}
     ${driversHtml}
@@ -4780,6 +4856,16 @@ async function renderSkiatosManifest(){
     const after = e.target.value.length;
     e.target.selectionStart = e.target.selectionEnd = Math.max(0, pos + (after - before));
   }));
+  block.querySelectorAll('[data-role="manNewTypeSelect"]').forEach(el=> el.addEventListener('change', e=>{
+    const g = e.target.dataset.guide;
+    const isPartner = e.target.value === 'partner';
+    document.getElementById(`manNewPartner_${g}`).style.display = isPartner ? 'inline-block' : 'none';
+    if(!isPartner) document.getElementById(`manNewPartnerCustom_${g}`).style.display = 'none';
+  }));
+  block.querySelectorAll('[id^="manNewPartner_"]').forEach(el=> el.addEventListener('change', e=>{
+    const g = e.target.id.replace('manNewPartner_','');
+    document.getElementById(`manNewPartnerCustom_${g}`).style.display = e.target.value===CUSTOM_PARTNER_VALUE ? 'inline-block' : 'none';
+  }));
   block.querySelectorAll('[data-role="manAddExtra"]').forEach(el=> el.addEventListener('click', async e=>{
     const g = e.target.dataset.guide;
     const type = document.getElementById(`manNewType_${g}`).value;
@@ -4790,6 +4876,12 @@ async function renderSkiatosManifest(){
     if(!first && !last) return;
     if(type==='guide') await addForeignGuideToManifest(currentTripId, g, first, last, birth||null, passport);
     else if(type==='driver') await addDriverToManifest(currentTripId, g, first, last, birth||null, passport);
+    else if(type==='partner'){
+      const partnerSel = document.getElementById(`manNewPartner_${g}`).value;
+      const partnerName = partnerSel===CUSTOM_PARTNER_VALUE ? document.getElementById(`manNewPartnerCustom_${g}`).value.trim() : partnerSel;
+      if(!partnerName){ alert('Вкажіть партнера/оператора.'); return; }
+      await addExtraPersonToManifest(currentTripId, g, first, last, birth||null, passport, partnerName);
+    }
     else await addExtraPersonToManifest(currentTripId, g, first, last, birth||null, passport);
     renderSkiatosManifest();
   }));
@@ -4804,14 +4896,14 @@ async function renderSkiatosManifest(){
     renderSkiatosManifest();
   }));
   const exportBtn = document.getElementById('manExportBtn');
-  if(exportBtn) exportBtn.addEventListener('click', ()=> exportSkiatosManifestToExcel(def?def.label:currentTripId, groups, drivers, foreignGuides));
+  if(exportBtn) exportBtn.addEventListener('click', ()=> exportSkiatosManifestToExcel(def?def.label:currentTripId, groups, drivers, foreignGuides, partnerGroups));
   const exportFerryBtn = document.getElementById('manExportFerryBtn');
-  if(exportFerryBtn) exportFerryBtn.addEventListener('click', ()=> exportFerryManifestToExcel(def?def.label:currentTripId, groups, drivers, foreignGuides));
+  if(exportFerryBtn) exportFerryBtn.addEventListener('click', ()=> exportFerryManifestToExcel(def?def.label:currentTripId, groups, drivers, foreignGuides, partnerGroups));
   document.getElementById('manSaveBtn').addEventListener('click', async ()=>{
     const btn = document.getElementById('manSaveBtn');
     btn.disabled = true; btn.textContent = 'Зберігаю…';
     try{
-      const rows = buildSkiatosManifestRows(groups, drivers, foreignGuides);
+      const rows = buildSkiatosManifestRows(groups, drivers, foreignGuides, partnerGroups);
       const path = `${currentTripId}/skiatos-list/report_${tripFileTag(currentTripId)}.xlsx`;
       const error = await saveXlsxSnapshot(path, rows, 'Скіатос');
       if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
