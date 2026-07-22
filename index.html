@@ -918,10 +918,10 @@ function standardPriceFor(excName, age){
 // "Вартість квитка" mode: entrance-ticket-only price (no package), same tiers across excursions.
 function ticketPriceForAge(age){
   if(age === null) return 27; // unknown age — default to adult rather than under-charge
-  if(age <= 5) return 0;
-  if(age <= 11) return 15;
-  if(age <= 16) return 20;
-  return 27;
+  if(age <= 5) return 0;    // 0–5.99
+  if(age <= 11) return 15;  // 6–11.99
+  if(age <= 15) return 20;  // 12–15.99
+  return 27;                // 16+
 }
 
 const GUIDE_COLORS = {"Галя":"#7a2230","Ліда":"#274a72","Марта":"#6f9fc4","Іра":"#6fa383","Таня":"#c9a45c","Мирослава":"#d98a8a"};
@@ -1140,14 +1140,15 @@ async function rtGuideWrite(type, table, payload, matchOrOptions){
 
 async function fetchTrips(){
   const cacheKey = 'tripsList';
-  const { data, error } = await sb.from('trips').select('id,label,start_date,end_date').order('start_date');
+  const { data, error } = await sb.from('trips').select('id,label,start_date,end_date,skiatos_date').order('start_date');
   if(error){
     console.error(error); setStatus("Помилка завантаження заїздів");
     const cached = getOfflineCache(cacheKey);
-    if(cached) return cached.data.map(t=>({...t, start:new Date(t.start), end:new Date(t.end)}));
+    if(cached) return cached.data.map(t=>({...t, start:new Date(t.start), end:new Date(t.end), skiatosDate: t.skiatosDate ? new Date(t.skiatosDate) : null}));
     return [];
   }
-  const result = data.map(t=>({ id:t.id, label:t.label, start:new Date(t.start_date+"T00:00:00"), end:new Date(t.end_date+"T23:59:59") }));
+  const result = data.map(t=>({ id:t.id, label:t.label, start:new Date(t.start_date+"T00:00:00"), end:new Date(t.end_date+"T23:59:59"),
+    skiatosDate: t.skiatos_date ? new Date(t.skiatos_date+"T00:00:00") : null }));
   cacheOffline(cacheKey, result);
   return result;
 }
@@ -2261,7 +2262,7 @@ async function afterAuthSuccess(){
   // Instant paint from local cache (if any) while the real network calls are still in flight.
   const cachedTripsList = getOfflineCache('tripsList');
   if(cachedTripsList && cachedTripsList.data.length){
-    TRIPS_DEF = cachedTripsList.data.map(t=>({...t, start:new Date(t.start), end:new Date(t.end)}));
+    TRIPS_DEF = cachedTripsList.data.map(t=>({...t, start:new Date(t.start), end:new Date(t.end), skiatosDate: t.skiatosDate ? new Date(t.skiatosDate) : null}));
     const cachedMyTripId = (currentProfile.role==='guide' && currentProfile.guide_name) ? getOfflineCache('myTripId:'+currentProfile.guide_name) : null;
     const activeDef = (cachedMyTripId && TRIPS_DEF.find(d=>d.id===cachedMyTripId.data))
       ? TRIPS_DEF.find(d=>d.id===cachedMyTripId.data)
@@ -2520,6 +2521,8 @@ document.getElementById('sectionProfitBtnDirect').addEventListener('click', swit
 document.getElementById('sectionTouristsBtnDirect').addEventListener('click', switchToTouristsSection);
 document.getElementById('sectionFinanceBtnDirect').addEventListener('click', switchToFinanceSection);
 document.getElementById('goToSkiatosBtn').addEventListener('click', async ()=>{
+  tourSectionTripChosen = true;
+  tourSectionGuideChosen = true;
   await switchToTouristsSection();
   const details = document.getElementById('skiatosManifestDetails');
   if(details) details.open = true;
@@ -4487,7 +4490,7 @@ function buildSkiatosManifestGroups(tripId, data){
     const t = touristsById[s.tourist_id]; if(!t) return;
     const g = t.guide_name;
     if(!groups[g]) groups[g] = [];
-    const age = def ? calcAgeAtTrip(t.birth_date, def.start) : null;
+    const age = def ? calcAgeAtTrip(t.birth_date, def.skiatosDate || def.start) : null;
     groups[g].push({ kind:'tourist', name:`${t.last_name} ${t.first_name}`.trim(), age, price: ticketPriceForAge(age), id:'t:'+s.id,
       passport: t.passport_data||'', firstName: t.first_name||'', lastName: t.last_name||'', birthDate: t.birth_date||'' });
   });
@@ -4506,7 +4509,7 @@ function buildSkiatosManifestGroups(tripId, data){
       groups[g].push({ kind:'guide', name:fullName, price:0, id:e.id, extra:e, passport: e.passport_data||'',
         firstName: e.first_name||'', lastName: e.last_name||'', birthDate: e.birth_date||'' });
     } else {
-      const age = e.birth_date && def ? calcAgeAtTrip(e.birth_date, def.start) : null;
+      const age = e.birth_date && def ? calcAgeAtTrip(e.birth_date, def.skiatosDate || def.start) : null;
       groups[g].push({ kind:'extra', name, age, price:Number(e.price)||0, id:e.id, extra:e, passport: e.passport_data||'',
         firstName: e.first_name||'', lastName: e.last_name||'', birthDate: e.birth_date||'' });
     }
@@ -4542,7 +4545,7 @@ async function addGuideSelfToManifest(tripId, guideName){
 }
 async function addExtraPersonToManifest(tripId, guideName, firstName, lastName, birthDate, passport){
   const def = TRIPS_DEF.find(d=>d.id===tripId);
-  const age = birthDate && def ? calcAgeAtTrip(birthDate, def.start) : null;
+  const age = birthDate && def ? calcAgeAtTrip(birthDate, def.skiatosDate || def.start) : null;
   const price = ticketPriceForAge(age);
   const { error } = await sb.from('skiatos_manifest_extras').insert({
     trip_id: tripId, guide_name: guideName, entry_type:'extra_person',
@@ -4670,9 +4673,10 @@ async function renderSkiatosManifest(){
     return `<div style="margin-bottom:14px;">
       <p style="font-weight:700; margin:0 0 4px;">${g}${canAdd && !iAmIn && g===myGuideName ? ` <button class="btn btn-ghost btn-small no-print" data-role="manAddSelf" data-guide="${g}">+ Я теж їду</button>` : ''}</p>
       <table class="report-table" style="font-size:12.5px;">
-        <thead><tr><th style="text-align:left;">Ім'я</th><th>Вік</th><th>Паспорт</th><th>Ціна</th><th></th></tr></thead>
+        <thead><tr><th>№</th><th style="text-align:left;">Ім'я</th><th>Вік</th><th>Паспорт</th><th>Ціна</th><th></th></tr></thead>
         <tbody>
-          ${rows.map(r=>`<tr${r.kind==='guide' ? ' style="font-weight:700;"' : ''}>
+          ${(()=>{ let n=0; return rows.map(r=>{ if(r.kind!=='guide') n++; return `<tr${r.kind==='guide' ? ' style="font-weight:700;"' : ''}>
+            <td class="muted">${r.kind==='guide' ? '—' : n}</td>
             <td style="text-align:left;">${r.name}${r.kind==='guide' ? ' guide' : ''}</td>
             <td>${r.kind==='guide' ? '—' : (r.age!==null && r.age!==undefined ? r.age+' р.' : '—')}</td>
             <td class="muted" style="font-size:11px;">${r.passport||'—'}</td>
@@ -4680,7 +4684,7 @@ async function renderSkiatosManifest(){
                 ? `<input type="text" inputmode="decimal" class="fin-amount" style="width:70px;" data-role="manEditPrice" data-id="${r.extra.id}" value="${r.price}">`
                 : fmt(r.price)+' €')}</td>
             <td class="no-print">${r.kind==='extra' && canManage ? `<button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button>` : ''}</td>
-          </tr>`).join('') || `<tr><td colspan="5" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}
+          </tr>`; }).join(''); })() || `<tr><td colspan="6" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}
         </tbody>
       </table>
       ${canAdd ? `<div class="no-print" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
@@ -4736,7 +4740,13 @@ async function renderSkiatosManifest(){
   </div>`;
 
   block.innerHTML = `
-    <p class="report-note" style="margin:0;">Розрахунок за тарифами катера (27€ дорослий, 0-5 безкоштовно, 6-11 → 15€, 12-16 → 20€). Гіди їдуть безкоштовно.</p>
+    <div class="manager-only" style="margin:0 0 10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <label style="font-size:13px; font-weight:600;">Дата екскурсії на Скіатос:</label>
+      <input type="date" id="skiatosExcDateInput" value="${def && def.skiatosDate ? def.skiatosDate.toISOString().slice(0,10) : ''}">
+      <button class="btn btn-ghost btn-small no-print" id="skiatosExcDateSaveBtn">💾 Зберегти дату</button>
+      <span class="muted" style="font-size:12px;">Вік туристів для тарифу рахується саме на цю дату${def && def.skiatosDate ? '' : ' (поки не задана — рахується на дату старту туру)'}.</span>
+    </div>
+    <p class="report-note" style="margin:0;">Розрахунок за тарифами катера (27€ від 16 років, 0-5 безкоштовно, 6-11 → 15€, 12-15 → 20€). Гіди їдуть безкоштовно.</p>
     <div style="margin-top:10px;">${bodyHtml || '<p class="report-note">Ще ніхто не записаний на Скіатос.</p>'}</div>
     ${summaryHtml}
     ${foreignGuidesHtml}
@@ -4750,6 +4760,15 @@ async function renderSkiatosManifest(){
     </div>
   `;
 
+  const skiatosDateBtn = block.querySelector('#skiatosExcDateSaveBtn');
+  if(skiatosDateBtn) skiatosDateBtn.addEventListener('click', async ()=>{
+    const val = block.querySelector('#skiatosExcDateInput').value;
+    const { error } = await sb.from('trips').update({ skiatos_date: val || null }).eq('id', currentTripId);
+    if(error){ alert('Не вдалося зберегти дату: ' + friendlyErrorMessage(error)); return; }
+    const def2 = TRIPS_DEF.find(d=>d.id===currentTripId);
+    if(def2) def2.skiatosDate = val ? new Date(val+"T00:00:00") : null;
+    renderSkiatosManifest();
+  });
   block.querySelectorAll('[data-role="manAddSelf"]').forEach(el=> el.addEventListener('click', async e=>{
     await addGuideSelfToManifest(currentTripId, e.target.dataset.guide);
     renderSkiatosManifest();
