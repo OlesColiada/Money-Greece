@@ -916,12 +916,22 @@ function standardPriceFor(excName, age){
   return isChild ? def.child : def.adult;
 }
 // "Вартість квитка" mode: entrance-ticket-only price (no package), same tiers across excursions.
+function skiatosDateForTrip(def){
+  if(!def || !def.start || !def.end) return null;
+  const d = new Date(def.start);
+  for(let i=0;i<14;i++){
+    if(d.getDay()===4) return new Date(d); // 4 = Thursday
+    if(d > def.end) return null;
+    d.setDate(d.getDate()+1);
+  }
+  return null;
+}
 function ticketPriceForAge(age){
   if(age === null) return 27; // unknown age — default to adult rather than under-charge
   if(age <= 5) return 0;    // 0–5.99
   if(age <= 11) return 15;  // 6–11.99
-  if(age <= 15) return 20;  // 12–15.99
-  return 27;                // 16+
+  if(age <= 16) return 20;  // 12–16.99
+  return 27;                // 17+
 }
 
 const GUIDE_COLORS = {"Галя":"#7a2230","Ліда":"#274a72","Марта":"#6f9fc4","Іра":"#6fa383","Таня":"#c9a45c","Мирослава":"#d98a8a"};
@@ -4493,7 +4503,7 @@ function buildSkiatosManifestGroups(tripId, data){
     const t = touristsById[s.tourist_id]; if(!t) return;
     const g = t.guide_name;
     if(!groups[g]) groups[g] = [];
-    const age = def ? calcAgeAtTrip(t.birth_date, def.skiatosDate || def.start) : null;
+    const age = def ? calcAgeAtTrip(t.birth_date, skiatosDateForTrip(def) || def.start) : null;
     groups[g].push({ kind:'tourist', name:`${t.last_name} ${t.first_name}`.trim(), age, price: ticketPriceForAge(age), id:'t:'+s.id,
       passport: t.passport_data||'', firstName: t.first_name||'', lastName: t.last_name||'', birthDate: t.birth_date||'' });
   });
@@ -4515,7 +4525,7 @@ function buildSkiatosManifestGroups(tripId, data){
       return;
     }
     // entry_type === 'extra_person'
-    const age = e.birth_date && def ? calcAgeAtTrip(e.birth_date, def.skiatosDate || def.start) : null;
+    const age = e.birth_date && def ? calcAgeAtTrip(e.birth_date, skiatosDateForTrip(def) || def.start) : null;
     const row = { kind:'extra', name, age, price:Number(e.price)||0, id:e.id, extra:e, passport: e.passport_data||'',
       firstName: e.first_name||'', lastName: e.last_name||'', birthDate: e.birth_date||'' };
     if(e.partner_operator){
@@ -4568,7 +4578,7 @@ async function addGuideSelfToManifest(tripId, guideName){
 }
 async function addExtraPersonToManifest(tripId, guideName, firstName, lastName, birthDate, passport, partnerOperator){
   const def = TRIPS_DEF.find(d=>d.id===tripId);
-  const age = birthDate && def ? calcAgeAtTrip(birthDate, def.skiatosDate || def.start) : null;
+  const age = birthDate && def ? calcAgeAtTrip(birthDate, skiatosDateForTrip(def) || def.start) : null;
   const price = ticketPriceForAge(age);
   const { error } = await sb.from('skiatos_manifest_extras').insert({
     trip_id: tripId, guide_name: guideName, entry_type:'extra_person',
@@ -4659,28 +4669,50 @@ function formatUkrDateAsTyped(value){
 }
 
 function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides, partnerGroups){
+  const PALETTE = ['DCE6F1','E2EFDA','FFF2CC','FCE4EC','E8DAEF','FDEBD0','D6EAF8','FADBD8'];
   const rows = [['№ п/п', 'Name Surname', 'Date of birth', 'Passport']];
-  let n = 1;
+  const rowColors = [];
+  let n = 1, colorIdx = 0;
   Object.keys(groups).sort().forEach(g=>{
+    const color = PALETTE[colorIdx % PALETTE.length]; colorIdx++;
     groups[g].forEach(r=>{
       rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
+      rowColors.push(color);
     });
   });
   Object.keys(partnerGroups||{}).sort().forEach(p=>{
+    const color = PALETTE[colorIdx % PALETTE.length]; colorIdx++;
     partnerGroups[p].forEach(r=>{
       rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
+      rowColors.push(color);
     });
   });
-  (foreignGuides||[]).forEach(r=>{
-    rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
-  });
-  drivers.forEach(r=>{
-    rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
-  });
+  if((foreignGuides||[]).length){
+    const color = PALETTE[colorIdx % PALETTE.length]; colorIdx++;
+    foreignGuides.forEach(r=>{
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
+      rowColors.push(color);
+    });
+  }
+  if(drivers.length){
+    const color = PALETTE[colorIdx % PALETTE.length]; colorIdx++;
+    drivers.forEach(r=>{
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
+      rowColors.push(color);
+    });
+  }
   const ws = XLSX.utils.aoa_to_sheet(rows);
+  rowColors.forEach((color, i)=>{
+    const rowIdx = i + 1; // skip header row
+    for(let col=0; col<4; col++){
+      const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: col });
+      if(!ws[cellRef]) ws[cellRef] = { t:'s', v:'' };
+      ws[cellRef].s = { fill: { patternType: 'solid', fgColor: { rgb: color } } };
+    }
+  });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Passenger List');
-  XLSX.writeFile(wb, `Elisabet_Cruises_manifest_${tripLabel}.xlsx`);
+  XLSX.writeFile(wb, `Elisabet_Cruises_manifest_${tripLabel}.xlsx`, { cellStyles: true });
 }
 
 async function renderSkiatosManifest(){
@@ -4745,38 +4777,42 @@ async function renderSkiatosManifest(){
     </div>`;
   };
 
-  let allGroupNames = guideNames.slice();
-  if(myGuideName && !allGroupNames.includes(myGuideName)) allGroupNames.push(myGuideName);
-  allGroupNames.sort();
+  let allGroupNames;
+  if(currentProfile.role==='guide'){
+    allGroupNames = myGuideName ? [myGuideName] : [];
+  } else {
+    allGroupNames = guideNames.slice();
+    if(myGuideName && !allGroupNames.includes(myGuideName)) allGroupNames.push(myGuideName);
+    allGroupNames.sort();
+  }
   const bodyHtml = allGroupNames.map(groupHtml).join('');
 
-  const partnerGroupHtml = (p)=>{
-    const rows = partnerGroups[p] || [];
-    const subtotal = rows.reduce((s,r)=>s+r.price, 0);
-    grandTotal += subtotal;
-    return `<div style="margin-bottom:14px;">
-      <p style="font-weight:700; margin:0 0 4px;">🅿️ ${p}</p>
-      <table class="report-table" style="font-size:12.5px;">
-        <thead><tr><th>№</th><th style="text-align:left;">Ім'я</th><th>Вік</th><th>Паспорт</th><th>Ціна</th><th></th></tr></thead>
-        <tbody>
-          ${rows.map((r,idx)=>`<tr>
-            <td class="muted">${idx+1}</td>
-            <td style="text-align:left;">${r.name}</td>
-            <td>${r.age!==null && r.age!==undefined ? r.age+' р.' : '—'}</td>
-            <td class="muted" style="font-size:11px;">${r.passport||'—'}</td>
-            <td><input type="text" inputmode="decimal" class="fin-amount" style="width:70px;" data-role="manEditPrice" data-id="${r.extra.id}" value="${r.price}"></td>
-            <td class="no-print"><button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button></td>
-          </tr>`).join('') || `<tr><td colspan="6" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}
-        </tbody>
-      </table>
-      <p class="muted" style="font-size:12px; margin-top:4px;">Підсумок групи: ${fmt(subtotal)} €</p>
-    </div>`;
-  };
   const partnerGroupNames = Object.keys(partnerGroups).sort();
-  const partnerGroupsHtml = partnerGroupNames.length ? `<div style="margin-top:16px; border-top:1px dashed var(--line); padding-top:10px;">
-    <p class="muted" style="font-size:12px; margin:0 0 8px; text-transform:uppercase; letter-spacing:.03em;">Партнерські групи</p>
-    ${partnerGroupNames.map(partnerGroupHtml).join('')}
-  </div>` : '';
+  const extraRows = [];
+  partnerGroupNames.forEach(p=>{
+    (partnerGroups[p]||[]).forEach(r=> extraRows.push({ ...r, groupLabel: '🅿️ '+p, free:false }));
+  });
+  foreignGuides.forEach(r=> extraRows.push({ ...r, groupLabel:'гід', free:true }));
+  drivers.forEach(r=> extraRows.push({ ...r, groupLabel:'водій', free:true }));
+  const extraSubtotal = extraRows.reduce((s,r)=> s + (r.free ? 0 : r.price), 0);
+  grandTotal += extraSubtotal;
+
+  const extraParticipantsHtml = `<div style="margin-top:16px; border-top:1px dashed var(--line); padding-top:10px;">
+    <p style="font-weight:700; margin:0 0 6px;">Додаткові учасники</p>
+    <table class="report-table" style="font-size:12.5px;">
+      <thead><tr><th>№</th><th style="text-align:left;">Ім'я</th><th>Група</th><th>Вік</th><th>Паспорт</th><th>Ціна</th><th></th></tr></thead>
+      <tbody>${extraRows.map((r,idx)=>`<tr style="${r.free ? 'font-weight:700;' : 'background:#fce8ee;'}">
+        <td class="muted">${idx+1}</td>
+        <td style="text-align:left;">${r.name}${r.free ? ' '+r.groupLabel : ''}</td>
+        <td class="muted" style="font-size:11px;">${r.groupLabel}</td>
+        <td>${!r.free && r.age!==null && r.age!==undefined ? r.age+' р.' : '—'}</td>
+        <td class="muted" style="font-size:11px;">${r.passport||'—'}</td>
+        <td>${r.free ? r.groupLabel : `<input type="text" inputmode="decimal" class="fin-amount" style="width:70px;" data-role="manEditPrice" data-id="${r.extra.id}" value="${r.price}">`}</td>
+        <td class="no-print"><button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button></td>
+      </tr>`).join('') || `<tr><td colspan="7" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}</tbody>
+    </table>
+    <p class="muted" style="font-size:12px; margin-top:4px;">Підсумок: ${fmt(extraSubtotal)} €</p>
+  </div>`;
 
   const summaryHtml = currentProfile.role==='manager' ? `<div class="manager-only" style="margin-top:14px;">
     <p style="font-weight:700; margin:0 0 4px;">Підсумок по гідах (аналіз)</p>
@@ -4798,53 +4834,23 @@ async function renderSkiatosManifest(){
     <p class="muted" style="font-size:12px; margin-top:4px;">Гідів іншої компанії: ${foreignGuides.length} · Водіїв: ${drivers.length} · Партнерських груп: ${partnerGroupNames.length}</p>
   </div>` : '';
 
-  const foreignGuidesHtml = `<div style="margin-top:10px;">
-    <p style="font-weight:700; margin:0 0 4px;">Гіди (в т.ч. інших компаній)</p>
-    <table class="report-table" style="font-size:12.5px;">
-      <thead><tr><th style="text-align:left;">Ім'я</th><th></th></tr></thead>
-      <tbody>${foreignGuides.map(r=>`<tr style="font-weight:700;"><td style="text-align:left;">${r.name} guide</td><td class="no-print"><button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button></td></tr>`).join('') || `<tr><td class="muted" style="text-align:left;">Немає.</td></tr>`}</tbody>
-    </table>
-  </div>`;
-
-  const driversHtml = `<div style="margin-top:10px;">
-    <p style="font-weight:700; margin:0 0 4px;">Водії</p>
-    <table class="report-table" style="font-size:12.5px;">
-      <thead><tr><th style="text-align:left;">Ім'я</th><th></th></tr></thead>
-      <tbody>${drivers.map(r=>`<tr style="font-weight:700;"><td style="text-align:left;">${r.name} driver</td><td class="no-print"><button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button></td></tr>`).join('') || `<tr><td class="muted" style="text-align:left;">Немає.</td></tr>`}</tbody>
-    </table>
-  </div>`;
+  const skiatosDate = skiatosDateForTrip(def);
+  const skiatosDateLabel = skiatosDate ? skiatosDate.toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}) : '—';
 
   block.innerHTML = `
-    <div class="manager-only" style="margin:0 0 10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-      <label style="font-size:13px; font-weight:600;">Дата екскурсії на Скіатос:</label>
-      <input type="date" id="skiatosExcDateInput" value="${def && def.skiatosDate ? def.skiatosDate.toISOString().slice(0,10) : ''}">
-      <button class="btn btn-ghost btn-small no-print" id="skiatosExcDateSaveBtn">💾 Зберегти дату</button>
-      <span class="muted" style="font-size:12px;">Вік туристів для тарифу рахується саме на цю дату${def && def.skiatosDate ? '' : ' (поки не задана — рахується на дату старту туру)'}.</span>
-    </div>
-    <p class="report-note" style="margin:0;">Розрахунок за тарифами катера (27€ від 16 років, 0-5 безкоштовно, 6-11 → 15€, 12-15 → 20€). Гіди їдуть безкоштовно.</p>
+    <p style="font-weight:700; margin:0 0 10px; font-size:14px;">📅 Дата поїздки на Скіатос: ${skiatosDateLabel}</p>
     <div style="margin-top:10px;">${bodyHtml || '<p class="report-note">Ще ніхто не записаний на Скіатос.</p>'}</div>
-    ${partnerGroupsHtml}
+    ${extraParticipantsHtml}
     ${summaryHtml}
-    ${foreignGuidesHtml}
-    ${driversHtml}
-    <div class="fin-total-row" style="margin-top:10px;"><span>Загалом до сплати катеру</span><span>${fmt(grandTotal)} €</span></div>
-    <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:14px; border-top:1px solid var(--line); padding-top:14px;">
+    <div class="manager-only fin-total-row" style="margin-top:10px;"><span>Загалом до сплати катеру</span><span>${fmt(grandTotal)} €</span></div>
+    <div class="no-print manager-only" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:14px; border-top:1px solid var(--line); padding-top:14px;">
       <button class="btn btn-ghost btn-small" id="manSaveBtn">💾 Зберегти</button>
       <button class="btn btn-ghost btn-small" id="manDownloadBtn">⬇ Завантажити збережений</button>
-      ${currentProfile.role==='manager' ? `<button class="btn btn-ghost btn-small manager-only" id="manExportBtn">📥 Excel (внутрішній)</button>
-      <button class="btn btn-ghost btn-small manager-only" id="manExportFerryBtn">📥 Список для порому</button>` : ''}
+      <button class="btn btn-ghost btn-small" id="manExportBtn">📥 Excel (внутрішній)</button>
+      <button class="btn btn-ghost btn-small" id="manExportFerryBtn">📥 Список для порому</button>
     </div>
   `;
 
-  const skiatosDateBtn = block.querySelector('#skiatosExcDateSaveBtn');
-  if(skiatosDateBtn) skiatosDateBtn.addEventListener('click', async ()=>{
-    const val = block.querySelector('#skiatosExcDateInput').value;
-    const { error } = await sb.from('trips').update({ skiatos_date: val || null }).eq('id', currentTripId);
-    if(error){ alert('Не вдалося зберегти дату: ' + friendlyErrorMessage(error)); return; }
-    const def2 = TRIPS_DEF.find(d=>d.id===currentTripId);
-    if(def2) def2.skiatosDate = val ? new Date(val+"T00:00:00") : null;
-    renderSkiatosManifest();
-  });
   block.querySelectorAll('[data-role="manAddSelf"]').forEach(el=> el.addEventListener('click', async e=>{
     await addGuideSelfToManifest(currentTripId, e.target.dataset.guide);
     renderSkiatosManifest();
