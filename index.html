@@ -4441,7 +4441,7 @@ function buildSkiatosManifestGroups(tripId, data){
     const g = t.guide_name;
     if(!groups[g]) groups[g] = [];
     const age = def ? calcAgeAtTrip(t.birth_date, skiatosDateForTrip(def) || def.start) : null;
-    groups[g].push({ kind:'tourist', name:`${t.last_name} ${t.first_name}`.trim(), age, price: ticketPriceForAge(age), id:'t:'+s.id,
+    groups[g].push({ kind:'tourist', name:`${t.last_name} ${t.first_name}`.trim(), age, price: ticketPriceForAge(age), id:'t:'+s.id, selectionId: s.id,
       passport: t.passport_data||'', firstName: t.first_name||'', lastName: t.last_name||'', birthDate: t.birth_date||'' });
   });
   const drivers = [];
@@ -4677,7 +4677,8 @@ async function renderSkiatosManifest(){
             <td>${r.kind==='guide' ? 'guide' : (r.kind==='extra' && canManage
                 ? `<input type="text" inputmode="decimal" class="fin-amount" style="width:70px;" data-role="manEditPrice" data-id="${r.extra.id}" value="${r.price}">`
                 : fmt(r.price)+' €')}</td>
-            <td class="no-print">${r.kind==='extra' && canManage ? `<button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button>` : ''}</td>
+            <td class="no-print">${r.kind==='extra' && canManage ? `<button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button>`
+                : (r.kind==='tourist' && canManage ? `<button class="row-del" data-role="removeFromSkiatos" data-sel="${r.selectionId}" title="Прибрати зі Скіатосу (туриста не видаляє)">✕</button>` : '')}</td>
           </tr>`; }).join(''); })() || `<tr><td colspan="6" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}
         </tbody>
       </table>
@@ -4739,6 +4740,24 @@ async function renderSkiatosManifest(){
         <td class="no-print">${canManageExtra ? `<button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button>` : ''}</td>
       </tr>`).join('') || `<tr><td colspan="7" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}</tbody>
     </table>
+    ${canManageExtra ? `<div class="no-print" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+      <select id="extraNewType" style="width:110px;">
+        <option value="partner">Партн. група</option>
+        <option value="guide">Гід</option>
+        <option value="driver">Водій</option>
+      </select>
+      <select id="extraNewPartner" style="width:130px;">
+        <option value="">— оператор —</option>
+        ${PARTNERS_FIXED.map(p=>`<option value="${p}">${p}</option>`).join('')}
+        <option value="${CUSTOM_PARTNER_VALUE}">+ Новий партнер...</option>
+      </select>
+      <input type="text" placeholder="Назва партнера" id="extraNewPartnerCustom" style="width:130px; display:none;">
+      <input type="text" placeholder="Ім'я" id="extraNewFirst" style="width:100px;">
+      <input type="text" placeholder="Прізвище" id="extraNewLast" style="width:100px;">
+      <input type="text" inputmode="numeric" placeholder="дд.мм.рррр" id="extraNewBirth" data-role="birthMaskInput" maxlength="10" style="width:110px;">
+      <input type="text" placeholder="Паспорт" id="extraNewPassport" style="width:100px;">
+      <button class="btn btn-ghost btn-small" data-role="addExtraParticipant">+ Додати</button>
+    </div>` : ''}
     <p class="muted" style="font-size:12px; margin-top:4px;">Підсумок: ${fmt(extraSubtotal)} €</p>
   </div>`;
 
@@ -4834,6 +4853,38 @@ async function renderSkiatosManifest(){
     else await addExtraPersonToManifest(currentTripId, g, first, last, birth||null, passport);
     renderSkiatosManifest();
   }));
+  const extraTypeSelect = document.getElementById('extraNewType');
+  if(extraTypeSelect) extraTypeSelect.addEventListener('change', e=>{
+    const isPartner = e.target.value === 'partner';
+    document.getElementById('extraNewPartner').style.display = isPartner ? 'inline-block' : 'none';
+    if(!isPartner) document.getElementById('extraNewPartnerCustom').style.display = 'none';
+  });
+  const extraPartnerSelect = document.getElementById('extraNewPartner');
+  if(extraPartnerSelect){
+    extraPartnerSelect.style.display = extraTypeSelect && extraTypeSelect.value==='partner' ? 'inline-block' : 'none';
+    extraPartnerSelect.addEventListener('change', e=>{
+      document.getElementById('extraNewPartnerCustom').style.display = e.target.value===CUSTOM_PARTNER_VALUE ? 'inline-block' : 'none';
+    });
+  }
+  const addExtraBtn = document.getElementById('addExtraParticipant');
+  if(addExtraBtn) addExtraBtn.addEventListener('click', async ()=>{
+    const type = document.getElementById('extraNewType').value;
+    const first = document.getElementById('extraNewFirst').value.trim();
+    const last = document.getElementById('extraNewLast').value.trim();
+    const birth = parseUkrDateInput(document.getElementById('extraNewBirth').value);
+    const passport = document.getElementById('extraNewPassport').value.trim();
+    if(!first && !last) return;
+    const attributedGuide = currentProfile.role==='guide' ? currentProfile.guide_name : (getTripData(currentTripId).guides[0]?.name || '');
+    if(type==='guide') await addForeignGuideToManifest(currentTripId, attributedGuide, first, last, birth||null, passport);
+    else if(type==='driver') await addDriverToManifest(currentTripId, attributedGuide, first, last, birth||null, passport);
+    else {
+      const partnerSel = document.getElementById('extraNewPartner').value;
+      const partnerName = partnerSel===CUSTOM_PARTNER_VALUE ? document.getElementById('extraNewPartnerCustom').value.trim() : partnerSel;
+      if(!partnerName){ alert('Вкажіть партнера/оператора.'); return; }
+      await addExtraPersonToManifest(currentTripId, attributedGuide, first, last, birth||null, passport, partnerName);
+    }
+    renderSkiatosManifest();
+  });
   block.querySelectorAll('[data-role="manEditPrice"]').forEach(el=> el.addEventListener('input', e=>{
     const id = e.target.dataset.id;
     const val = parseDecimalInput(e.target.value);
@@ -4842,6 +4893,12 @@ async function renderSkiatosManifest(){
   }));
   block.querySelectorAll('[data-role="manDeleteExtra"]').forEach(el=> el.addEventListener('click', async e=>{
     await deleteManifestExtra(e.target.dataset.id);
+    renderSkiatosManifest();
+  }));
+  block.querySelectorAll('[data-role="removeFromSkiatos"]').forEach(el=> el.addEventListener('click', async e=>{
+    if(!confirm('Прибрати цю людину зі списку на Скіатос? Самого туриста це не видалить.')) return;
+    const { error } = await sb.rpc('cancel_tourist_selection', { p_selection_id: e.target.dataset.sel, p_reason: 'Прибрано зі Скіатосу' });
+    if(error){ alert('Не вдалося прибрати: ' + friendlyErrorMessage(error)); return; }
     renderSkiatosManifest();
   }));
   const exportBtn = document.getElementById('manExportBtn');
