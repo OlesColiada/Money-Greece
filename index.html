@@ -4541,15 +4541,17 @@ async function addExtraPersonToManifest(tripId, guideName, firstName, lastName, 
   });
   if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
 }
-async function addDriverToManifest(tripId, firstName, lastName){
+async function addDriverToManifest(tripId, firstName, lastName, birthDate, passport){
   const { error } = await sb.from('skiatos_manifest_extras').insert({
-    trip_id: tripId, guide_name:'', entry_type:'driver', first_name:firstName, last_name:lastName, price:0
+    trip_id: tripId, guide_name:'', entry_type:'driver', first_name:firstName, last_name:lastName, price:0,
+    birth_date: birthDate||null, passport_data: passport||''
   });
   if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
 }
-async function addForeignGuideToManifest(tripId, firstName, lastName){
+async function addForeignGuideToManifest(tripId, firstName, lastName, birthDate, passport){
   const { error } = await sb.from('skiatos_manifest_extras').insert({
-    trip_id: tripId, guide_name:'', entry_type:'guide_foreign', first_name:firstName, last_name:lastName, price:0
+    trip_id: tripId, guide_name:'', entry_type:'guide_foreign', first_name:firstName, last_name:lastName, price:0,
+    birth_date: birthDate||null, passport_data: passport||''
   });
   if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
 }
@@ -4733,8 +4735,8 @@ async function renderSkiatosManifest(){
     const birth = document.getElementById(`manNewBirth_${g}`).value;
     const passport = document.getElementById(`manNewPassport_${g}`).value.trim();
     if(!first && !last) return;
-    if(type==='guide') await addForeignGuideToManifest(currentTripId, first, last);
-    else if(type==='driver') await addDriverToManifest(currentTripId, first, last);
+    if(type==='guide') await addForeignGuideToManifest(currentTripId, first, last, birth||null, passport);
+    else if(type==='driver') await addDriverToManifest(currentTripId, first, last, birth||null, passport);
     else await addExtraPersonToManifest(currentTripId, g, first, last, birth||null, passport);
     renderSkiatosManifest();
   }));
