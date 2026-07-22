@@ -658,17 +658,6 @@
       </details>
     </section>
 
-    <section class="step-block manager-only" id="touristSeasonStatsSection" style="margin-top:20px;">
-      <p class="report-title">Загальна статистика туристів (усі гіди, усі заїзди)</p>
-      <p class="report-note">Зведення по всьому сезону, з розбивкою по гідах і по екскурсіях.</p>
-      <div class="table-scroll">
-        <table class="report-table" id="touristSeasonByGuideTable"></table>
-      </div>
-      <div class="table-scroll" style="margin-top:14px;">
-        <table class="report-table" id="touristSeasonByExcTable"></table>
-      </div>
-    </section>
-
   </div>
 
   <div id="financeSection" style="display:none;">
@@ -2363,6 +2352,7 @@ let tourSectionTripChosen = false;
 let tourSectionGuideChosen = false;
 let currentTourGuideName = null;
 let touristGuideFilter = null; // for manager: which guide's group is being viewed
+let managerSkiatosCorrectionMode = false; // manager must explicitly confirm before editing guides' Skiatos lists
 let touristData = { tourists: [], selectionsByTourist: {} }; // cache for current (trip, guideFilter)
 let openTouristId = null;
 let openEditPanels = new Set();
@@ -2944,58 +2934,6 @@ async function loadTripGuideExcursionStats(){
   return byGuideExc;
 }
 
-async function loadAllTouristStatsData(){
-  const [{data:allTourists, error:e1}, {data:allSelections, error:e2}] = await Promise.all([
-    sb.from('tourists').select('*'),
-    sb.from('tourist_excursion_selections').select('*')
-  ]);
-  if(e1||e2){ console.error(e1||e2); return null; }
-  return { tourists: allTourists||[], selections: allSelections||[] };
-}
-
-async function renderTouristSeasonStats(){
-  if(!currentProfile || currentProfile.role !== 'manager') return;
-  const data = await loadAllTouristStatsData();
-  if(!data) return;
-  const touristGuide = {};
-  data.tourists.forEach(t=> touristGuide[t.id]=t.guide_name);
-  const byGuide = {};
-  const byExc = {};
-  TOURIST_PRICE_LIST.forEach(p=> byExc[p.name] = {count:0, sum:0});
-  data.selections.forEach(s=>{
-    if(!(s.going && !s.cancelled)) return;
-    const guideName = touristGuide[s.tourist_id];
-    if(!guideName) return;
-    if(!byGuide[guideName]) byGuide[guideName] = {count:0, sum:0};
-    byGuide[guideName].count++; byGuide[guideName].sum += Number(s.price)||0;
-    if(byExc[s.excursion_name]){ byExc[s.excursion_name].count++; byExc[s.excursion_name].sum += Number(s.price)||0; }
-  });
-
-  const guideTable = document.getElementById('touristSeasonByGuideTable');
-  let gRows='', gTotalCount=0, gTotalSum=0;
-  Object.keys(byGuide).sort().forEach(name=>{
-    const g = byGuide[name]; gTotalCount+=g.count; gTotalSum+=g.sum;
-    gRows += `<tr><td>${name}</td><td>${g.count}</td><td>${fmt(g.sum)} €</td></tr>`;
-  });
-  guideTable.innerHTML = gRows
-    ? `<thead><tr><th style="text-align:left;">Гід</th><th>Записів на екскурсії</th><th>Зібрано</th></tr></thead><tbody>${gRows}</tbody><tfoot><tr><td>Разом</td><td>${gTotalCount}</td><td>${fmt(gTotalSum)} €</td></tr></tfoot>`
-    : `<tr><td style="padding:12px;color:var(--ink-soft);">Ще немає даних.</td></tr>`;
-
-  const excTable = document.getElementById('touristSeasonByExcTable');
-  let eRows='', eTotalCount=0, eTotalSum=0;
-  TOURIST_PRICE_LIST.forEach(p=>{
-    const st = byExc[p.name]; eTotalCount+=st.count; eTotalSum+=st.sum;
-    eRows += `<tr><td>${p.name}</td><td>${st.count}</td><td>${fmt(st.sum)} €</td></tr>`;
-  });
-  excTable.innerHTML = `<thead><tr><th style="text-align:left;">Екскурсія</th><th>Туристів</th><th>Зібрано</th></tr></thead><tbody>${eRows}</tbody><tfoot><tr><td>Разом</td><td>${eTotalCount}</td><td>${fmt(eTotalSum)} €</td></tr></tfoot>`;
-}
-let touristSeasonStatsTimer;
-function scheduleTouristSeasonStats(){
-  if(!currentProfile || currentProfile.role !== 'manager') return;
-  clearTimeout(touristSeasonStatsTimer);
-  touristSeasonStatsTimer = setTimeout(renderTouristSeasonStats, 800);
-}
-
 function renderTouristSection(){
   const td = getTripData(currentTripId);
   const noGuideBanner = document.getElementById('noGuidesBanner');
@@ -3015,7 +2953,6 @@ function renderTouristSection(){
   renderTouristList();
   renderTouristDetail();
   renderTouristStats();
-  scheduleTouristSeasonStats();
   renderSkiatosManifest();
 }
 document.getElementById('touristStatsSaveBtn').addEventListener('click', async ()=>{
@@ -4669,50 +4606,40 @@ function formatUkrDateAsTyped(value){
 }
 
 function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides, partnerGroups){
-  const PALETTE = ['DCE6F1','E2EFDA','FFF2CC','FCE4EC','E8DAEF','FDEBD0','D6EAF8','FADBD8'];
-  const rows = [['№ п/п', 'Name Surname', 'Date of birth', 'Passport']];
-  const rowColors = [];
-  let n = 1, colorIdx = 0;
+  const rows = [['№ п/п', 'Name Surname', 'Date of birth', 'Passport', 'Група']];
+  let n = 1;
+  let firstSegment = true;
+  const addSeparator = ()=>{ if(!firstSegment) rows.push(['','','','','']); firstSegment = false; };
   Object.keys(groups).sort().forEach(g=>{
-    const color = PALETTE[colorIdx % PALETTE.length]; colorIdx++;
+    if(!groups[g].length) return;
+    addSeparator();
     groups[g].forEach(r=>{
-      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
-      rowColors.push(color);
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'', g]);
     });
   });
   Object.keys(partnerGroups||{}).sort().forEach(p=>{
-    const color = PALETTE[colorIdx % PALETTE.length]; colorIdx++;
+    if(!partnerGroups[p].length) return;
+    addSeparator();
     partnerGroups[p].forEach(r=>{
-      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
-      rowColors.push(color);
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'', '🅿️ '+p]);
     });
   });
   if((foreignGuides||[]).length){
-    const color = PALETTE[colorIdx % PALETTE.length]; colorIdx++;
+    addSeparator();
     foreignGuides.forEach(r=>{
-      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
-      rowColors.push(color);
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'', 'гіди інших компаній']);
     });
   }
   if(drivers.length){
-    const color = PALETTE[colorIdx % PALETTE.length]; colorIdx++;
+    addSeparator();
     drivers.forEach(r=>{
-      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'']);
-      rowColors.push(color);
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'', 'водії']);
     });
   }
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  rowColors.forEach((color, i)=>{
-    const rowIdx = i + 1; // skip header row
-    for(let col=0; col<4; col++){
-      const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: col });
-      if(!ws[cellRef]) ws[cellRef] = { t:'s', v:'' };
-      ws[cellRef].s = { fill: { patternType: 'solid', fgColor: { rgb: color } } };
-    }
-  });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Passenger List');
-  XLSX.writeFile(wb, `Elisabet_Cruises_manifest_${tripLabel}.xlsx`, { cellStyles: true });
+  XLSX.writeFile(wb, `Elisabet_Cruises_manifest_${tripLabel}.xlsx`);
 }
 
 async function renderSkiatosManifest(){
@@ -4734,8 +4661,8 @@ async function renderSkiatosManifest(){
     const rows = groups[g] || [];
     const subtotal = rows.filter(r=>r.kind!=='guide').reduce((s,r)=>s+r.price, 0);
     grandTotal += subtotal;
-    const canAdd = currentProfile.role==='guide' && currentProfile.guide_name===g;
-    const canManage = canAdd || currentProfile.role==='manager';
+    const canAdd = (currentProfile.role==='guide' && currentProfile.guide_name===g) || (currentProfile.role==='manager' && managerSkiatosCorrectionMode);
+    const canManage = canAdd;
     const iAmIn = rows.some(r=>r.kind==='guide' && r.name===g);
     return `<div style="margin-bottom:14px;">
       <p style="font-weight:700; margin:0 0 4px;">${g}${canAdd && !iAmIn && g===myGuideName ? ` <button class="btn btn-ghost btn-small no-print" data-role="manAddSelf" data-guide="${g}">+ Я теж їду</button>` : ''}</p>
@@ -4797,6 +4724,7 @@ async function renderSkiatosManifest(){
   const extraSubtotal = extraRows.reduce((s,r)=> s + (r.free ? 0 : r.price), 0);
   grandTotal += extraSubtotal;
 
+  const canManageExtra = currentProfile.role==='guide' || (currentProfile.role==='manager' && managerSkiatosCorrectionMode);
   const extraParticipantsHtml = `<div style="margin-top:16px; border-top:1px dashed var(--line); padding-top:10px;">
     <p style="font-weight:700; margin:0 0 6px;">Додаткові учасники</p>
     <table class="report-table" style="font-size:12.5px;">
@@ -4807,8 +4735,8 @@ async function renderSkiatosManifest(){
         <td class="muted" style="font-size:11px;">${r.groupLabel}</td>
         <td>${!r.free && r.age!==null && r.age!==undefined ? r.age+' р.' : '—'}</td>
         <td class="muted" style="font-size:11px;">${r.passport||'—'}</td>
-        <td>${r.free ? r.groupLabel : `<input type="text" inputmode="decimal" class="fin-amount" style="width:70px;" data-role="manEditPrice" data-id="${r.extra.id}" value="${r.price}">`}</td>
-        <td class="no-print"><button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button></td>
+        <td>${r.free ? r.groupLabel : (canManageExtra ? `<input type="text" inputmode="decimal" class="fin-amount" style="width:70px;" data-role="manEditPrice" data-id="${r.extra.id}" value="${r.price}">` : fmt(r.price)+' €')}</td>
+        <td class="no-print">${canManageExtra ? `<button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button>` : ''}</td>
       </tr>`).join('') || `<tr><td colspan="7" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}</tbody>
     </table>
     <p class="muted" style="font-size:12px; margin-top:4px;">Підсумок: ${fmt(extraSubtotal)} €</p>
@@ -4839,6 +4767,10 @@ async function renderSkiatosManifest(){
 
   block.innerHTML = `
     <p style="font-weight:700; margin:0 0 10px; font-size:14px;">📅 Дата поїздки на Скіатос: ${skiatosDateLabel}</p>
+    <div class="manager-only no-print" style="margin:0 0 10px;">
+      <button class="btn btn-ghost btn-small" id="managerCorrectionToggle">${managerSkiatosCorrectionMode ? '🔒 Вимкнути редагування' : '✏️ Дозволити правки списку'}</button>
+      ${managerSkiatosCorrectionMode ? `<span class="muted" style="font-size:12px; margin-left:8px; color:var(--bad, #b91c1c);">Режим правок увімкнено — зазвичай ці дані вносить гід.</span>` : ''}
+    </div>
     <div style="margin-top:10px;">${bodyHtml || '<p class="report-note">Ще ніхто не записаний на Скіатос.</p>'}</div>
     ${extraParticipantsHtml}
     ${summaryHtml}
@@ -4850,6 +4782,17 @@ async function renderSkiatosManifest(){
       <button class="btn btn-ghost btn-small" id="manExportFerryBtn">📥 Список для порому</button>
     </div>
   `;
+
+  const correctionToggle = block.querySelector('#managerCorrectionToggle');
+  if(correctionToggle) correctionToggle.addEventListener('click', ()=>{
+    if(managerSkiatosCorrectionMode){
+      managerSkiatosCorrectionMode = false;
+    } else {
+      if(!confirm('Ви дійсно хочете внести правки до списку на Скіатос? Зазвичай ці дані вносить гід — вмикайте це лише для виправлення помилки.')) return;
+      managerSkiatosCorrectionMode = true;
+    }
+    renderSkiatosManifest();
+  });
 
   block.querySelectorAll('[data-role="manAddSelf"]').forEach(el=> el.addEventListener('click', async e=>{
     await addGuideSelfToManifest(currentTripId, e.target.dataset.guide);
