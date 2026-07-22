@@ -382,7 +382,7 @@
     .fin-row{ flex-wrap:wrap; gap:8px 6px; padding:10px 0; }
     .fin-label-input{ flex:1 1 100%; font-size:16px; padding:9px 10px; min-height:40px; order:1; }
     .fin-label{ flex:1 1 100%; order:1; font-size:14px; }
-    .fin-amount{ width:auto; flex:1 1 auto; font-size:16px; padding:9px 10px; min-height:40px; order:2; }
+    .fin-row .fin-amount, .fin-card-fields .fin-amount{ width:auto; flex:1 1 auto; font-size:16px; padding:9px 10px; min-height:40px; order:2; }
     .fin-row .row-del{ order:3; }
     .fin-row select{ order:1; flex:1 1 100%; }
     .fin-row label{ order:2; }
@@ -4761,8 +4761,8 @@ async function renderSkiatosManifest(){
     <div class="no-print" style="margin-top:8px;">
       <button class="btn btn-ghost btn-small" data-role="toggleBulkExtra" type="button">➕ Додати список одразу (кілька людей)</button>
       <div id="extraBulkPanel" style="display:none; margin-top:8px; gap:6px; flex-wrap:wrap; align-items:flex-start;">
-        <p class="muted" style="font-size:12px; margin:0 0 6px;">Обери оператора вище (в полі "— оператор —"), встав список по одному на рядок у форматі "Прізвище Ім'я", і додай усіх одразу — вік/паспорт потім донесеш вручну в таблиці.</p>
-        <textarea id="extraBulkNames" placeholder="Іваненко Іван&#10;Петренко Марія&#10;..." style="width:100%; max-width:420px; min-height:90px; padding:8px; border:2px solid var(--line); border-radius:8px; font-family:inherit;"></textarea>
+        <p class="muted" style="font-size:12px; margin:0 0 6px; max-width:480px;">Обери оператора вище (в полі "— оператор —"). Виділи в Excel 4 колонки — <b>Прізвище, Ім'я, Дата народження (дд.мм.рррр), Паспорт</b> — скопіюй і встав сюди одним шматком (кожна людина з нового рядка). Можна і без Excel: просто "Прізвище Ім'я" в рядку, без дати й паспорта.</p>
+        <textarea id="extraBulkNames" placeholder="Іваненко&#9;Іван&#9;28.06.1988&#9;FN123456&#10;Петренко&#9;Марія&#9;05.03.1995&#9;FG654321" style="width:100%; max-width:480px; min-height:110px; padding:8px; border:2px solid var(--line); border-radius:8px; font-family:inherit;"></textarea>
         <div style="margin-top:6px;"><button class="btn btn-ghost btn-small" data-role="addExtraBulk">+ Додати весь список</button></div>
       </div>
     </div>` : ''}
@@ -4908,13 +4908,24 @@ async function renderSkiatosManifest(){
     if(!partnerName){ alert('Спершу обери оператора вгорі (в полі "— оператор —").'); return; }
     const attributedGuide = currentProfile.role==='guide' ? currentProfile.guide_name : (getTripData(currentTripId).guides[0]?.name || '');
     if(!attributedGuide){ alert('Не вдалося визначити гіда для запису.'); return; }
-    const lines = document.getElementById('extraBulkNames').value.split('\n').map(l=>l.trim()).filter(Boolean);
+    const lines = document.getElementById('extraBulkNames').value.split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim());
     if(!lines.length){ alert('Список порожній.'); return; }
     for(const line of lines){
-      const parts = line.split(/\s+/);
-      const last = parts[0] || '';
-      const first = parts.slice(1).join(' ') || '';
-      await addExtraPersonToManifest(currentTripId, attributedGuide, first, last, null, '', partnerName);
+      const cols = line.split('\t');
+      let last, first, birth, passport;
+      if(cols.length >= 2){
+        last = (cols[0]||'').trim();
+        first = (cols[1]||'').trim();
+        birth = parseUkrDateInput((cols[2]||'').trim());
+        passport = (cols[3]||'').trim();
+      } else {
+        const parts = line.trim().split(/\s+/);
+        last = parts[0] || '';
+        first = parts.slice(1).join(' ') || '';
+        birth = null; passport = '';
+      }
+      if(!last && !first) continue;
+      await addExtraPersonToManifest(currentTripId, attributedGuide, first, last, birth, passport, partnerName);
     }
     renderSkiatosManifest();
   });
