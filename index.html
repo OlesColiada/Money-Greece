@@ -4610,6 +4610,13 @@ function parseUkrDateInput(str){
   return `${year}-${month}-${day}`;
 }
 
+function formatUkrDateAsTyped(value){
+  const digits = String(value).replace(/\D/g,'').slice(0,8);
+  if(digits.length <= 2) return digits;
+  if(digits.length <= 4) return digits.slice(0,2) + '.' + digits.slice(2);
+  return digits.slice(0,2) + '.' + digits.slice(2,4) + '.' + digits.slice(4);
+}
+
 function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides){
   const rows = [['№ п/п', 'Name Surname', 'Date of birth', 'Passport']];
   let n = 1;
@@ -4676,7 +4683,7 @@ async function renderSkiatosManifest(){
         </select>
         <input type="text" placeholder="Ім'я" id="manNewFirst_${g}" style="width:100px;">
         <input type="text" placeholder="Прізвище" id="manNewLast_${g}" style="width:100px;">
-        <input type="text" inputmode="numeric" placeholder="дд.мм.рррр" id="manNewBirth_${g}" style="width:110px;">
+        <input type="text" inputmode="numeric" placeholder="дд.мм.рррр" id="manNewBirth_${g}" data-role="birthMaskInput" maxlength="10" style="width:110px;">
         <input type="text" placeholder="Паспорт" id="manNewPassport_${g}" style="width:100px;">
         <button class="btn btn-ghost btn-small" data-role="manAddExtra" data-guide="${g}">+ Додати людину</button>
       </div>` : ''}
@@ -4738,6 +4745,13 @@ async function renderSkiatosManifest(){
   block.querySelectorAll('[data-role="manAddSelf"]').forEach(el=> el.addEventListener('click', async e=>{
     await addGuideSelfToManifest(currentTripId, e.target.dataset.guide);
     renderSkiatosManifest();
+  }));
+  block.querySelectorAll('[data-role="birthMaskInput"]').forEach(el=> el.addEventListener('input', e=>{
+    const pos = e.target.selectionStart;
+    const before = e.target.value.length;
+    e.target.value = formatUkrDateAsTyped(e.target.value);
+    const after = e.target.value.length;
+    e.target.selectionStart = e.target.selectionEnd = Math.max(0, pos + (after - before));
   }));
   block.querySelectorAll('[data-role="manAddExtra"]').forEach(el=> el.addEventListener('click', async e=>{
     const g = e.target.dataset.guide;
