@@ -486,6 +486,7 @@
   <div class="step-block no-print manager-only" id="managerTripPickBlock">
     <p class="step-title" style="margin:0 0 8px;">Заїзд</p>
     <div class="trip-grid" id="tripGrid"></div>
+    <button class="btn btn-ghost btn-small" id="goToSkiatosBtn" style="margin-top:10px; display:none;">📋 Список на Скіатос (об'єднаний)</button>
   </div>
 
   <div class="step-block no-print app-hidden" id="guideTripPickBlock" style="margin:0 0 16px;">
@@ -2478,6 +2479,7 @@ function renderSectionTabs(){
   document.getElementById('reportsSection').style.display = currentSection==='reports' ? 'block' : 'none';
   document.getElementById('statsSection').style.display = currentSection==='stats' ? 'block' : 'none';
   document.getElementById('tripPrepSection').style.display = currentSection==='tripPrep' ? 'block' : 'none';
+  document.getElementById('goToSkiatosBtn').style.display = inTourGroup ? 'inline-block' : 'none';
   if(inTourGroup) updateTourSectionBanner();
 }
 
@@ -2517,6 +2519,12 @@ document.getElementById('sectionFinanceBtn').addEventListener('click', switchToF
 document.getElementById('sectionProfitBtnDirect').addEventListener('click', switchToProfitSection);
 document.getElementById('sectionTouristsBtnDirect').addEventListener('click', switchToTouristsSection);
 document.getElementById('sectionFinanceBtnDirect').addEventListener('click', switchToFinanceSection);
+document.getElementById('goToSkiatosBtn').addEventListener('click', async ()=>{
+  await switchToTouristsSection();
+  const details = document.getElementById('skiatosManifestDetails');
+  if(details) details.open = true;
+  document.getElementById('skiatosManifestSection')?.scrollIntoView({behavior:'smooth', block:'start'});
+});
 document.getElementById('sectionManagerReportBtn').addEventListener('click', async ()=>{
   currentSection='managerReport'; renderTripGrid(); renderSectionTabs();
   await renderManagerReportSection();
