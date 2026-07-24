@@ -100,6 +100,14 @@
   .fin-card-fields .fin-amount{ width:100%; box-sizing:border-box; font-size:16px; padding:8px 10px; }
   .fin-card-fields select{ padding:8px 10px; border:2px solid var(--line); border-radius:8px; }
   .fin-card-checkbox{ flex-direction:row !important; align-items:center !important; gap:6px !important; font-weight:600 !important; color:var(--ink) !important; }
+  .fin-panel{ border:1px solid var(--line); border-radius:12px; padding:4px 14px; background:#fff; }
+  .fin-list-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 0; border-bottom:1px solid #f0f0ea; }
+  .fin-list-row:last-child{ border-bottom:none; }
+  .fin-list-row .fin-label-input{ flex:1 1 120px; min-width:90px; font-size:13.5px; border:1px solid var(--line); border-radius:6px; padding:7px 9px; }
+  .fin-list-row .fin-amount{ width:90px; flex-shrink:0; text-align:right; font-size:14.5px; padding:7px 9px; }
+  .fin-list-row select{ padding:7px 8px; border:2px solid var(--line); border-radius:8px; font-size:13px; }
+  .fin-list-row .num-input{ width:64px; }
+  .fin-list-sub{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12px; width:100%; margin-top:4px; }
 
   /* No spinner arrows on any number field — easy to type on phone and laptop alike */
   input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
@@ -382,7 +390,9 @@
     .fin-row{ flex-wrap:wrap; gap:8px 6px; padding:10px 0; }
     .fin-label-input{ flex:1 1 100%; font-size:16px; padding:9px 10px; min-height:40px; order:1; }
     .fin-label{ flex:1 1 100%; order:1; font-size:14px; }
-    .fin-row .fin-amount, .fin-card-fields .fin-amount{ width:auto; min-width:0; flex:1 1 auto; font-size:16px; padding:9px 10px; min-height:40px; order:2; box-sizing:border-box; }
+    .fin-row .fin-amount, .fin-card-fields .fin-amount, .fin-list-row .fin-amount{ width:auto; min-width:0; flex:1 1 auto; font-size:16px; padding:9px 10px; min-height:40px; order:2; box-sizing:border-box; }
+    .fin-list-row .fin-label-input{ flex:1 1 100%; order:1; font-size:16px; min-height:40px; }
+    .fin-list-row .row-del{ order:3; }
     .fin-row .row-del{ order:3; }
     .fin-row select{ order:1; flex:1 1 100%; }
     .fin-row label{ order:2; }
@@ -3522,40 +3532,28 @@ function renderFinanceReport(report){
         isHotel && e.hotel ? e.hotel : '',
         isBus ? `${e.start_km||0} → ${e.end_km||0} км` : ''
       ].filter(Boolean).join(' · ');
-      return `<div class="fin-card">
-        <div class="fin-card-top">
-          <span style="font-weight:600;">${e.label}</span>
-        </div>
-        <div class="fin-card-fields">
-          ${extraBits ? `<span class="muted" style="font-size:11.5px;">${extraBits}</span>` : ''}
-          <span>${fmt(e.amount)} €</span>
-        </div>
+      return `<div class="fin-list-row">
+        <span style="flex:1; font-weight:600;">${e.label}</span>
+        ${extraBits ? `<span class="muted" style="font-size:11.5px;">${extraBits}</span>` : ''}
+        <span>${fmt(e.amount)} €</span>
       </div>`;
     }
-    return `<div class="fin-card">
-      <div class="fin-card-top">
-        <input type="text" class="fin-label-input" data-role="finLabel" data-idx="${idx}" value="${e.label}">
-        <button class="row-del no-print" data-role="finDelete" data-idx="${idx}" title="Видалити пункт">✕</button>
-      </div>
-      <div class="fin-card-fields">
-        ${isPerDiem ? `<label class="fin-card-checkbox">
-            <input type="checkbox" data-role="finKpi" data-idx="${idx}" ${e.kpi?'checked':''}> KPI виконано
-          </label>` : ''}
-        ${isHotel ? `<label>Готель<select data-role="finHotel" data-idx="${idx}">
-            <option value="" ${!e.hotel?'selected':''}>— обрати —</option>
+    return `<div class="fin-list-row">
+      <input type="text" class="fin-label-input" data-role="finLabel" data-idx="${idx}" value="${e.label}">
+      <input type="text" inputmode="decimal" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem||isBus?'disabled':''} title="${isPerDiem?'Змінюється чекбоксом KPI':isBus?'Рахується автоматично з км':''}">
+      ${isPercent ? `<button class="edit-toggle-btn no-print" data-role="finRefreshPercent" data-idx="${idx}" title="Підтягнути суму комісії з прибутковості">🔄</button>` : ''}
+      <button class="row-del no-print" data-role="finDelete" data-idx="${idx}" title="Видалити пункт">✕</button>
+      ${isPerDiem || isHotel || isBus ? `<div class="fin-list-sub">
+        ${isPerDiem ? `<label class="fin-card-checkbox"><input type="checkbox" data-role="finKpi" data-idx="${idx}" ${e.kpi?'checked':''}> KPI виконано</label>` : ''}
+        ${isHotel ? `<select data-role="finHotel" data-idx="${idx}">
+            <option value="" ${!e.hotel?'selected':''}>— обрати готель —</option>
             <option value="Konstantin 3*" ${e.hotel==='Konstantin 3*'?'selected':''}>Konstantin 3*</option>
             <option value="Great Aleksander 3*" ${e.hotel==='Great Aleksander 3*'?'selected':''}>Great Aleksander 3*</option>
-          </select></label>` : ''}
-        ${isBus ? `<label>Поч. км<input type="text" inputmode="decimal" class="num-input" data-role="finBusStartKm" data-idx="${idx}" value="${e.start_km||''}"></label>
-          <label>Кін. км<input type="text" inputmode="decimal" class="num-input" data-role="finBusEndKm" data-idx="${idx}" value="${e.end_km||''}"></label>
-          <span class="muted" style="align-self:center; font-size:11.5px;">× 1,6 €/км</span>` : ''}
-        <label>Сума €
-          <div style="display:flex; align-items:center; gap:6px;">
-            <input type="text" inputmode="decimal" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem||isBus?'disabled':''} title="${isPerDiem?'Змінюється чекбоксом KPI':isBus?'Рахується автоматично з км':''}">
-            ${isPercent ? `<button class="edit-toggle-btn no-print" data-role="finRefreshPercent" data-idx="${idx}" title="Підтягнути суму комісії з прибутковості">🔄</button>` : ''}
-          </div>
-        </label>
-      </div>
+          </select>` : ''}
+        ${isBus ? `<span class="muted">Поч. км</span><input type="text" inputmode="decimal" class="num-input" data-role="finBusStartKm" data-idx="${idx}" value="${e.start_km||''}">
+          <span class="muted">Кін. км</span><input type="text" inputmode="decimal" class="num-input" data-role="finBusEndKm" data-idx="${idx}" value="${e.end_km||''}">
+          <span class="muted">× 1,6 €/км</span>` : ''}
+      </div>` : ''}
     </div>`;
   };
 
@@ -3574,7 +3572,7 @@ function renderFinanceReport(report){
     <details open style="margin-top:14px;">
       <summary style="cursor:pointer; font-weight:700; font-size:15px;">💰 Отримано — скільки грошей у мене на руках</summary>
       <div style="margin-top:8px;">
-        ${received.map(rowHtml).join('')}
+        <div class="fin-panel">${received.map(rowHtml).join('')}</div>
         ${readOnly ? '' : `<div class="no-print" style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn btn-ghost btn-small" data-role="finAddNamed" data-section="received" data-prefix="Партнер">+ Додати партнера</button>
           <button class="btn btn-ghost btn-small" data-role="finAddNamed" data-section="received" data-prefix="Борг">+ Додати борг</button>
@@ -3587,7 +3585,7 @@ function renderFinanceReport(report){
     <details open style="margin-top:10px;">
       <summary style="cursor:pointer; font-weight:700; font-size:15px;">💸 Затрати — куди пішли ці гроші (включно з моєю винагородою)</summary>
       <div style="margin-top:8px;">
-        ${paid.map(rowHtml).join('')}
+        <div class="fin-panel">${paid.map(rowHtml).join('')}</div>
         ${readOnly ? '' : `<div class="no-print" style="margin-top:8px;"><button class="btn btn-ghost btn-small" data-role="finAddRow" data-section="paid">+ Додати пункт</button></div>`}
         <div class="fin-total-row"><span>Разом затрати</span><span>${fmt(totalPaid)} €</span></div>
       </div>
