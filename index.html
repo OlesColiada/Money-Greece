@@ -1142,8 +1142,10 @@ async function rtProcessOutbox(){
       try{
         let error = null;
         if(op.type==='upsert') ({ error } = await sb.from(op.table).upsert(op.payload, op.options||{}));
+        else if(op.type==='insert') ({ error } = await sb.from(op.table).insert(op.payload));
         else if(op.type==='update') ({ error } = await sb.from(op.table).update(op.payload).match(op.match));
         else if(op.type==='delete') ({ error } = await sb.from(op.table).delete().match(op.match));
+        else if(op.type==='rpc') ({ error } = await sb.rpc(op.fn, op.args));
         if(error) continue; // leave in queue, try again next pass
         await rtOutboxRemove(op.id);
       }catch(e){ break; } // network dropped again mid-sync — stop, resume later
@@ -1162,22 +1164,43 @@ updateOutboxBadge();
 // the normal Supabase calls with the existing read-only cache fallback above.
 async function rtGuideWrite(type, table, payload, matchOrOptions){
   if(!navigator.onLine){
-    await rtOutboxAdd({ type, table, payload, match: type!=='upsert'?matchOrOptions:undefined, options: type==='upsert'?matchOrOptions:undefined });
+    await rtOutboxAdd({ type, table, payload, match: (type==='update'||type==='delete')?matchOrOptions:undefined, options: type==='upsert'?matchOrOptions:undefined });
     renderOfflineBanner();
     return { error: null, queued: true };
   }
   try{
     let error = null;
     if(type==='upsert') ({ error } = await sb.from(table).upsert(payload, matchOrOptions||{}));
+    else if(type==='insert') ({ error } = await sb.from(table).insert(payload));
     else if(type==='update') ({ error } = await sb.from(table).update(payload).match(matchOrOptions));
     else if(type==='delete') ({ error } = await sb.from(table).delete().match(matchOrOptions));
     if(error && /fetch|network|failed to fetch/i.test(error.message||'')){
-      await rtOutboxAdd({ type, table, payload, match: type!=='upsert'?matchOrOptions:undefined, options: type==='upsert'?matchOrOptions:undefined });
+      await rtOutboxAdd({ type, table, payload, match: (type==='update'||type==='delete')?matchOrOptions:undefined, options: type==='upsert'?matchOrOptions:undefined });
       return { error: null, queued: true };
     }
     return { error };
   }catch(e){
-    await rtOutboxAdd({ type, table, payload, match: type!=='upsert'?matchOrOptions:undefined, options: type==='upsert'?matchOrOptions:undefined });
+    await rtOutboxAdd({ type, table, payload, match: (type==='update'||type==='delete')?matchOrOptions:undefined, options: type==='upsert'?matchOrOptions:undefined });
+    return { error: null, queued: true };
+  }
+}
+// Same offline-safe pattern as rtGuideWrite, but for Postgres RPC calls
+// (e.g. mark_tourist_paid, cancel_tourist_selection) instead of plain table writes.
+async function rtGuideRpc(fnName, args){
+  if(!navigator.onLine){
+    await rtOutboxAdd({ type:'rpc', fn: fnName, args });
+    renderOfflineBanner();
+    return { error: null, queued: true };
+  }
+  try{
+    const { error } = await sb.rpc(fnName, args);
+    if(error && /fetch|network|failed to fetch/i.test(error.message||'')){
+      await rtOutboxAdd({ type:'rpc', fn: fnName, args });
+      return { error: null, queued: true };
+    }
+    return { error };
+  }catch(e){
+    await rtOutboxAdd({ type:'rpc', fn: fnName, args });
     return { error: null, queued: true };
   }
 }
@@ -1995,39 +2018,42 @@ async function renderTouristRefBanner(){
 
 /* ---------- Supabase persistence helpers ---------- */
 async function upsertExcursion(tripId, exc){
-  const { error } = await sb.from('excursions').upsert({
+  const { error, queued } = await rtGuideWrite('upsert', 'excursions', {
     id: exc.id, trip_id: tripId, name: exc.name, custom_name: exc.customName,
     bus_owner: exc.busOwner, bus_rate: Number(exc.busRate)||0, km: Number(exc.km)||0,
     guide_fee_default: Number(exc.guideFeeDefault)||0, guide_fee: Number(exc.guideFee)||0,
     guide_fee_reason: exc.guideFeeReason, recipient_guide: exc.recipientGuide, payer_guide: exc.payerGuide
   });
-  setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
+  if(queued) setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет");
+  else setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
   if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
 }
 async function upsertRow(tripId, excId, row){
-  const { error } = await sb.from('excursion_rows').upsert({
+  const { error, queued } = await rtGuideWrite('upsert', 'excursion_rows', {
     id: row.id, excursion_id: excId, trip_id: tripId,
     person_type: row.personType, person: row.person, custom_partner_name: row.customPartnerName,
     chol: Number(row.chol)||0, zibrano: Number(row.zibrano)||0, quitky: Number(row.quitky)||0,
     is_test: !!(currentProfile && currentProfile.is_test_account)
   });
-  setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
+  if(queued) setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет");
+  else setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
   if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
 }
 async function upsertGuide(tripId, guide){
-  const { error } = await sb.from('trip_guides').upsert({ id: guide.id, trip_id: tripId, guide_name: guide.name, own_bus: !!guide.ownBus, substitute_note: guide.substituteNote||'' });
+  const { error } = await rtGuideWrite('upsert', 'trip_guides', { id: guide.id, trip_id: tripId, guide_name: guide.name, own_bus: !!guide.ownBus, substitute_note: guide.substituteNote||'' });
   if(error) console.error(error);
 }
-async function deleteExcursionDb(excId){ const { error } = await sb.from('excursions').delete().eq('id', excId); if(error) console.error(error); }
-async function deleteRowDb(rowId){ const { error } = await sb.from('excursion_rows').delete().eq('id', rowId); if(error) console.error(error); }
+async function deleteExcursionDb(excId){ const { error } = await rtGuideWrite('delete', 'excursions', null, { id: excId }); if(error) console.error(error); }
+async function deleteRowDb(rowId){ const { error } = await rtGuideWrite('delete', 'excursion_rows', null, { id: rowId }); if(error) console.error(error); }
 async function deleteGuideDb(guideId){ const { error } = await sb.from('trip_guides').delete().eq('id', guideId); if(error) console.error(error); }
 async function deleteGuidesForTrip(tripId){ const { error } = await sb.from('trip_guides').delete().eq('trip_id', tripId); if(error) console.error(error); }
 
 async function markSettlementPaid(excId, which){
   setStatus("Підтвердження…");
   await flushPendingPersists();
-  const { error } = await sb.rpc('mark_settlement_paid', { p_excursion_id: excId, p_which: which });
+  const { error, queued } = await rtGuideRpc('mark_settlement_paid', { p_excursion_id: excId, p_which: which });
   if(error){ alert(friendlyErrorMessage(error)); setStatus("Помилка"); return; }
+  if(queued){ setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет"); return; }
   await loadTripData(currentTripId);
   renderAll();
 }
@@ -2937,10 +2963,18 @@ function updateSelectionLocal(touristId, selId, patch, debounce){
 
 async function payTourist(touristId){
   await flushPendingPersists();
-  const { error } = await sb.rpc('mark_tourist_paid', { p_tourist_id: touristId });
+  const { error, queued } = await rtGuideRpc('mark_tourist_paid', { p_tourist_id: touristId });
   if(error){ alert(friendlyErrorMessage(error)); return; }
+  if(queued){
+    // Offline — reflect the payment locally right away so the guide sees progress;
+    // the real DB update happens automatically once the outbox syncs.
+    const sels = touristData.selectionsByTourist[touristId] || [];
+    sels.forEach(s=>{ if(s.going && !s.cancelled) s.paid = true; });
+    hbShowToast('💾 Оплату збережено локально — синхронізується, коли з\'явиться інтернет');
+  } else {
+    await loadTourists();
+  }
   openTouristId = null;
-  await loadTourists();
   renderTouristSection();
   const target = document.querySelector(`[data-tourist-row-id="${touristId}"]`) || document.getElementById('touristListBlock');
   if(target){
@@ -2952,15 +2986,31 @@ async function payTourist(touristId){
 }
 async function cancelSelection(selId, reason){
   await flushPendingPersists();
-  const { error } = await sb.rpc('cancel_tourist_selection', { p_selection_id: selId, p_reason: reason });
+  const { error, queued } = await rtGuideRpc('cancel_tourist_selection', { p_selection_id: selId, p_reason: reason });
   if(error){ alert(friendlyErrorMessage(error)); return; }
-  await loadTourists();
+  if(queued){
+    Object.values(touristData.selectionsByTourist).forEach(sels=>{
+      const s = sels.find(x=>x.id===selId);
+      if(s){ s.cancelled = true; s.cancelled_reason = reason||''; }
+    });
+    hbShowToast('💾 Скасування збережено локально — синхронізується, коли з\'явиться інтернет');
+  } else {
+    await loadTourists();
+  }
   renderTouristSection();
 }
 async function refundSelection(selId){
-  const { error } = await sb.rpc('refund_tourist_selection', { p_selection_id: selId });
+  const { error, queued } = await rtGuideRpc('refund_tourist_selection', { p_selection_id: selId });
   if(error){ alert(friendlyErrorMessage(error)); return; }
-  await loadTourists();
+  if(queued){
+    Object.values(touristData.selectionsByTourist).forEach(sels=>{
+      const s = sels.find(x=>x.id===selId);
+      if(s) s.refunded = true;
+    });
+    hbShowToast('💾 Позначку про повернення збережено локально — синхронізується, коли з\'явиться інтернет');
+  } else {
+    await loadTourists();
+  }
   renderTouristSection();
 }
 
@@ -3111,13 +3161,19 @@ document.getElementById('addExtraTouristBtn').addEventListener('click', async ()
   const passport = document.getElementById('newExtraTouristPassport').value.trim();
   const guideName = activeTouristGuideName();
   if(!first || !last || !guideName) return;
-  const { error } = await sb.from('tourists').insert({ trip_id: currentTripId, guide_name: guideName, first_name:first, last_name:last, birth_date: birth||null, passport_data: passport, added_by_guide:true });
+  const payload = { trip_id: currentTripId, guide_name: guideName, first_name:first, last_name:last, birth_date: birth||null, passport_data: passport, added_by_guide:true };
+  const { error, queued } = await rtGuideWrite('insert', 'tourists', payload);
   if(error){ alert(friendlyErrorMessage(error)); return; }
   document.getElementById('newExtraTouristFirst').value='';
   document.getElementById('newExtraTouristLast').value='';
   document.getElementById('newExtraTouristBirth').value='';
   document.getElementById('newExtraTouristPassport').value='';
-  await loadTourists();
+  if(queued){
+    touristData.tourists.push({ id:'pending_'+uid(), ...payload, _pendingSync:true });
+    hbShowToast('💾 Туриста збережено локально — з\'явиться в базі, коли повернеться інтернет');
+  } else {
+    await loadTourists();
+  }
   renderTouristSection();
 });
 function parseBulkDate(raw){
@@ -4549,45 +4605,51 @@ async function addGuideSelfToManifest(tripId, guideName){
     first = parts.slice(1).join(' ');
     last = parts[0];
   }
-  const { error } = await sb.from('skiatos_manifest_extras').insert({
+  const { error, queued } = await rtGuideWrite('insert', 'skiatos_manifest_extras', {
     trip_id: tripId, guide_name: guideName, entry_type:'guide_self',
     first_name:first, last_name:last, passport_data: info ? info.passport : '',
     birth_date: info ? info.birthDate : null
   });
   if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
+  else if(queued) hbShowToast('💾 Збережено локально — з\'явиться в списку, коли повернеться інтернет');
 }
 async function addExtraPersonToManifest(tripId, guideName, firstName, lastName, birthDate, passport, partnerOperator){
   const def = TRIPS_DEF.find(d=>d.id===tripId);
   const age = birthDate && def ? calcAgeAtTrip(birthDate, skiatosDateForTrip(def) || def.start) : null;
   const price = ticketPriceForAge(age);
-  const { error } = await sb.from('skiatos_manifest_extras').insert({
+  const { error, queued } = await rtGuideWrite('insert', 'skiatos_manifest_extras', {
     trip_id: tripId, guide_name: guideName, entry_type:'extra_person',
     first_name:firstName, last_name:lastName, birth_date: birthDate||null, price, price_mode:'standard',
     passport_data: passport||'', partner_operator: partnerOperator||null
   });
   if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
+  else if(queued) hbShowToast('💾 Збережено локально — з\'явиться в списку, коли повернеться інтернет');
 }
 async function addDriverToManifest(tripId, guideName, firstName, lastName, birthDate, passport){
-  const { error } = await sb.from('skiatos_manifest_extras').insert({
+  const { error, queued } = await rtGuideWrite('insert', 'skiatos_manifest_extras', {
     trip_id: tripId, guide_name: guideName, entry_type:'driver', first_name:firstName, last_name:lastName, price:0,
     birth_date: birthDate||null, passport_data: passport||''
   });
   if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
+  else if(queued) hbShowToast('💾 Збережено локально — з\'явиться в списку, коли повернеться інтернет');
 }
 async function addForeignGuideToManifest(tripId, guideName, firstName, lastName, birthDate, passport){
-  const { error } = await sb.from('skiatos_manifest_extras').insert({
+  const { error, queued } = await rtGuideWrite('insert', 'skiatos_manifest_extras', {
     trip_id: tripId, guide_name: guideName, entry_type:'guide_foreign', first_name:firstName, last_name:lastName, price:0,
     birth_date: birthDate||null, passport_data: passport||''
   });
   if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
+  else if(queued) hbShowToast('💾 Збережено локально — з\'явиться в списку, коли повернеться інтернет');
 }
 async function updateManifestExtraPrice(extraId, price){
-  const { error } = await sb.from('skiatos_manifest_extras').update({ price, price_mode:'manual' }).eq('id', extraId);
+  const { error, queued } = await rtGuideWrite('update', 'skiatos_manifest_extras', { price, price_mode:'manual' }, { id: extraId });
   if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+  else if(queued) hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет');
 }
 async function deleteManifestExtra(extraId){
-  const { error } = await sb.from('skiatos_manifest_extras').delete().eq('id', extraId);
+  const { error, queued } = await rtGuideWrite('delete', 'skiatos_manifest_extras', null, { id: extraId });
   if(error) alert('Не вдалося видалити: ' + friendlyErrorMessage(error));
+  else if(queued) hbShowToast('💾 Видалення збережено локально — синхронізується, коли з\'явиться інтернет');
 }
 
 function buildSkiatosManifestRows(groups, drivers, foreignGuides, partnerGroups){
@@ -4735,28 +4797,6 @@ async function renderSkiatosManifest(){
           </tr>`; }).join(''); })() || `<tr><td colspan="6" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}
         </tbody>
       </table></div>
-      ${canAdd ? `<details class="no-print" style="margin-top:6px;">
-        <summary style="cursor:pointer; font-weight:600; font-size:13px;">➕ Додати людину в цю групу</summary>
-        <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-        <select id="manNewType_${g}" data-role="manNewTypeSelect" data-guide="${g}" style="width:110px;">
-          <option value="tourist">Турист</option>
-          <option value="guide">Гід</option>
-          <option value="driver">Водій</option>
-          <option value="partner">Партн. група</option>
-        </select>
-        <select id="manNewPartner_${g}" style="width:130px; display:none;">
-          <option value="">— оператор —</option>
-          ${PARTNERS_FIXED.map(p=>`<option value="${p}">${p}</option>`).join('')}
-          <option value="${CUSTOM_PARTNER_VALUE}">+ Новий партнер...</option>
-        </select>
-        <input type="text" placeholder="Назва партнера" id="manNewPartnerCustom_${g}" style="width:130px; display:none;">
-        <input type="text" placeholder="Ім'я" id="manNewFirst_${g}" style="width:100px;">
-        <input type="text" placeholder="Прізвище" id="manNewLast_${g}" style="width:100px;">
-        <input type="text" inputmode="numeric" placeholder="дд.мм.рррр" id="manNewBirth_${g}" data-role="birthMaskInput" maxlength="10" style="width:110px;">
-        <input type="text" placeholder="Паспорт" id="manNewPassport_${g}" style="width:100px;">
-        <button class="btn btn-ghost btn-small" data-role="manAddExtra" data-guide="${g}">+ Додати людину</button>
-        </div>
-      </details>` : ''}
       <p class="muted" style="font-size:12px; margin-top:4px;">Підсумок групи: ${fmt(subtotal)} €</p>
     </div>`;
   };
@@ -4797,14 +4837,15 @@ async function renderSkiatosManifest(){
       </tr>`).join('') || `<tr><td colspan="7" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}</tbody>
     </table></div>
     ${canManageExtra ? `<details class="no-print" style="margin-top:8px;">
-      <summary style="cursor:pointer; font-weight:600; font-size:13px;">➕ Додати учасника (гід / водій / партнерська група)</summary>
+      <summary style="cursor:pointer; font-weight:600; font-size:13px;">➕ Додати учасника (турист / гід / водій / партнерська група)</summary>
       <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
         <select id="extraNewType" style="width:110px;">
+          <option value="tourist">Турист</option>
           <option value="partner">Партн. група</option>
           <option value="guide">Гід</option>
           <option value="driver">Водій</option>
         </select>
-        <select id="extraNewPartner" style="width:130px;">
+        <select id="extraNewPartner" style="width:130px; display:none;">
           <option value="">— оператор —</option>
           ${PARTNERS_FIXED.map(p=>`<option value="${p}">${p}</option>`).join('')}
           <option value="${CUSTOM_PARTNER_VALUE}">+ Новий партнер...</option>
@@ -4885,35 +4926,6 @@ async function renderSkiatosManifest(){
     const after = e.target.value.length;
     e.target.selectionStart = e.target.selectionEnd = Math.max(0, pos + (after - before));
   }));
-  block.querySelectorAll('[data-role="manNewTypeSelect"]').forEach(el=> el.addEventListener('change', e=>{
-    const g = e.target.dataset.guide;
-    const isPartner = e.target.value === 'partner';
-    document.getElementById(`manNewPartner_${g}`).style.display = isPartner ? 'inline-block' : 'none';
-    if(!isPartner) document.getElementById(`manNewPartnerCustom_${g}`).style.display = 'none';
-  }));
-  block.querySelectorAll('[id^="manNewPartner_"]').forEach(el=> el.addEventListener('change', e=>{
-    const g = e.target.id.replace('manNewPartner_','');
-    document.getElementById(`manNewPartnerCustom_${g}`).style.display = e.target.value===CUSTOM_PARTNER_VALUE ? 'inline-block' : 'none';
-  }));
-  block.querySelectorAll('[data-role="manAddExtra"]').forEach(el=> el.addEventListener('click', async e=>{
-    const g = e.target.dataset.guide;
-    const type = document.getElementById(`manNewType_${g}`).value;
-    const first = document.getElementById(`manNewFirst_${g}`).value.trim();
-    const last = document.getElementById(`manNewLast_${g}`).value.trim();
-    const birth = parseUkrDateInput(document.getElementById(`manNewBirth_${g}`).value);
-    const passport = document.getElementById(`manNewPassport_${g}`).value.trim();
-    if(!first && !last){ alert('Введіть ім\'я або прізвище.'); return; }
-    if(type==='guide') await addForeignGuideToManifest(currentTripId, g, first, last, birth||null, passport);
-    else if(type==='driver') await addDriverToManifest(currentTripId, g, first, last, birth||null, passport);
-    else if(type==='partner'){
-      const partnerSel = document.getElementById(`manNewPartner_${g}`).value;
-      const partnerName = partnerSel===CUSTOM_PARTNER_VALUE ? document.getElementById(`manNewPartnerCustom_${g}`).value.trim() : partnerSel;
-      if(!partnerName){ alert('Вкажіть партнера/оператора.'); return; }
-      await addExtraPersonToManifest(currentTripId, g, first, last, birth||null, passport, partnerName);
-    }
-    else await addExtraPersonToManifest(currentTripId, g, first, last, birth||null, passport);
-    renderSkiatosManifest();
-  }));
   const extraTypeSelect = document.getElementById('extraNewType');
   if(extraTypeSelect) extraTypeSelect.addEventListener('change', e=>{
     const isPartner = e.target.value === 'partner';
@@ -4931,13 +4943,13 @@ async function renderSkiatosManifest(){
   if(addExtraBtn) addExtraBtn.addEventListener('click', async ()=>{
     const type = document.getElementById('extraNewType').value;
     let partnerName = '';
+    const attributedGuide = currentProfile.role==='guide' ? currentProfile.guide_name : (getTripData(currentTripId).guides[0]?.name || '');
     if(type==='partner'){
       const partnerSel = document.getElementById('extraNewPartner').value;
       partnerName = partnerSel===CUSTOM_PARTNER_VALUE ? document.getElementById('extraNewPartnerCustom').value.trim() : partnerSel;
       if(!partnerName){ alert('Вкажіть партнера/оператора зі списку (або "+ Новий партнер...").'); return; }
     }
-    const attributedGuide = currentProfile.role==='guide' ? currentProfile.guide_name : (getTripData(currentTripId).guides[0]?.name || '');
-    if(!attributedGuide){ alert('Не вдалося визначити гіда для запису (спробуйте додати через таблицю конкретного гіда вище).'); return; }
+    if(!attributedGuide){ alert('Не вдалося визначити гіда для запису.'); return; }
     const rows = Array.from(document.querySelectorAll('#extraNewRows .extra-person-row'));
     const people = rows.map(row=>({
       first: row.querySelector('.extraRowFirst').value.trim(),
@@ -4949,6 +4961,7 @@ async function renderSkiatosManifest(){
     for(const p of people){
       if(type==='guide') await addForeignGuideToManifest(currentTripId, attributedGuide, p.first, p.last, p.birth||null, p.passport);
       else if(type==='driver') await addDriverToManifest(currentTripId, attributedGuide, p.first, p.last, p.birth||null, p.passport);
+      else if(type==='tourist') await addExtraPersonToManifest(currentTripId, attributedGuide, p.first, p.last, p.birth||null, p.passport);
       else await addExtraPersonToManifest(currentTripId, attributedGuide, p.first, p.last, p.birth||null, p.passport, partnerName);
     }
     renderSkiatosManifest();
@@ -4986,8 +4999,9 @@ async function renderSkiatosManifest(){
   }));
   block.querySelectorAll('[data-role="removeFromSkiatos"]').forEach(el=> el.addEventListener('click', async e=>{
     if(!confirm('Прибрати цю людину зі списку на Скіатос? Самого туриста це не видалить.')) return;
-    const { error } = await sb.rpc('cancel_tourist_selection', { p_selection_id: e.target.dataset.sel, p_reason: 'Прибрано зі Скіатосу' });
+    const { error, queued } = await rtGuideRpc('cancel_tourist_selection', { p_selection_id: e.target.dataset.sel, p_reason: 'Прибрано зі Скіатосу' });
     if(error){ alert('Не вдалося прибрати: ' + friendlyErrorMessage(error)); return; }
+    if(queued) hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет');
     renderSkiatosManifest();
   }));
   const exportBtn = document.getElementById('manExportBtn');
