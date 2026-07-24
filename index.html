@@ -613,6 +613,23 @@
       </details>
     </div>
 
+    <section class="step-block" id="touristListBlock" style="margin-top:16px;">
+      <details id="touristListDetails" class="top-accordion" open>
+        <summary style="cursor:pointer; font-weight:700; font-size:15px;">Туристи</summary>
+        <div style="margin-top:10px;">
+          <div style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px;">
+            <button class="btn btn-danger-ghost no-print manager-only" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
+          </div>
+          <p class="report-note" style="margin-top:4px;">Основа списку передається сюди з "Документи до туру" (кнопка "📤 Передати гіду" у вкладці "Автобуси") — керівник передає, коли розподіл готовий.</p>
+          <div id="touristListWrap"></div>
+          <div class="no-print" style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--line); padding-top:14px;">
+            <button class="btn btn-ghost btn-small" id="touristListSaveBtn">💾 Зберегти</button>
+            <button class="btn btn-ghost btn-small" id="touristListDownloadBtn">⬇ Завантажити збережений</button>
+          </div>
+        </div>
+      </details>
+    </section>
+
     <div class="step-block no-print guide-only" id="addExtraTouristBlock" style="display:none; margin-top:16px;">
       <details>
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">➕ Додати туриста поза групою</summary>
@@ -631,22 +648,6 @@
       </details>
     </div>
 
-    <section class="step-block" id="touristListBlock" style="margin-top:16px;">
-      <details id="touristListDetails" class="top-accordion" open>
-        <summary style="cursor:pointer; font-weight:700; font-size:15px;">Туристи</summary>
-        <div style="margin-top:10px;">
-          <div style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px;">
-            <button class="btn btn-danger-ghost no-print manager-only" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
-          </div>
-          <p class="report-note" style="margin-top:4px;">Основа списку передається сюди з "Документи до туру" (кнопка "📤 Передати гіду" у вкладці "Автобуси") — керівник передає, коли розподіл готовий.</p>
-          <div id="touristListWrap"></div>
-          <div class="no-print" style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--line); padding-top:14px;">
-            <button class="btn btn-ghost btn-small" id="touristListSaveBtn">💾 Зберегти</button>
-            <button class="btn btn-ghost btn-small" id="touristListDownloadBtn">⬇ Завантажити збережений</button>
-          </div>
-        </div>
-      </details>
-    </section>
 
     <div class="step-block" id="touristDetailBlock" style="display:none; margin-top:16px;"></div>
 
@@ -2678,7 +2679,7 @@ function renderTouristList(){
     return;
   }
   const def = TRIPS_DEF.find(d=>d.id===currentTripId);
-  touristData.tourists.forEach(t=>{
+  touristData.tourists.forEach((t, idx)=>{
     const processed = touristIsProcessed(t.id);
     const sels = touristData.selectionsByTourist[t.id] || [];
     const allPaid = sels.filter(s=>s.going && !s.cancelled).length > 0 && sels.filter(s=>s.going && !s.cancelled).every(s=>s.paid);
@@ -2690,6 +2691,7 @@ function renderTouristList(){
     if(t.added_by_guide) row.style.background = '#fce8ee';
     row.innerHTML = `
       <span class="dot"></span>
+      <span class="muted" style="font-size:11.5px; min-width:22px;">${idx+1}.</span>
       <span class="t-name" style="flex:1;">${(t.last_name+' '+t.first_name).toUpperCase()}</span>
       ${age===null ? `<span class="profit-neg" style="font-size:11px;" title="Дата народження не вказана або не розпізналась — ціна за замовчуванням доросла">❓ дата?</span>` : `<span class="muted" style="font-size:11.5px;">${age} р.</span>`}
       ${allPaid ? `<span class="paid-badge">✓ оплачено</span>` : ''}
@@ -4680,6 +4682,15 @@ function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides, p
   XLSX.writeFile(wb, `Elisabet_Cruises_manifest_${tripLabel}.xlsx`);
 }
 
+function extraPersonRowHtml(idx){
+  return `<div class="extra-person-row" data-idx="${idx}" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+    <input type="text" placeholder="Ім'я" class="extraRowFirst" style="width:100px;">
+    <input type="text" placeholder="Прізвище" class="extraRowLast" style="width:100px;">
+    <input type="text" inputmode="numeric" placeholder="дд.мм.рррр" class="extraRowBirth" data-role="birthMaskInput" maxlength="10" style="width:110px;">
+    <input type="text" placeholder="Паспорт" class="extraRowPassport" style="width:100px;">
+    ${idx>0 ? `<button type="button" class="row-del" data-role="removeExtraRow" title="Прибрати цей рядок">✕</button>` : ''}
+  </div>`;
+}
 async function renderSkiatosManifest(){
   const block = document.getElementById('skiatosManifestBlock');
   if(!block) return;
@@ -4703,7 +4714,8 @@ async function renderSkiatosManifest(){
     const canManage = canAdd;
     const iAmIn = rows.some(r=>r.kind==='guide' && r.name===g);
     return `<div style="margin-bottom:14px;">
-      <p style="font-weight:700; margin:0 0 4px;">${g}${canAdd && !iAmIn && g===myGuideName ? ` <button class="btn btn-ghost btn-small no-print" data-role="manAddSelf" data-guide="${g}">+ Я теж їду</button>` : ''}</p>
+      <p style="font-weight:700; margin:0 0 4px;">${g}</p>
+      ${canAdd && !iAmIn && g===myGuideName ? `<button class="btn btn-primary btn-small no-print" data-role="manAddSelf" data-guide="${g}" style="margin-bottom:8px;">+ Я теж їду</button>` : ''}
       <div class="table-scroll"><table class="report-table" style="font-size:12.5px;">
         <thead><tr><th>№</th><th style="text-align:left;">Ім'я</th><th>Вік</th><th>Паспорт</th><th>Ціна</th><th></th></tr></thead>
         <tbody>
@@ -4778,24 +4790,29 @@ async function renderSkiatosManifest(){
         <td class="no-print">${canManageExtra ? `<button class="row-del" data-role="manDeleteExtra" data-id="${r.extra.id}">✕</button>` : ''}</td>
       </tr>`).join('') || `<tr><td colspan="7" class="muted" style="text-align:left;">Ще нікого немає.</td></tr>`}</tbody>
     </table></div>
-    ${canManageExtra ? `<div class="no-print" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-      <select id="extraNewType" style="width:110px;">
-        <option value="partner">Партн. група</option>
-        <option value="guide">Гід</option>
-        <option value="driver">Водій</option>
-      </select>
-      <select id="extraNewPartner" style="width:130px;">
-        <option value="">— оператор —</option>
-        ${PARTNERS_FIXED.map(p=>`<option value="${p}">${p}</option>`).join('')}
-        <option value="${CUSTOM_PARTNER_VALUE}">+ Новий партнер...</option>
-      </select>
-      <input type="text" placeholder="Назва партнера" id="extraNewPartnerCustom" style="width:130px; display:none;">
-      <input type="text" placeholder="Ім'я" id="extraNewFirst" style="width:100px;">
-      <input type="text" placeholder="Прізвище" id="extraNewLast" style="width:100px;">
-      <input type="text" inputmode="numeric" placeholder="дд.мм.рррр" id="extraNewBirth" data-role="birthMaskInput" maxlength="10" style="width:110px;">
-      <input type="text" placeholder="Паспорт" id="extraNewPassport" style="width:100px;">
-      <button class="btn btn-ghost btn-small" data-role="addExtraParticipant">+ Додати</button>
-    </div>` : ''}
+    ${canManageExtra ? `<details class="no-print" style="margin-top:8px;">
+      <summary style="cursor:pointer; font-weight:600; font-size:13px;">➕ Додати учасника (гід / водій / партнерська група)</summary>
+      <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+        <select id="extraNewType" style="width:110px;">
+          <option value="partner">Партн. група</option>
+          <option value="guide">Гід</option>
+          <option value="driver">Водій</option>
+        </select>
+        <select id="extraNewPartner" style="width:130px;">
+          <option value="">— оператор —</option>
+          ${PARTNERS_FIXED.map(p=>`<option value="${p}">${p}</option>`).join('')}
+          <option value="${CUSTOM_PARTNER_VALUE}">+ Новий партнер...</option>
+        </select>
+        <input type="text" placeholder="Назва партнера" id="extraNewPartnerCustom" style="width:130px; display:none;">
+      </div>
+      <div id="extraNewRows" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+        ${extraPersonRowHtml(0)}
+      </div>
+      <div class="no-print" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-small" type="button" data-role="addExtraRowBtn">+ Додати ще одну людину</button>
+        <button class="btn btn-primary btn-small" data-role="addExtraParticipant">Додати всіх</button>
+      </div>
+    </details>` : ''}
     <p class="muted" style="font-size:12px; margin-top:4px;">Підсумок: ${fmt(extraSubtotal)} €</p>
   </div>`;
 
@@ -4907,24 +4924,49 @@ async function renderSkiatosManifest(){
   const addExtraBtn = document.querySelector('[data-role="addExtraParticipant"]');
   if(addExtraBtn) addExtraBtn.addEventListener('click', async ()=>{
     const type = document.getElementById('extraNewType').value;
-    const first = document.getElementById('extraNewFirst').value.trim();
-    const last = document.getElementById('extraNewLast').value.trim();
-    const birth = parseUkrDateInput(document.getElementById('extraNewBirth').value);
-    const passport = document.getElementById('extraNewPassport').value.trim();
-    if(!first && !last){ alert('Введіть ім\'я або прізвище.'); return; }
     let partnerName = '';
-    if(type==='partner' || type==='tourist'){
+    if(type==='partner'){
       const partnerSel = document.getElementById('extraNewPartner').value;
       partnerName = partnerSel===CUSTOM_PARTNER_VALUE ? document.getElementById('extraNewPartnerCustom').value.trim() : partnerSel;
       if(!partnerName){ alert('Вкажіть партнера/оператора зі списку (або "+ Новий партнер...").'); return; }
     }
     const attributedGuide = currentProfile.role==='guide' ? currentProfile.guide_name : (getTripData(currentTripId).guides[0]?.name || '');
     if(!attributedGuide){ alert('Не вдалося визначити гіда для запису (спробуйте додати через таблицю конкретного гіда вище).'); return; }
-    if(type==='guide') await addForeignGuideToManifest(currentTripId, attributedGuide, first, last, birth||null, passport);
-    else if(type==='driver') await addDriverToManifest(currentTripId, attributedGuide, first, last, birth||null, passport);
-    else await addExtraPersonToManifest(currentTripId, attributedGuide, first, last, birth||null, passport, partnerName);
+    const rows = Array.from(document.querySelectorAll('#extraNewRows .extra-person-row'));
+    const people = rows.map(row=>({
+      first: row.querySelector('.extraRowFirst').value.trim(),
+      last: row.querySelector('.extraRowLast').value.trim(),
+      birth: parseUkrDateInput(row.querySelector('.extraRowBirth').value),
+      passport: row.querySelector('.extraRowPassport').value.trim()
+    })).filter(p=>p.first || p.last);
+    if(!people.length){ alert('Введіть ім\'я або прізвище хоча б для однієї людини.'); return; }
+    for(const p of people){
+      if(type==='guide') await addForeignGuideToManifest(currentTripId, attributedGuide, p.first, p.last, p.birth||null, p.passport);
+      else if(type==='driver') await addDriverToManifest(currentTripId, attributedGuide, p.first, p.last, p.birth||null, p.passport);
+      else await addExtraPersonToManifest(currentTripId, attributedGuide, p.first, p.last, p.birth||null, p.passport, partnerName);
+    }
     renderSkiatosManifest();
   });
+  const addExtraRowBtn = document.querySelector('[data-role="addExtraRowBtn"]');
+  if(addExtraRowBtn) addExtraRowBtn.addEventListener('click', ()=>{
+    const container = document.getElementById('extraNewRows');
+    const nextIdx = container.querySelectorAll('.extra-person-row').length;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = extraPersonRowHtml(nextIdx);
+    const newRow = wrap.firstElementChild;
+    container.appendChild(newRow);
+    const birthInput = newRow.querySelector('[data-role="birthMaskInput"]');
+    birthInput.addEventListener('input', e=>{
+      const pos = e.target.selectionStart;
+      const before = e.target.value.length;
+      e.target.value = formatUkrDateAsTyped(e.target.value);
+      const after = e.target.value.length;
+      e.target.selectionStart = e.target.selectionEnd = Math.max(0, pos + (after - before));
+    });
+    const removeBtn = newRow.querySelector('[data-role="removeExtraRow"]');
+    if(removeBtn) removeBtn.addEventListener('click', ()=> newRow.remove());
+  });
+  block.querySelectorAll('[data-role="removeExtraRow"]').forEach(el=> el.addEventListener('click', e=> e.target.closest('.extra-person-row').remove()));
   block.querySelectorAll('[data-role="manEditPrice"]').forEach(el=> el.addEventListener('input', e=>{
     const id = e.target.dataset.id;
     const val = parseDecimalInput(e.target.value);
