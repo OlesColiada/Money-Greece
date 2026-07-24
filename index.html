@@ -34,13 +34,14 @@
     --whitewash:#f8f6f0; --whitewash-2:#eef0e9;
     --ochre:#c17f3e; --olive:#6f7d4f; --coral:#c65b43;
     --line:#d8dccf; --good:#3f7a4f; --bad:#b23a3a;
-    --card:#ffffff; --shadow: 0 1px 2px rgba(19,42,58,.06), 0 8px 24px rgba(19,42,58,.06);
+    --card:#ffffff; --shadow: 0 2px 5px rgba(19,42,58,.09), 0 10px 28px rgba(19,42,58,.12);
   }
   *{box-sizing:border-box;}
   body{margin:0; background:var(--whitewash); color:var(--ink); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased;}
   .wave-bg{background:
-      radial-gradient(ellipse 900px 300px at 20% -10%, rgba(28,90,122,.10), transparent 60%),
-      radial-gradient(ellipse 700px 260px at 100% 0%, rgba(193,127,62,.10), transparent 60%);}
+      radial-gradient(ellipse 900px 300px at 20% -10%, rgba(28,90,122,.12), transparent 60%),
+      radial-gradient(ellipse 700px 260px at 100% 0%, rgba(193,127,62,.12), transparent 60%),
+      #efe9db;}
   header.top{padding:24px 20px 18px; border-bottom:1px solid var(--line); background:linear-gradient(180deg,#fff,#fbfaf6);}
   .brand-row{display:flex; align-items:center; gap:12px; max-width:1040px; margin:0 auto;}
   .brand-mark{width:38px;height:38px;border-radius:10px;flex-shrink:0;
@@ -1658,7 +1659,7 @@ function renderExcursions(){
       <div class="exc-head">
         <select class="exc-name-select" data-role="excName">${nameOptions}</select>
         ${exc.name==="Інше..." ? `<input type="text" placeholder="Назва екскурсії" value="${exc.customName||''}" data-role="customName" style="min-width:120px;">` : ''}
-        <button class="btn btn-danger-ghost no-print manager-detail" data-role="delExc" style="margin-left:auto;">Видалити екскурсію</button>
+        <button class="btn btn-danger-ghost no-print" data-role="delExc" style="margin-left:auto;">Видалити екскурсію</button>
       </div>
       <div class="exc-body">
         <div class="subgrid">
@@ -2283,6 +2284,12 @@ function showFinanceNotifyList(reports){
   });
 }
 setInterval(()=>{ if(currentProfile && currentProfile.role==='manager') checkFinanceSubmissions(); }, 60000);
+setInterval(async ()=>{
+  if(currentSection==='profit' && currentTripId && document.visibilityState==='visible'){
+    await loadTripData(currentTripId);
+    renderAll();
+  }
+}, 30000);
 
 document.getElementById('tabManagerBtn').addEventListener('click', ()=>{
   if(currentProfile.role !== 'manager') return; // hidden for guides anyway; RLS blocks regardless
@@ -4906,6 +4913,21 @@ async function renderSkiatosManifest(){
     <p class="muted" style="font-size:12px; margin-top:4px;">Гідів іншої компанії: ${foreignGuides.length} · Водіїв: ${drivers.length} · Партнерських груп: ${partnerGroupNames.length}</p>
   </div>` : '';
 
+  const overallPeopleCount = guideNames.reduce((s,g)=> s + (groups[g]||[]).filter(r=>r.kind!=='guide').length, 0)
+    + partnerGroupNames.reduce((s,p)=> s + (partnerGroups[p]||[]).length, 0);
+  const guideSummaryHtml = currentProfile.role==='guide' ? `<div style="margin-top:14px;">
+    <p style="font-weight:700; margin:0 0 4px;">Загалом на Скіатос: ${overallPeopleCount} чол.</p>
+    <div class="table-scroll"><table class="report-table" style="font-size:12.5px;">
+      <thead><tr><th style="text-align:left;">Гід</th><th>Людей</th></tr></thead>
+      <tbody>${guideNames.sort().map(g=>{
+        const people = (groups[g]||[]).filter(r=>r.kind!=='guide').length;
+        return `<tr><td style="text-align:left;">${g}${g===myGuideName?' (я)':''}</td><td>${people}</td></tr>`;
+      }).join('') || `<tr><td colspan="2" class="muted" style="text-align:left;">Немає даних.</td></tr>`}
+      ${partnerGroupNames.map(p=>`<tr><td style="text-align:left;">🅿️ ${p}</td><td>${(partnerGroups[p]||[]).length}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <p class="muted" style="font-size:12px; margin-top:4px;">Гідів іншої компанії: ${foreignGuides.length} · Водіїв: ${drivers.length}</p>
+  </div>` : '';
+
   const skiatosDate = skiatosDateForTrip(def);
   const skiatosDateLabel = skiatosDate ? skiatosDate.toLocaleDateString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric'}) : '—';
 
@@ -4918,6 +4940,7 @@ async function renderSkiatosManifest(){
     <div style="margin-top:10px;">${bodyHtml || '<p class="report-note">Ще ніхто не записаний на Скіатос.</p>'}</div>
     ${extraParticipantsHtml}
     ${summaryHtml}
+    ${guideSummaryHtml}
     <div class="manager-only fin-total-row" style="margin-top:10px;"><span>Загалом до сплати катеру</span><span>${fmt(grandTotal)} €</span></div>
     <div class="no-print manager-only" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:14px; border-top:1px solid var(--line); padding-top:14px;">
       <button class="btn btn-ghost btn-small" id="manSaveBtn">💾 Зберегти</button>
