@@ -7215,10 +7215,33 @@ async function hbLoadBookings(){
   hbDatabase = hbBuildDatabaseFromRows(data);
 }
 
+function hbFindDuplicateRoomedNames(hotel, period, roomNum, names){
+  const cleanNames = (names||[]).map(n=>String(n).trim()).filter(Boolean);
+  if(!cleanNames.length) return [];
+  const conflicts = [];
+  const entries = (hbDatabase[hotel] && hbDatabase[hotel][period]) || [];
+  entries.forEach(entry=>{
+    if(entry.number === roomNum) return; // the room being saved right now — not a conflict with itself
+    entry.shares.forEach(sh=>{
+      (sh.memberNames||[]).forEach(existingName=>{
+        const clean = String(existingName).trim();
+        const match = cleanNames.find(n=> n.toLowerCase() === clean.toLowerCase());
+        if(match && !conflicts.some(c=>c.name===match && c.roomNumber===entry.number)) conflicts.push({ name: match, roomNumber: entry.number });
+      });
+    });
+  });
+  return conflicts;
+}
 async function hbSaveShare(hotel, period, roomNum, share){
   if(!share.requestNum){
     console.error('hbSaveShare: rejected save without a request number', {hotel, period, roomNum, share});
     alert('⚠️ Внутрішня помилка: спроба зберегти бронювання без номера заявки. Збереження скасовано.');
+    return;
+  }
+  const conflicts = hbFindDuplicateRoomedNames(hotel, period, roomNum, share.memberNames);
+  if(conflicts.length){
+    const lines = conflicts.map(c=> `${c.name} — вже в номері ${c.roomNumber}`).join('\n');
+    alert(`⚠️ Не поселено — ці люди вже поселені в іншому номері цього заїзду:\n\n${lines}\n\nСпочатку прибери їх звідти (або скористайся "Перенести"), якщо треба змінити кімнату.`);
     return;
   }
   await hbDeleteShare(hotel, period, roomNum, share.requestNum, true);
@@ -7473,8 +7496,11 @@ function hbLoadRoomsGrid(){
     const occBadge = shares.length ? `<div class="hb-occupancy-badge" style="font-size:10px;">${occupancy}/${capacity}</div>` : '';
     const label = isExtra ? room.label : room.number;
     const subLabel = isExtra ? `${room.maxGuests} чол` : `${room.sea ? '🌊 ' : ''}${room.type}`;
+    const tooltipNames = shares.flatMap(sh => (sh.memberNames||[]).filter(Boolean));
+    const tooltipText = tooltipNames.length ? tooltipNames.join('\n') : (shares.length ? '' : 'Вільно');
+    const tooltipAttr = tooltipText.replace(/"/g, '&quot;');
 
-    return `<div onclick="hbHandleRoomClick(${room.number})" ${dataReqs} class="hb-room ${stateClass}" style="padding:10px; border-radius:12px; cursor:pointer; text-align:center; ${groupStyle}">
+    return `<div onclick="hbHandleRoomClick(${room.number})" ${dataReqs} title="${tooltipAttr}" class="hb-room ${stateClass}" style="padding:10px; border-radius:12px; cursor:pointer; text-align:center; ${groupStyle}">
         ${extraBedBadge}
         <div style="font-size:${isExtra?'15px':'18px'}; font-weight:700;">${label}</div>
         <div style="font-size:10px; margin-top:2px;">${subLabel}</div>
@@ -7986,6 +8012,7 @@ async function hbCancelShare(roomNum, requestNum){
   if(entry) entry.shares = entry.shares.filter(s=>s.requestNum!==requestNum);
   await hbDeleteShare(hbCurrentHotel, hbCurrentPeriod, roomNum, requestNum);
   if(requestNum!==null && requestNum!==undefined && requestNum!=='') await hbUnlinkRequest(hbCurrentHotel, hbCurrentPeriod, requestNum);
+  if(requestNum in hbWizardSubRemaining) delete hbWizardSubRemaining[requestNum];
   hbLoadRoomsGrid();
 }
 
