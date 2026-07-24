@@ -1409,6 +1409,7 @@ function renderGuidesBlock(){
 function renderGuidesBlockInstance(inst){
   const block = document.getElementById(inst.blockId);
   if(!block) return;
+  if(!currentProfile || currentProfile.role !== 'manager'){ block.style.display='none'; return; }
   if(!currentTripId){ block.style.display='none'; return; }
   block.style.display='block';
   const tripData = getTripData(currentTripId);
@@ -3914,6 +3915,7 @@ async function ensureAllTripsLoaded(){
 
 async function renderReportsSection(){
   const block = document.getElementById('reportsBlock');
+  if(!currentProfile || currentProfile.role !== 'manager'){ block.innerHTML = ''; return; }
   block.innerHTML = `<p class="report-note">Завантаження…</p>`;
 
   const [{ data: allReports, error: repErr }] = await Promise.all([
@@ -4012,6 +4014,7 @@ async function renderReportsSection(){
 
 async function renderStatsSection(){
   const block = document.getElementById('statsBlock');
+  if(!currentProfile || currentProfile.role !== 'manager'){ block.innerHTML = ''; return; }
   block.innerHTML = `<p class="report-note">Завантаження…</p>`;
 
   await ensureAllTripsLoaded();
@@ -4095,6 +4098,7 @@ async function renderStatsSection(){
 
 async function renderManagerReportSection(){
   const block = document.getElementById('managerReportBlock');
+  if(!currentProfile || currentProfile.role !== 'manager'){ block.innerHTML = ''; return; }
   if(!currentTripId){ block.innerHTML = `<p class="report-note">Оберіть заїзд.</p>`; return; }
   block.innerHTML = `<p class="report-note">Завантаження…</p>`;
   if(!state.trips[currentTripId]) await loadTripData(currentTripId);
@@ -5215,6 +5219,7 @@ async function unassignGroupFromBus(groupKey){
 let tripPrepManualPick = false;
 async function renderTripPrepSection(){
   const block = document.getElementById('tripPrepBlock');
+  if(!currentProfile || currentProfile.role !== 'manager'){ block.innerHTML = ''; return; }
   let def = currentTripId ? TRIPS_DEF.find(d=>d.id===currentTripId) : null;
   if(!def || !tripPrepManualPick){
     const nextUpcoming = TRIPS_DEF.find(d=> new Date() < d.start) || def || TRIPS_DEF[0];
