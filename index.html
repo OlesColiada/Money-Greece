@@ -3367,9 +3367,15 @@ async function loadFinanceReport(tripId, guideName){
   }
   const tripData = getTripData(tripId);
   const perGuide = calcTripByGuide(tripData)[guideName] || { guideIncome: 0 };
-  await loadBusSeatData(tripId);
-  const physicalBus = tripPrepBusSeatData.layouts[guideName] || '';
-  const kmBasedBus = physicalBus==='Миросик' || physicalBus==='Окатий';
+  let kmBasedBus = false;
+  try{
+    await loadBusSeatData(tripId);
+    const physicalBus = (tripPrepBusSeatData && tripPrepBusSeatData.layouts && tripPrepBusSeatData.layouts[guideName]) || '';
+    kmBasedBus = physicalBus==='Миросик' || physicalBus==='Окатий';
+  } catch(e){
+    console.error('loadBusSeatData failed while building finance report — defaulting to no km-based bus field', e);
+    kmBasedBus = false;
+  }
   const manual = DEFAULT_MANUAL_ENTRIES
     .filter(e=> e.label!=='Автобус' || kmBasedBus)
     .map(e=>{
