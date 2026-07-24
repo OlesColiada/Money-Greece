@@ -636,10 +636,9 @@
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Туристи</summary>
         <div style="margin-top:10px;">
           <div style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px;">
-            <button class="btn btn-primary btn-small no-print" id="touristListSyncBtn">🔄 Підтягнути з базового списку</button>
             <button class="btn btn-danger-ghost no-print manager-only" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
           </div>
-          <p class="report-note" style="margin-top:4px;">Основа списку вже є в "Документи до туру" (базовий файл + розселення + автобуси) — тисни "🔄 Підтягнути", щоб не вносити людей вдруге. Додасть лише тих, кого ще нема в цьому списку; кого вручну прибереш звідси — назад сам не з'явиться.</p>
+          <p class="report-note" style="margin-top:4px;">Основа списку передається сюди з "Документи до туру" (кнопка "📤 Передати гіду" у вкладці "Автобуси") — керівник передає, коли розподіл готовий.</p>
           <div id="touristListWrap"></div>
           <div class="no-print" style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--line); padding-top:14px;">
             <button class="btn btn-ghost btn-small" id="touristListSaveBtn">💾 Зберегти</button>
@@ -771,11 +770,43 @@
   <div class="hb-modal-card">
     <h2 style="font-size:18px; font-weight:700; margin-bottom:10px;">Додати додаткове місце (овербукінг)</h2>
     <p style="font-size:13px; color:#6b7280; margin-bottom:14px;">Це не контрактна кімната з номером — просто додаткове місце на певну кількість осіб.</p>
+    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">Підпис (необов'язково)</label>
+    <input id="hbExtraRoomLabel" type="text" placeholder="Наприклад: Гіди, Водії…" style="width:100%; padding:12px; border:2px solid var(--line); border-radius:10px; font-size:15px; margin-bottom:14px;">
     <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">Кількість людей</label>
     <input id="hbExtraRoomCapacity" type="number" min="1" value="2" style="width:100%; padding:12px; border:2px solid var(--line); border-radius:10px; font-size:15px; font-weight:600; margin-bottom:14px;">
     <div style="display:flex; gap:10px;">
       <button onclick="hbConfirmAddExtraRoom()" class="btn btn-primary" style="flex:1;">Додати</button>
       <button onclick="hbCloseAddRoomModal()" class="btn btn-ghost" style="flex:1;">Скасувати</button>
+    </div>
+  </div>
+</div>
+
+<div id="tpEditTouristModal" class="hb-modal-overlay app-hidden" style="z-index:420;">
+  <div class="hb-modal-card">
+    <h2 style="font-size:18px; font-weight:700; margin-bottom:10px;">Виправити дані туриста</h2>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:3px;">Прізвище та ім'я</label>
+        <input id="tpEditFullName" type="text" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;"></div>
+      <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:3px;">Дата народження</label>
+        <input id="tpEditBirth" type="date" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;"></div>
+      <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:3px;">Паспорт</label>
+        <input id="tpEditPassport" type="text" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;"></div>
+      <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:3px;">Агенція</label>
+        <input id="tpEditAgency" type="text" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;"></div>
+      <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:3px;">Місце посадки</label>
+        <input id="tpEditCity" type="text" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;"></div>
+      <div><label style="display:block; font-size:12px; font-weight:600; margin-bottom:3px;">Телефон</label>
+        <input id="tpEditPhone" type="text" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;"></div>
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;"><label style="display:block; font-size:12px; font-weight:600; margin-bottom:3px;">Платні місця (€)</label>
+          <input id="tpEditPaidSeats" type="text" inputmode="decimal" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;"></div>
+        <div style="flex:1;"><label style="display:block; font-size:12px; font-weight:600; margin-bottom:3px;">Страхівка (€)</label>
+          <input id="tpEditInsurance" type="text" inputmode="decimal" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;"></div>
+      </div>
+    </div>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button onclick="tpSaveEditTouristModal()" class="btn btn-primary" style="flex:1;">Зберегти</button>
+      <button onclick="document.getElementById('tpEditTouristModal').classList.add('app-hidden')" class="btn btn-ghost" style="flex:1;">Скасувати</button>
     </div>
   </div>
 </div>
@@ -1367,6 +1398,7 @@ function renderTripGrid(){
 }
 
 let guidesEditMode = true;
+let tpBaseListCorrectionMode = false;
 function renderGuidesBlock(){
   const instances = [
     { blockId:'guidesBlock', chipsId:'guideChips', quickpickId:'guideQuickpick', editBtnId:'editGuidesBtn' },
@@ -3014,37 +3046,6 @@ document.getElementById('touristStatsDownloadBtn').addEventListener('click', ()=
   const guideName = activeTouristGuideName();
   if(!guideName){ alert('Оберіть гіда вище.'); return; }
   downloadXlsxSnapshot(`${currentTripId}/tourist-stats/${guideName}/report_${tripFileTag(currentTripId)}.xlsx`);
-});
-document.getElementById('touristListSyncBtn').addEventListener('click', async ()=>{
-  const guideName = activeTouristGuideName();
-  if(!guideName){ alert('Оберіть гіда вище.'); return; }
-  const btn = document.getElementById('touristListSyncBtn');
-  btn.disabled = true; btn.textContent = 'Підтягую…';
-  try{
-    const { data: baseTourists, error } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', currentTripId).eq('assigned_bus', guideName);
-    if(error){ alert('Не вдалося завантажити базовий список: ' + friendlyErrorMessage(error)); return; }
-    if(!baseTourists || !baseTourists.length){ alert(`У "Документи до туру" ще немає людей, призначених на автобус гіда "${guideName}". Спочатку розподіли їх там (вкладка "Автобуси").`); return; }
-    const existingNames = new Set(touristData.tourists.map(t=>(t.last_name+' '+t.first_name).trim().toLowerCase()));
-    const toInsert = [];
-    baseTourists.forEach(t=>{
-      const fullName = (t.full_name||'').trim();
-      if(!fullName) return;
-      const parts = fullName.split(/\s+/);
-      const lastName = parts[0] || '';
-      const firstName = parts.slice(1).join(' ') || '';
-      const key = (lastName+' '+firstName).trim().toLowerCase();
-      if(existingNames.has(key)) return; // already in the list, don't duplicate
-      toInsert.push({ trip_id: currentTripId, guide_name: guideName, first_name: firstName, last_name: lastName, birth_date: t.birth_date||null, passport_data: t.passport||'' });
-    });
-    if(!toInsert.length){ hbShowToast('Усі вже додані — новеньких немає.'); return; }
-    const { error: insErr } = await sb.from('tourists').insert(toInsert);
-    if(insErr){ alert('Не вдалося додати: ' + friendlyErrorMessage(insErr)); return; }
-    await loadTourists();
-    renderTouristSection();
-    hbShowToast(`✅ Додано ${toInsert.length} чол. з базового списку`);
-  } finally {
-    btn.disabled = false; btn.textContent = '🔄 Підтягнути з базового списку';
-  }
 });
 document.getElementById('touristListSaveBtn').addEventListener('click', async ()=>{
   const guideName = activeTouristGuideName();
@@ -5044,15 +5045,13 @@ async function importTripPrepFile(file, tripId, targetHotel){
 
   let lastBooking = '';
   let lastConnected = '';
-  let lastCity = '';
   let lastPhone = '';
   const parsed = rows.map((r, idx)=>{
     let booking = keyBooking ? String(r[keyBooking]||'').trim() : '';
     if(booking) lastBooking = booking; else booking = lastBooking;
     let connected = keyConnected ? String(r[keyConnected]||'').trim() : '';
     if(connected) lastConnected = connected; else connected = lastConnected;
-    let city = keyCity ? String(r[keyCity]||'').trim() : '';
-    if(city) lastCity = city; else city = lastCity;
+    const city = keyCity ? String(r[keyCity]||'').trim() : '';
     let phoneVal = keyPhone ? String(r[keyPhone]||'').trim() : '';
     if(phoneVal) lastPhone = phoneVal; else phoneVal = lastPhone;
     return {
@@ -5140,7 +5139,11 @@ async function importTripPrepFile(file, tripId, targetHotel){
     if(error){ alert('Помилка імпорту: '+friendlyErrorMessage(error)); return false; }
   }
   const groupCount = new Set(parsed.map(r=>r.link_group)).size;
-  alert(`Імпортовано ${parsed.length} туристів, ${groupCount} непорушних груп.`);
+  const missingCity = keyCity ? parsed.filter(r=>r.full_name && !r.pickup_city) : [];
+  const cityWarning = missingCity.length
+    ? `\n\n⚠️ У ${missingCity.length} чол. не вказано місце посадки (лишено порожнім, нічого не вгадано): ${missingCity.slice(0,8).map(r=>r.full_name).join(', ')}${missingCity.length>8?` та ще ${missingCity.length-8}…`:''}. Перевір і встав вручну в списку.`
+    : '';
+  alert(`Імпортовано ${parsed.length} туристів, ${groupCount} непорушних груп.${cityWarning}`);
   return true;
 }
 
@@ -5226,7 +5229,7 @@ function renderTripPrepOverview(){
 
   const buildRowHtml = (gk)=>{
     const members = groups[gk];
-    const names = members.map(m=>`<span style="display:inline-flex; align-items:center; gap:3px; background:var(--whitewash-2); border-radius:6px; padding:2px 5px; margin:1px;">${m.full_name}<button class="no-print" data-role="tpRemovePerson" data-tourist="${m.id}" title="Видалити цю людину зі списку і з кімнати" style="border:none; background:none; color:#dc2626; cursor:pointer; font-weight:700; padding:0 2px;">✕</button></span>`).join(' ');
+    const names = members.map(m=>`<span style="display:inline-flex; align-items:center; gap:3px; background:var(--whitewash-2); border-radius:6px; padding:2px 5px; margin:1px;">${m.full_name}${tpBaseListCorrectionMode ? `<button class="no-print" data-role="tpEditPerson" data-tourist="${m.id}" title="Виправити дані цієї людини" style="border:none; background:none; color:#2563eb; cursor:pointer; font-weight:700; padding:0 2px;">✏️</button>` : ''}<button class="no-print" data-role="tpRemovePerson" data-tourist="${m.id}" title="Видалити цю людину зі списку і з кімнати" style="border:none; background:none; color:#dc2626; cursor:pointer; font-weight:700; padding:0 2px;">✕</button></span>`).join(' ');
     const agencies = [...new Set(members.map(m=>m.agency).filter(Boolean))].join(', ');
     const cities = [...new Set(members.map(m=>m.pickup_city).filter(Boolean))].join(', ');
     const debt = members.reduce((s,m)=>s+(Number(m.remaining)||0),0);
@@ -5263,6 +5266,10 @@ function renderTripPrepOverview(){
   const otherKeys = groupKeys.filter(gk=>!['konstantin','greataleksander'].includes(groups[gk][0].target_hotel));
 
   content.innerHTML = `
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <button class="btn btn-ghost btn-small" id="tpCorrectionToggle">${tpBaseListCorrectionMode ? '🔒 Вимкнути правки списку' : '✏️ Дозволити правки базового списку'}</button>
+      ${tpBaseListCorrectionMode ? `<span class="muted" style="font-size:12px; margin-left:8px; color:var(--bad, #b91c1c);">Режим правок увімкнено — біля кожного імені з'явилась кнопка ✏️.</span>` : ''}
+    </div>
     <div class="step-block no-print" style="margin-bottom:14px;">
       <details>
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">📤 Завантажити базові файли (окремо по готелях)</summary>
@@ -5471,6 +5478,20 @@ function renderTripPrepOverview(){
     if(error){ alert('Не вдалося роз\'єднати: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
+  }));
+  const correctionToggle = document.getElementById('tpCorrectionToggle');
+  if(correctionToggle) correctionToggle.addEventListener('click', ()=>{
+    if(tpBaseListCorrectionMode){
+      tpBaseListCorrectionMode = false;
+    } else {
+      if(!confirm('Ви дійсно хочете внести правки до базового списку туристів? Зазвичай ці дані беруться з файлу — вмикайте це лише для виправлення помилки.')) return;
+      tpBaseListCorrectionMode = true;
+    }
+    renderTripPrepOverview();
+  });
+  content.querySelectorAll('[data-role="tpEditPerson"]').forEach(el=> el.addEventListener('click', async e=>{
+    e.stopPropagation();
+    await tpOpenEditTouristModal(e.target.dataset.tourist);
   }));
   content.querySelectorAll('[data-role="tpRemovePerson"]').forEach(el=> el.addEventListener('click', async e=>{
     e.stopPropagation();
@@ -5718,6 +5739,10 @@ async function renderTripPrepBuses(){
   }).join('') || `<p class="report-note">Немає.</p>`;
 
   content.innerHTML = `
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <button class="btn btn-primary btn-small" id="tpHandoverToGuidesBtn">📤 Передати гіду</button>
+      <p class="report-note" style="margin-top:6px;">Копіює розподілених по автобусах туристів у робочий список кожного гіда (без дублів — вже додані пропускаються). Роби це, коли список групи по автобусах готовий.</p>
+    </div>
     ${configPanelHtml}
     <p class="fin-section-title">Розподілені по автобусах</p>
     ${assignedHtml}
@@ -5727,6 +5752,38 @@ async function renderTripPrepBuses(){
     <p class="fin-section-title">🚶 Дістаються самостійно (${selfArrivingGroups.length}, без автобуса)</p>
     ${selfArrivingHtml}
   `;
+
+  const handoverBtn = document.getElementById('tpHandoverToGuidesBtn');
+  if(handoverBtn) handoverBtn.addEventListener('click', async ()=>{
+    handoverBtn.disabled = true; handoverBtn.textContent = 'Передаю…';
+    try{
+      let totalAdded = 0;
+      for(const guideName of busNames){
+        const { data: baseTourists, error } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', currentTripId).eq('assigned_bus', guideName);
+        if(error || !baseTourists || !baseTourists.length) continue;
+        const { data: existingTourists } = await sb.from('tourists').select('first_name,last_name').eq('trip_id', currentTripId).eq('guide_name', guideName);
+        const existingNames = new Set((existingTourists||[]).map(t=>(t.last_name+' '+t.first_name).trim().toLowerCase()));
+        const toInsert = [];
+        baseTourists.forEach(t=>{
+          const fullName = (t.full_name||'').trim();
+          if(!fullName) return;
+          const parts = fullName.split(/\s+/);
+          const lastName = parts[0] || '';
+          const firstName = parts.slice(1).join(' ') || '';
+          const key = (lastName+' '+firstName).trim().toLowerCase();
+          if(existingNames.has(key)) return;
+          toInsert.push({ trip_id: currentTripId, guide_name: guideName, first_name: firstName, last_name: lastName, birth_date: t.birth_date||null, passport_data: t.passport||'' });
+        });
+        if(!toInsert.length) continue;
+        const { error: insErr } = await sb.from('tourists').insert(toInsert);
+        if(insErr){ alert(`Не вдалося передати список гіду ${guideName}: ` + friendlyErrorMessage(insErr)); continue; }
+        totalAdded += toInsert.length;
+      }
+      hbShowToast(totalAdded ? `✅ Передано ${totalAdded} чол. по всіх гідах` : 'Усі вже передані — новеньких немає.');
+    } finally {
+      handoverBtn.disabled = false; handoverBtn.textContent = '📤 Передати гіду';
+    }
+  });
 
   content.querySelectorAll('[data-role="tpSaveBusConfig"]').forEach(el=> el.addEventListener('click', async e=>{
     const b = e.target.dataset.bus;
@@ -5937,6 +5994,41 @@ async function hbSeatPersonByClick(touristId, busName){
   hbShowToast(`✅ ${t.full_name} посаджений на місце ${seatNum}`);
 }
 
+let tpEditTouristId = null;
+async function tpOpenEditTouristModal(touristId){
+  const t = tripPrepData.tourists.find(x=>x.id===touristId);
+  if(!t) return;
+  tpEditTouristId = touristId;
+  document.getElementById('tpEditFullName').value = t.full_name||'';
+  document.getElementById('tpEditBirth').value = t.birth_date||'';
+  document.getElementById('tpEditPassport').value = t.passport||'';
+  document.getElementById('tpEditAgency').value = t.agency||'';
+  document.getElementById('tpEditCity').value = t.pickup_city||'';
+  document.getElementById('tpEditPhone').value = t.phone||'';
+  document.getElementById('tpEditPaidSeats').value = t.paid_seats||0;
+  document.getElementById('tpEditInsurance').value = t.insurance||0;
+  document.getElementById('tpEditTouristModal').classList.remove('app-hidden');
+}
+async function tpSaveEditTouristModal(){
+  if(!tpEditTouristId) return;
+  const updates = {
+    full_name: document.getElementById('tpEditFullName').value.trim(),
+    birth_date: document.getElementById('tpEditBirth').value || null,
+    passport: document.getElementById('tpEditPassport').value.trim(),
+    agency: document.getElementById('tpEditAgency').value.trim(),
+    pickup_city: document.getElementById('tpEditCity').value.trim(),
+    phone: document.getElementById('tpEditPhone').value.trim(),
+    paid_seats: parseDecimalInput(document.getElementById('tpEditPaidSeats').value),
+    insurance: parseDecimalInput(document.getElementById('tpEditInsurance').value)
+  };
+  const { error } = await sb.from('trip_prep_tourists').update(updates).eq('id', tpEditTouristId);
+  if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+  document.getElementById('tpEditTouristModal').classList.add('app-hidden');
+  tpEditTouristId = null;
+  tripPrepData = await loadTripPrepData(currentTripId);
+  renderTripPrepView();
+  hbShowToast('✅ Дані туриста оновлено');
+}
 async function hbEditSeatPersonFields(touristId){
   const t = tripPrepData.tourists.find(x=>x.id===touristId);
   if(!t) return;
@@ -7298,6 +7390,22 @@ async function hbSaveExtraRoom(hotel, roomNum, typeLabel, maxGuests, label){
   if(error){ alert('⚠️ Не вдалося зберегти нове місце в хмару.'); return false; }
   return true;
 }
+async function hbDeleteExtraRoom(hotel, roomNum){
+  const { error } = await sb.from('extra_rooms').delete().eq('hotel', hotel).eq('room_number', roomNum);
+  if(error){ alert('⚠️ Не вдалося видалити з хмари. Перевірте інтернет.'); return false; }
+  if(hbExtraRooms[hotel]) hbExtraRooms[hotel] = hbExtraRooms[hotel].filter(r=>r.number!==roomNum);
+  return true;
+}
+async function hbHandleDeleteExtraRoom(roomNum){
+  const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
+  if(entry && entry.shares.length){
+    alert('⚠️ Це місце зараз зайняте — спочатку виселіть/перенесіть людей звідти, тоді можна буде видалити.');
+    return;
+  }
+  if(!confirm('Видалити це додаткове місце (овербукінг)?')) return;
+  const ok = await hbDeleteExtraRoom(hbCurrentHotel, roomNum);
+  if(ok) hbLoadRoomsGrid();
+}
 
 async function hbLoadLinkedRequests(){
   const { data, error } = await sb.from('linked_requests').select('*');
@@ -7514,6 +7622,7 @@ function hbLoadRoomsGrid(){
 
     return `<div onclick="hbHandleRoomClick(${room.number})" ${dataReqs} title="${tooltipAttr}" class="hb-room ${stateClass}" style="padding:10px; border-radius:12px; cursor:pointer; text-align:center; ${groupStyle}">
         ${extraBedBadge}
+        ${isExtra ? `<button onclick="event.stopPropagation(); hbHandleDeleteExtraRoom(${room.number})" style="position:absolute; top:-8px; left:-8px; background:#dc2626; color:#fff; border:none; border-radius:9999px; width:20px; height:20px; font-size:12px; line-height:1; cursor:pointer; z-index:10; box-shadow:0 1px 4px rgba(0,0,0,.3);" title="Видалити це додаткове місце">✕</button>` : ''}
         <div style="font-size:${isExtra?'15px':'18px'}; font-weight:700;">${label}</div>
         <div style="font-size:10px; margin-top:2px;">${subLabel}</div>
         ${centerInfo}
@@ -8074,18 +8183,20 @@ async function hbMoveShare(fromRoom, fromReq, toRoom){
 
 function hbOpenAddRoomModal(){
   document.getElementById('hbExtraRoomCapacity').value = 2;
+  document.getElementById('hbExtraRoomLabel').value = '';
   document.getElementById('hbAddRoomModal').classList.remove('app-hidden');
 }
 function hbCloseAddRoomModal(){ document.getElementById('hbAddRoomModal').classList.add('app-hidden'); }
 async function hbConfirmAddExtraRoom(){
   const capacity = parseInt(document.getElementById('hbExtraRoomCapacity').value) || 1;
+  const customLabel = document.getElementById('hbExtraRoomLabel').value.trim();
   const existing = hbExtraRooms[hbCurrentHotel] || [];
   const nextIndex = existing.length + 1;
   const usedNumbers = new Set(hbGetAllRoomsForHotel(hbCurrentHotel).map(r=>r.number));
   let internalNumber = 9000 + nextIndex;
   while(usedNumbers.has(internalNumber)) internalNumber++;
-  const label = `Місце ${nextIndex}`;
-  const typeLabel = `Додаткове місце (${capacity} чол)`;
+  const label = customLabel || `Місце ${nextIndex}`;
+  const typeLabel = customLabel ? `${customLabel} (${capacity} чол)` : `Додаткове місце (${capacity} чол)`;
   const ok = await hbSaveExtraRoom(hbCurrentHotel, internalNumber, typeLabel, capacity, label);
   if(!ok) return;
   if(!hbExtraRooms[hbCurrentHotel]) hbExtraRooms[hbCurrentHotel] = [];
