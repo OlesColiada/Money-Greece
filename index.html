@@ -710,7 +710,10 @@
     <div style="display:flex; flex-direction:column; gap:14px;">
       <div>
         <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">Номер заявки (4-5 цифр)</label>
-        <input id="hbRequestNum" type="text" maxlength="5" oninput="hbLookupRequestInModal()" style="width:100%; padding:12px; border:2px solid var(--line); border-radius:10px; font-size:16px; font-weight:600;">
+        <div style="position:relative;">
+          <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:16px; font-weight:600; color:var(--ink-soft); pointer-events:none;">#</span>
+          <input id="hbRequestNum" type="text" maxlength="5" oninput="hbLookupRequestInModal()" style="width:100%; padding:12px 12px 12px 26px; border:2px solid var(--line); border-radius:10px; font-size:16px; font-weight:600; box-sizing:border-box;">
+        </div>
         <div id="hbRequestLookupInfo" style="margin-top:6px;"></div>
       </div>
       <div id="hbModalNamedChecklistWrap" style="display:none;">
@@ -7236,13 +7239,13 @@ async function hbSaveShare(hotel, period, roomNum, share){
   if(!share.requestNum){
     console.error('hbSaveShare: rejected save without a request number', {hotel, period, roomNum, share});
     alert('⚠️ Внутрішня помилка: спроба зберегти бронювання без номера заявки. Збереження скасовано.');
-    return;
+    return false;
   }
   const conflicts = hbFindDuplicateRoomedNames(hotel, period, roomNum, share.memberNames);
   if(conflicts.length){
     const lines = conflicts.map(c=> `${c.name} — вже в номері ${c.roomNumber}`).join('\n');
     alert(`⚠️ Не поселено — ці люди вже поселені в іншому номері цього заїзду:\n\n${lines}\n\nСпочатку прибери їх звідти (або скористайся "Перенести"), якщо треба змінити кімнату.`);
-    return;
+    return false;
   }
   await hbDeleteShare(hotel, period, roomNum, share.requestNum, true);
   const { error } = await sb.from('room_bookings').insert({
@@ -7251,7 +7254,8 @@ async function hbSaveShare(hotel, period, roomNum, share){
     total: share.total||0, extra_bed: !!share.extraBed, seeking_roommate: !!share.seeking, notes: share.notes||'',
     member_names: share.memberNames||[]
   });
-  if(error){ alert('⚠️ Не вдалося зберегти в хмару. Перевірте інтернет.'); }
+  if(error){ alert('⚠️ Не вдалося зберегти в хмару. Перевірте інтернет.'); return false; }
+  return true;
 }
 
 async function hbDeleteShare(hotel, period, roomNum, requestNum, silent){
@@ -7375,7 +7379,10 @@ function hbRenderShell(){
   content.innerHTML = `
     <div class="step-block no-print" style="margin-bottom:14px;">
       <label style="font-weight:600; font-size:13px;">🔍 Швидкий пошук за номером заявки</label>
-      <input id="hbSearchRequestInput" type="text" oninput="hbSearchByRequest()" placeholder="Введіть номер заявки…" style="width:100%; padding:10px; border:2px solid var(--line); border-radius:10px; font-size:15px; margin-top:4px;">
+      <div style="position:relative;">
+        <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:15px; font-weight:600; color:var(--ink-soft); pointer-events:none;">#</span>
+        <input id="hbSearchRequestInput" type="text" oninput="hbSearchByRequest()" placeholder="Введіть номер заявки…" style="width:100%; padding:10px 10px 10px 26px; border:2px solid var(--line); border-radius:10px; font-size:15px; margin-top:4px; box-sizing:border-box;">
+      </div>
       <div id="hbSearchResults" style="margin-top:8px; display:flex; flex-direction:column; gap:6px;"></div>
     </div>
 
@@ -7424,6 +7431,11 @@ async function hbManualRefresh(){
   hbLoadRoomsGrid();
   hbShowToast('🔄 Оновлено');
 }
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible' && currentSection==='tripPrep' && tripPrepView==='rooms' && currentProfile){
+    hbManualRefresh();
+  }
+});
 
 async function hbClearHotelBookings(){
   const hotelName = HB_HOTEL_STRUCTURE[hbCurrentHotel].name;
@@ -7927,7 +7939,7 @@ async function hbSuggestMoveSiblingNear(req, targetRoomNum){
 }
 
 async function hbConfirmBooking(){
-  const requestNum = document.getElementById('hbRequestNum').value.trim();
+  const requestNum = document.getElementById('hbRequestNum').value.trim().replace(/^#/,'');
   const adults = parseInt(document.getElementById('hbAdults').value) || 0;
   const kids612 = parseInt(document.getElementById('hbKids612').value) || 0;
   const kidsUnder6 = parseInt(document.getElementById('hbKidsUnder6').value) || 0;
@@ -7939,10 +7951,9 @@ async function hbConfirmBooking(){
 
   if(!requestNum || requestNum.length<4) return alert("Введіть номер заявки (4-5 цифр)");
 
-  const reqCleaned = requestNum.replace(/^#/,'');
-  const requestTourists = (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===reqCleaned);
+  const requestTourists = (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===requestNum);
   if(requestTourists.length && requestTourists[0].target_hotel && requestTourists[0].target_hotel !== hbCurrentHotel){
-    return alert(`⛔ Заявка №${reqCleaned} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — зроби це через "🔄 Перенести вибрані в інший готель" у вкладці "Огляд і імпорт".`);
+    return alert(`⛔ Заявка №${requestNum} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — зроби це через "🔄 Перенести вибрані в інший готель" у вкладці "Огляд і імпорт".`);
   }
 
   const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
@@ -7962,6 +7973,9 @@ async function hbConfirmBooking(){
   }
   const share = { requestNum, adults, kids612, kidsUnder6, total, extraBed: extraBed||alreadyHasExtraBed, seeking: seeking && (occupancy+total<effectiveCapacity), notes, memberNames: shareMemberNames };
 
+  const saved = await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, roomNum, share);
+  if(!saved) return;
+
   if(!hbDatabase[hbCurrentHotel]) hbDatabase[hbCurrentHotel] = {};
   if(!hbDatabase[hbCurrentHotel][hbCurrentPeriod]) hbDatabase[hbCurrentHotel][hbCurrentPeriod] = [];
   const list = hbDatabase[hbCurrentHotel][hbCurrentPeriod];
@@ -7970,7 +7984,6 @@ async function hbConfirmBooking(){
   roomEntry.shares = roomEntry.shares.filter(s=>s.requestNum!==requestNum);
   roomEntry.shares.push(share);
 
-  await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, roomNum, share);
   hbShowToast("✅ Кімната заброньована!");
   hbLoadRoomsGrid();
 
@@ -8044,8 +8057,16 @@ async function hbMoveShare(fromRoom, fromReq, toRoom){
 
   let destEntry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, toRoom);
   if(!destEntry){ destEntry = { number:toRoom, shares:[] }; hbDatabase[hbCurrentHotel][hbCurrentPeriod].push(destEntry); }
+  const saved = await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, toRoom, movedShare);
+  if(!saved){
+    // Roll back — put the booking back where it was rather than losing it.
+    fromEntry.shares.push(share);
+    await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, fromRoom, share);
+    hbLoadRoomsGrid();
+    alert('Перенесення скасовано — заявку повернуто в попередню кімнату.');
+    return;
+  }
   destEntry.shares.push(movedShare);
-  await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, toRoom, movedShare);
 
   hbLoadRoomsGrid();
   hbShowToast(`✅ Заявку №${fromReq} перенесено в ${hbRoomDisplay(hbCurrentHotel,toRoom)}${movedShare.extraBed?' (з екстраліжком)':''}`);
