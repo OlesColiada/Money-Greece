@@ -2529,6 +2529,7 @@ let managerSkiatosCorrectionMode = false; // manager must explicitly confirm bef
 let touristData = { tourists: [], selectionsByTourist: {} }; // cache for current (trip, guideFilter)
 let openTouristId = null;
 let openEditPanels = new Set();
+let priceCorrectionUnlocked = new Set();
 
 let testAccountGuideFilter = null;
 function activeTouristGuideName(){
@@ -2917,7 +2918,8 @@ function renderTouristDetail(){
   TOURIST_PRICE_LIST.forEach(p=>{
     const s = sels.find(x=>x.excursion_name===p.name);
     if(!s) return;
-    const locked = s.paid && !s.cancelled;
+    const paidLocked = s.paid && !s.cancelled;
+    const locked = paidLocked && !priceCorrectionUnlocked.has(s.id);
     const panelOpen = openEditPanels.has(s.id);
     rowsHtml += `<div class="exc-select-row">
       <label class="switch">
@@ -2934,6 +2936,7 @@ function renderTouristDetail(){
           : `<span class="muted" style="font-size:12px;">не їде</span>`
       }
       ${s.going && !s.cancelled ? `<button class="edit-toggle-btn no-print" data-role="toggleEdit" data-sel="${s.id}" title="Особлива ціна (знижка/безкоштовно/квиток)">✎</button>` : ''}
+      ${paidLocked ? `<button class="edit-toggle-btn no-print" data-role="toggleUnlockPrice" data-sel="${s.id}" title="${locked ? 'Розблокувати виправлення ціни (уже оплачено)' : 'Заблокувати назад'}">${locked ? '🔒' : '🔓'}</button>` : ''}
       ${s.going && !s.cancelled ? `<button class="btn btn-danger-ghost btn-small no-print" data-role="cancelSel" data-sel="${s.id}" title="Скасувати цю екскурсію (якщо не набралась група, хвороба тощо)">Скасувати</button>` : ''}
       ${s.cancelled && s.paid && !s.refunded ? `<span class="profit-neg" style="font-size:11.5px;">повернути ${fmt(s.price)} €</span> <button class="btn btn-ghost btn-small no-print" data-role="refund" data-sel="${s.id}">Кошти повернуто</button>` : ''}
       ${s.going && !s.cancelled ? `<div class="exc-edit-panel ${panelOpen?'open':''}" data-panel="${s.id}">
@@ -2991,6 +2994,17 @@ function renderTouristDetail(){
   block.querySelectorAll('[data-role="toggleEdit"]').forEach(el=> el.addEventListener('click', e=>{
     const sel = e.target.dataset.sel;
     if(openEditPanels.has(sel)) openEditPanels.delete(sel); else openEditPanels.add(sel);
+    renderTouristDetail();
+  }));
+  block.querySelectorAll('[data-role="toggleUnlockPrice"]').forEach(el=> el.addEventListener('click', e=>{
+    const sel = e.target.dataset.sel;
+    if(priceCorrectionUnlocked.has(sel)){
+      priceCorrectionUnlocked.delete(sel);
+    } else {
+      if(!confirm('Цю екскурсію вже позначено як оплачену. Розблокувати виправлення ціни? Вносьте зміни обережно.')) return;
+      priceCorrectionUnlocked.add(sel);
+      openEditPanels.add(sel);
+    }
     renderTouristDetail();
   }));
   block.querySelectorAll('[data-role="going"]').forEach(el=> el.addEventListener('change', e=>{
