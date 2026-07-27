@@ -3,7 +3,7 @@
 // no internet connection at all. It does NOT cache or intercept calls to
 // Supabase or any other cross-origin service — those still need real network
 // (or are queued locally by the app itself, see the offline outbox in index.html).
-const CACHE_NAME = 'richtour-shell-v3';
+const CACHE_NAME = 'richtour-shell-v4';
 const SHELL_FILES = ['./', './index.html', './manifest.json', './icon-192_1.png', './icon-512_1.png'];
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -28,9 +28,14 @@ self.addEventListener('fetch', (event) => {
   // Force an actual network round-trip (bypassing the browser's own HTTP cache),
   // so "network-first" really means fresh-from-server, not a stale cached response
   // that the browser hands back silently before this code ever runs.
-  const freshReq = new Request(req.url, { cache: 'no-store', mode: req.mode, credentials: req.credentials, redirect: req.redirect });
+  //
+  // IMPORTANT: browsers forbid constructing a new Request with mode:'navigate'
+  // (that mode only exists on the browser's own top-level navigation requests,
+  // and `new Request(url, {mode:'navigate'})` throws). Passing the override as
+  // fetch's second argument instead of building a new Request avoids that,
+  // and works for every request type, navigate included.
   event.respondWith(
-    fetch(freshReq)
+    fetch(req, { cache: 'no-store' })
       .then(res => {
         const resClone = res.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(req, resClone)).catch(() => {});
