@@ -4267,40 +4267,7 @@ async function renderReportsSection(){
   if(!currentProfile || currentProfile.role !== 'manager'){ block.innerHTML = ''; return; }
   block.innerHTML = `<p class="report-note">Завантаження…</p>`;
 
-  const [{ data: allReports, error: repErr }] = await Promise.all([
-    sb.from('financial_reports').select('*'),
-    ensureAllTripsLoaded()
-  ]);
-  if(repErr) console.error(repErr);
-
-  // ---- Фінзвіти гідів по датам турів ----
-  const reportsByTrip = {};
-  (allReports||[]).forEach(r=>{
-    if(!reportsByTrip[r.trip_id]) reportsByTrip[r.trip_id] = [];
-    reportsByTrip[r.trip_id].push(r);
-  });
-  const tripsSorted = [...TRIPS_DEF].sort((a,b)=> b.start - a.start);
-  const financeHtml = tripsSorted.map(def=>{
-    const reports = reportsByTrip[def.id] || [];
-    const td = state.trips[def.id];
-    const guideNames = td ? td.guides.map(g=>g.name) : [];
-    if(!guideNames.length && !reports.length) return '';
-    const rowsHtml = guideNames.map(gName=>{
-      const r = reports.find(x=>x.guide_name===gName);
-      const status = r && r.submitted ? `✅ Здав${r.submitted_at ? ' · '+new Date(r.submitted_at).toLocaleDateString('uk-UA') : ''}` : (r ? '📝 Заповнює' : '— Не почав');
-      const handed = r ? fmt(r.handed_over||0)+' €' : '—';
-      return `<div class="fin-row">
-        <span class="fin-label">${gName}</span>
-        <span class="muted" style="font-size:12.5px;">${status}</span>
-        <span style="font-weight:700;">${handed}</span>
-        ${r ? `<button class="btn btn-ghost btn-small no-print" data-role="reportsDownloadFin" data-trip="${def.id}" data-guide="${gName}">⬇</button>` : ''}
-      </div>`;
-    }).join('');
-    return `<details style="margin-bottom:10px;">
-      <summary style="cursor:pointer; font-weight:700;">${def.label} <span class="muted" style="font-weight:400; font-size:12.5px;">(${tripStatus(def).text})</span></summary>
-      <div style="margin-top:8px;">${rowsHtml || '<p class="report-note">Гіди ще не призначені.</p>'}</div>
-    </details>`;
-  }).join('') || '<p class="report-note">Немає даних.</p>';
+  await ensureAllTripsLoaded();
 
   // ---- Зведена таблиця прибутковості по екскурсіям (весь сезон) ----
   const byExcName = {};
@@ -4343,9 +4310,6 @@ async function renderReportsSection(){
   block.innerHTML = `
     <p class="report-title" style="margin:0;">Звіти</p>
 
-    <p class="fin-section-title">Фінзвіти гідів по датам турів</p>
-    <div id="reportsFinanceList">${financeHtml}</div>
-
     <p class="fin-section-title">Прибутковість екскурсій по заїзду</p>
     <div class="table-scroll">
       <table class="report-table" style="font-size:12.5px;">
@@ -4374,7 +4338,6 @@ async function renderReportsSection(){
       <button class="btn btn-ghost btn-small" id="reportsDrilldownBtn">👁 Переглянути по гідах</button>
     </div>
     <div id="reportsReconcileResult" style="margin-top:10px;"></div>
-    <div id="reportsDrilldownResult" style="margin-top:10px;"></div>
 
     <p class="fin-section-title">Зведена прибутковість по екскурсіям (весь сезон)</p>
     <div class="table-scroll">
@@ -4421,7 +4384,6 @@ async function renderReportsSection(){
   block.querySelectorAll('.reports-overview-row').forEach(row=> row.addEventListener('click', async ()=>{
     const tripId = row.dataset.trip;
     document.getElementById('reportsExcTripSelect').value = tripId;
-    document.getElementById('reportsDrilldownResult').scrollIntoView({behavior:'smooth', block:'start'});
     await renderReportsGuideDrilldown(tripId);
   }));
   block.querySelectorAll('.reports-guide-link').forEach(el=> el.addEventListener('click', (e)=>{
@@ -4443,17 +4405,8 @@ async function renderReportsSection(){
       const tripId = el.dataset.trip, guide = el.dataset.guide, target = btn.dataset.target;
       closeMenu();
       document.getElementById('reportsExcTripSelect').value = tripId;
-      await renderReportsGuideDrilldown(tripId);
-      const anchorId = `guide-${target}-${tripId}-${safePathSlug(guide)}`;
-      const blockEl = document.getElementById(`guide-block-${tripId}-${safePathSlug(guide)}`);
-      if(blockEl) blockEl.open = true;
-      const anchor = document.getElementById(anchorId);
-      if(anchor) anchor.scrollIntoView({behavior:'smooth', block:'start'});
+      await showGuideSingleView(tripId, guide, target);
     }));
-  }));
-
-  block.querySelectorAll('[data-role="reportsDownloadFin"]').forEach(btn=> btn.addEventListener('click', ()=>{
-    downloadXlsxSnapshot(`${btn.dataset.trip}/finance-report/${safePathSlug(btn.dataset.guide)}/report_${tripFileTag(btn.dataset.trip)}.xlsx`, 'Ще немає збереженої версії цього звіту.');
   }));
 }
 
@@ -4483,9 +4436,99 @@ function computeExcursionSummary(tripId){
   return { rows, grand };
 }
 
+async function showGuideSingleView(tripId, guideName, target){
+  let modal = document.getElementById('reportsDrilldownModal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'reportsDrilldownModal';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:800; display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;';
+  const def = TRIPS_DEF.find(d=>d.id===tripId);
+  const title = target==='fin' ? `💵 Фінансовий звіт — ${guideName}` : `📋 Список збору коштів — ${guideName}`;
+  modal.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:560px; width:100%; margin:20px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+      <p class="report-title" style="margin:0;">${title}</p>
+      <button class="btn btn-ghost btn-small" id="guideSingleCloseBtn">✕ Закрити</button>
+    </div>
+    <p class="report-note" style="margin-top:0;">${def?def.label:''}</p>
+    <div id="guideSingleViewResult"><p class="report-note">Завантажую…</p></div>
+  </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('guideSingleCloseBtn').addEventListener('click', ()=> modal.remove());
+  modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.remove(); });
+
+  const container = document.getElementById('guideSingleViewResult');
+
+  if(target==='list'){
+    const { data: tourists } = await sb.from('tourists').select('id').eq('trip_id', tripId).eq('guide_name', guideName);
+    const touristIds = (tourists||[]).map(t=>t.id);
+    let selections = [];
+    if(touristIds.length){
+      const { data: sels } = await sb.from('tourist_excursion_selections').select('*').in('tourist_id', touristIds);
+      selections = (sels||[]).filter(s=>s.going && !s.cancelled);
+    }
+    const byExc = {};
+    selections.forEach(s=>{
+      if(!byExc[s.excursion_name]) byExc[s.excursion_name] = { count:0, sum:0 };
+      byExc[s.excursion_name].count++;
+      byExc[s.excursion_name].sum += Number(s.price)||0;
+    });
+    const excNames = Object.keys(byExc).sort();
+    container.innerHTML = excNames.length ? `
+      <table class="report-table" style="font-size:13px; width:100%;">
+        <thead><tr><th style="text-align:left;">Екскурсія</th><th>К-ть</th><th>Сума</th></tr></thead>
+        <tbody>${excNames.map(n=>`<tr><td style="text-align:left;">${n}</td><td>${byExc[n].count}</td><td>${fmt(byExc[n].sum)} €</td></tr>`).join('')}</tbody>
+      </table>
+    ` : `<p class="report-note">Немає позначених екскурсій.</p>`;
+    return;
+  }
+
+  const { data: rep } = await sb.from('financial_reports').select('*').eq('trip_id', tripId).eq('guide_name', guideName).maybeSingle();
+  if(!rep){ container.innerHTML = `<p class="report-note">Фінансовий звіт ще не створений.</p>`; return; }
+  const received = (rep.entries||[]).filter(e=>e.section==='received');
+  const paid = (rep.entries||[]).filter(e=>e.section==='paid');
+  const totalReceived = received.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const totalPaid = paid.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const balance = totalReceived - totalPaid;
+  container.innerHTML = `
+    <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Отримано</p>
+    <div class="fin-panel" style="margin-bottom:8px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+    <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Затрати</p>
+    <div class="fin-panel" style="margin-bottom:8px;">${paid.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+    <div class="fin-row"><span class="fin-label">Залишок</span><span>${fmt(balance)} €</span></div>
+    <div class="fin-row"><span class="fin-label">Здано менеджеру</span><span>${fmt(rep.handed_over||0)} €</span></div>
+    <p class="${rep.submitted?'muted':'profit-neg'}" style="font-size:11.5px; margin-top:4px; font-weight:${rep.submitted?'400':'600'};">${rep.submitted ? '✅ Відправлено'+(rep.submitted_at?' · '+new Date(rep.submitted_at).toLocaleString('uk-UA'):'') : '⚠ Ще не відправлено'}</p>
+    ${rep.accepted
+      ? `<p class="profit-pos" style="font-weight:700; margin-top:6px;">🔒 Прийнято${rep.accepted_at ? ' · '+new Date(rep.accepted_at).toLocaleString('uk-UA') : ''}</p>`
+      : rep.submitted ? `<button class="btn btn-primary btn-small no-print" id="guideSingleAcceptBtn" style="margin-top:8px;">✅ Прийняти звіт (заблокувати)</button>` : ''
+    }
+  `;
+  const acceptBtn = document.getElementById('guideSingleAcceptBtn');
+  if(acceptBtn) acceptBtn.addEventListener('click', async ()=>{
+    if(!confirm(`Прийняти фінансовий звіт гіда ${guideName}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`)) return;
+    const { error } = await sb.from('financial_reports').update({ accepted:true, accepted_at:new Date().toISOString() }).eq('trip_id', tripId).eq('guide_name', guideName);
+    if(error){ alert(friendlyErrorMessage(error)); return; }
+    showGuideSingleView(tripId, guideName, target);
+  });
+}
+
 async function renderReportsGuideDrilldown(tripId){
+  let modal = document.getElementById('reportsDrilldownModal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'reportsDrilldownModal';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:800; display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;';
+  modal.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:720px; width:100%; margin:20px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <p class="report-title" style="margin:0;">Перегляд по гідах</p>
+      <button class="btn btn-ghost btn-small" id="reportsDrilldownCloseBtn">✕ Закрити</button>
+    </div>
+    <div id="reportsDrilldownResult"><p class="report-note">Завантажую…</p></div>
+  </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('reportsDrilldownCloseBtn').addEventListener('click', ()=> modal.remove());
+  modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.remove(); });
+
   const container = document.getElementById('reportsDrilldownResult');
-  container.innerHTML = `<p class="report-note">Завантажую…</p>`;
   if(!state.trips[tripId]) await loadTripData(tripId);
   const td = state.trips[tripId];
   if(!td){ container.innerHTML = `<p class="report-note">Немає даних по цьому заїзду.</p>`; return; }
