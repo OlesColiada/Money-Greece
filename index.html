@@ -4313,16 +4313,18 @@ async function renderReportsSection(){
     <p class="fin-section-title">Прибутковість екскурсій по заїзду</p>
     <div class="table-scroll">
       <table class="report-table" style="font-size:12.5px;">
-        <thead><tr><th>Дата</th><th>Гід 1</th><th>Гід 2</th><th>Гід 3</th></tr></thead>
+        <thead><tr><th>Дата</th><th>Гід 1</th><th>Гід 2</th><th>Гід 3</th><th>Прибутковість</th></tr></thead>
         <tbody>${[...TRIPS_DEF].sort((a,b)=>a.start-b.start).map(def=>{
           const td = state.trips[def.id];
           const names = td ? td.guides.map(g=>g.name) : [];
           const guideCell = (n)=> n ? `<span class="reports-guide-link" data-trip="${def.id}" data-guide="${n}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);">${n}</span>` : '—';
+          const hasExcursions = td && (td.excursions||[]).length;
           return `<tr>
             <td class="reports-overview-row" data-trip="${def.id}" style="cursor:pointer;">${def.label}</td>
             <td>${guideCell(names[0])}</td>
             <td>${guideCell(names[1])}</td>
             <td>${guideCell(names[2])}</td>
+            <td>${hasExcursions ? `<span class="reports-profit-link" data-trip="${def.id}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);">переглянути</span>` : '—'}</td>
           </tr>`;
         }).join('')}</tbody>
       </table>
@@ -4408,6 +4410,40 @@ async function renderReportsSection(){
       await showGuideSingleView(tripId, guide, target);
     }));
   }));
+  block.querySelectorAll('.reports-profit-link').forEach(el=> el.addEventListener('click', ()=>{
+    showTripProfitabilityView(el.dataset.trip);
+  }));
+}
+
+function showTripProfitabilityView(tripId){
+  let modal = document.getElementById('reportsDrilldownModal');
+  if(modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'reportsDrilldownModal';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:800; display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;';
+  const def = TRIPS_DEF.find(d=>d.id===tripId);
+  const summary = computeExcursionSummary(tripId);
+  const rowsHtml = summary.rows.map(r=>`<tr>
+    <td style="text-align:left;">${r.excLabel}</td>
+    <td>${fmt(r.collected)} €</td><td>${fmt(r.fromPartner)} €</td><td>${fmt(r.cost)} €</td>
+    <td>${fmt(r.toPartner)} €</td><td>${fmt(r.remain)} €</td><td>${fmt(r.guidesShare)} €</td><td>${fmt(r.officeShare)} €</td>
+  </tr>`).join('') || `<tr><td colspan="8" class="muted">Немає екскурсій.</td></tr>`;
+  modal.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:760px; width:100%; margin:20px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+      <p class="report-title" style="margin:0;">💰 Прибутковість екскурсій</p>
+      <button class="btn btn-ghost btn-small" id="tripProfitCloseBtn">✕ Закрити</button>
+    </div>
+    <p class="report-note" style="margin-top:0;">${def?def.label:''}</p>
+    <div class="table-scroll"><table class="report-table" style="font-size:12px;">
+      <thead><tr><th style="text-align:left;">Екскурсія</th><th>Зібрано</th><th>Нам платить партнер</th><th>Затрати</th><th>Ми платимо партнеру</th><th>Залишок</th><th>Керівники</th><th>Офіс</th></tr></thead>
+      <tbody>${rowsHtml}
+      <tr style="font-weight:700;"><td style="text-align:left;">РАЗОМ</td><td>${fmt(summary.grand.collected)} €</td><td>${fmt(summary.grand.fromPartner)} €</td><td>${fmt(summary.grand.cost)} €</td><td>${fmt(summary.grand.toPartner)} €</td><td>${fmt(summary.grand.remain)} €</td><td>${fmt(summary.grand.guides)} €</td><td>${fmt(summary.grand.office)} €</td></tr>
+      </tbody>
+    </table></div>
+  </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('tripProfitCloseBtn').addEventListener('click', ()=> modal.remove());
+  modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.remove(); });
 }
 
 function computeExcursionSummary(tripId){
@@ -4457,6 +4493,7 @@ async function showGuideSingleView(tripId, guideName, target){
   modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.remove(); });
 
   const container = document.getElementById('guideSingleViewResult');
+  if(!state.trips[tripId]) await loadTripData(tripId);
 
   if(target==='list'){
     const { data: tourists } = await sb.from('tourists').select('id').eq('trip_id', tripId).eq('guide_name', guideName);
@@ -4472,11 +4509,25 @@ async function showGuideSingleView(tripId, guideName, target){
       byExc[s.excursion_name].count++;
       byExc[s.excursion_name].sum += Number(s.price)||0;
     });
-    const excNames = Object.keys(byExc).sort();
+    // Profitability contributed by this guide, per excursion name (from Прибутковість cards).
+    const profitByExc = {};
+    const td = state.trips[tripId];
+    (td ? td.excursions||[] : []).forEach(exc=>{
+      const label = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+      const calc = calcExcursion(exc);
+      calc.rowResults.filter(r=>r.isGuide && !r.isTest && r.person===guideName).forEach(r=>{
+        profitByExc[label] = (profitByExc[label]||0) + (Number(r.profit)||0);
+      });
+    });
+    const excNames = [...new Set([...Object.keys(byExc), ...Object.keys(profitByExc)])].sort();
     container.innerHTML = excNames.length ? `
       <table class="report-table" style="font-size:13px; width:100%;">
-        <thead><tr><th style="text-align:left;">Екскурсія</th><th>К-ть</th><th>Сума</th></tr></thead>
-        <tbody>${excNames.map(n=>`<tr><td style="text-align:left;">${n}</td><td>${byExc[n].count}</td><td>${fmt(byExc[n].sum)} €</td></tr>`).join('')}</tbody>
+        <thead><tr><th style="text-align:left;">Екскурсія</th><th>К-ть</th><th>Сума</th><th>Прибутковість</th></tr></thead>
+        <tbody>${excNames.map(n=>{
+          const e = byExc[n] || { count:0, sum:0 };
+          const hasProfit = Object.prototype.hasOwnProperty.call(profitByExc, n);
+          return `<tr><td style="text-align:left;">${n}</td><td>${e.count}</td><td>${fmt(e.sum)} €</td><td>${hasProfit ? fmt(profitByExc[n])+' €' : '—'}</td></tr>`;
+        }).join('')}</tbody>
       </table>
     ` : `<p class="report-note">Немає позначених екскурсій.</p>`;
     return;
