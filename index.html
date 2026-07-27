@@ -2292,7 +2292,7 @@ function applyMode(mode){
 
 async function checkFinanceSubmissions(){
   if(!currentProfile || currentProfile.role !== 'manager') return;
-  const { data, error } = await sb.from('financial_reports').select('trip_id,guide_name,submitted_at').eq('submitted', true).eq('manager_seen', false);
+  const { data, error } = await sb.from('financial_reports').select('*').eq('submitted', true).eq('accepted', false);
   if(error || !data) return;
   renderFinanceNotifyBadge(data);
 }
@@ -2316,36 +2316,71 @@ function showFinanceNotifyList(reports){
   panel = document.createElement('div');
   panel.id = 'financeNotifyPanel';
   panel.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:700; display:flex; align-items:center; justify-content:center; padding:20px;';
-  const itemsHtml = reports.map(r=>{
+
+  const buildItemsHtml = ()=> reports.map(r=>{
     const def = TRIPS_DEF.find(d=>d.id===r.trip_id);
     const label = def ? def.label : r.trip_id;
     const time = r.submitted_at ? new Date(r.submitted_at).toLocaleString('uk-UA') : '';
-    return `<div style="padding:10px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-      <div><b>${r.guide_name}</b> (${label})<div class="muted" style="font-size:12px;">${time}</div></div>
-      <button class="btn btn-ghost btn-small" data-role="finNotifyDownload" data-trip="${r.trip_id}" data-guide="${r.guide_name}">⬇ Завантажити</button>
-    </div>`;
+    const received = (r.entries||[]).filter(e=>e.section==='received');
+    const paid = (r.entries||[]).filter(e=>e.section==='paid');
+    const totalReceived = received.reduce((s,e)=>s+(Number(e.amount)||0),0);
+    const totalPaid = paid.reduce((s,e)=>s+(Number(e.amount)||0),0);
+    const balance = totalReceived - totalPaid;
+    return `<details style="border:1px solid var(--line); border-radius:8px; margin-bottom:8px; padding:10px;">
+      <summary style="cursor:pointer; font-weight:700;">${r.guide_name} <span class="muted" style="font-weight:400; font-size:12px;">(${label}) · ${time}</span></summary>
+      <div style="margin-top:10px;">
+        <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Отримано</p>
+        <div class="fin-panel" style="margin-bottom:8px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+        <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Затрати</p>
+        <div class="fin-panel" style="margin-bottom:8px;">${paid.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+        <div class="fin-row"><span class="fin-label">Залишок</span><span>${fmt(balance)} €</span></div>
+        <div class="fin-row"><span class="fin-label">Здано менеджеру</span><span>${fmt(r.handed_over||0)} €</span></div>
+        <div class="no-print" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-small" data-role="finNotifyCorrect" data-trip="${r.trip_id}" data-guide="${r.guide_name}">🔓 Відкрити для корекції</button>
+          <button class="btn btn-primary btn-small" data-role="finNotifyAccept" data-trip="${r.trip_id}" data-guide="${r.guide_name}">✅ Прийняти звіт</button>
+        </div>
+      </div>
+    </details>`;
   }).join('');
-  panel.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:480px; width:100%; max-height:80vh; overflow-y:auto;">
+
+  const rerenderPanel = ()=>{
+    panel.querySelector('#finNotifyItemsWrap').innerHTML = buildItemsHtml() || `<p class="report-note">Усі звіти прийнято.</p>`;
+    wireItemButtons();
+    if(!reports.length){ panel.remove(); checkFinanceSubmissions(); }
+  };
+
+  const wireItemButtons = ()=>{
+    panel.querySelectorAll('[data-role="finNotifyCorrect"]').forEach(btn=> btn.addEventListener('click', ()=>{
+      const trip = btn.dataset.trip, guide = btn.dataset.guide;
+      if(!confirm(`Відкрити фінансовий звіт гіда ${guide} для корекції? Ви зможете виправити цифри напряму — вносьте зміни обережно.`)) return;
+      managerFinanceCorrectionKey = trip+'|'+guide;
+      panel.remove();
+      currentTripId = trip;
+      tourSectionTripChosen = true;
+      financeGuideFilter = guide;
+      switchToFinanceSection();
+    }));
+    panel.querySelectorAll('[data-role="finNotifyAccept"]').forEach(btn=> btn.addEventListener('click', async ()=>{
+      const trip = btn.dataset.trip, guide = btn.dataset.guide;
+      if(!confirm(`Прийняти фінансовий звіт гіда ${guide}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`)) return;
+      const { error } = await sb.from('financial_reports').update({ accepted:true, accepted_at:new Date().toISOString() }).eq('trip_id', trip).eq('guide_name', guide);
+      if(error){ alert(friendlyErrorMessage(error)); return; }
+      const idx = reports.findIndex(r=>r.trip_id===trip && r.guide_name===guide);
+      if(idx>-1) reports.splice(idx,1);
+      rerenderPanel();
+    }));
+  };
+
+  panel.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:520px; width:100%; max-height:80vh; overflow-y:auto;">
     <p class="report-title" style="margin-top:0;">📥 Готові фінзвіти</p>
-    ${itemsHtml}
+    <div id="finNotifyItemsWrap">${buildItemsHtml()}</div>
     <div style="display:flex; gap:8px; margin-top:12px;">
-      <button class="btn btn-primary btn-small" id="finNotifyMarkSeenBtn" style="flex:1;">Позначити всі переглянутими</button>
-      <button class="btn btn-ghost btn-small" id="finNotifyCloseBtn">Закрити</button>
+      <button class="btn btn-ghost btn-small" id="finNotifyCloseBtn" style="flex:1;">Закрити</button>
     </div>
   </div>`;
   document.body.appendChild(panel);
-  panel.querySelectorAll('[data-role="finNotifyDownload"]').forEach(btn=> btn.addEventListener('click', async ()=>{
-    const path = `${btn.dataset.trip}/finance-report/${safePathSlug(btn.dataset.guide)}/report_${tripFileTag(btn.dataset.trip)}.xlsx`;
-    const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-    if(error){ alert('Немає збереженої версії цього звіту — гід ще не зберігав/відправляв його з цим оновленням.'); return; }
-    window.open(data.signedUrl, '_blank');
-  }));
+  wireItemButtons();
   document.getElementById('finNotifyCloseBtn').addEventListener('click', ()=> panel.remove());
-  document.getElementById('finNotifyMarkSeenBtn').addEventListener('click', async ()=>{
-    await Promise.all(reports.map(r=> sb.from('financial_reports').update({manager_seen:true}).eq('trip_id',r.trip_id).eq('guide_name',r.guide_name)));
-    panel.remove();
-    checkFinanceSubmissions();
-  });
 }
 setInterval(()=>{ if(currentProfile && currentProfile.role==='manager') checkFinanceSubmissions(); }, 60000);
 setInterval(async ()=>{
@@ -2530,6 +2565,7 @@ let touristData = { tourists: [], selectionsByTourist: {} }; // cache for curren
 let openTouristId = null;
 let openEditPanels = new Set();
 let priceCorrectionUnlocked = new Set();
+let managerFinanceCorrectionKey = null;
 
 let testAccountGuideFilter = null;
 function activeTouristGuideName(){
@@ -3613,7 +3649,8 @@ function renderFinanceReport(report){
   const guideRecord = tripDataForNote.guides.find(g=>g.name===report.guide_name);
   const substituteNote = guideRecord && guideRecord.substituteNote ? ` (заміна: ${guideRecord.substituteNote})` : '';
 
-  const readOnly = currentProfile.role !== 'guide' || !!report.accepted;
+  const isManagerCorrecting = currentProfile.role==='manager' && managerFinanceCorrectionKey === (report.trip_id+'|'+report.guide_name);
+  const readOnly = (currentProfile.role !== 'guide' && !isManagerCorrecting) || !!report.accepted;
 
   lastRenderedFinanceReport = { report, received, paid, totalReceived, totalPaid, balance, handedOver, def };
   if(report.submitted && navigator.onLine && !report._snapshotChecked){
@@ -3664,6 +3701,11 @@ function renderFinanceReport(report){
       <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${report.guide_name}${substituteNote}</p>
       <p class="report-note" style="margin:6px 0 0;">Це облік грошей туру, що пройшли через твої руки — не твоя зарплата. «Отримано» — все, що ти отримав. «Затрати» — усі витрати туру, включно з твоєю добовою й відсотком. Різниця — те, що маєш здати менеджеру.</p>
     </div>
+
+    ${isManagerCorrecting ? `<div class="no-print" style="margin-top:12px; background:#fce8ee; border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span style="font-weight:700;">✏️ Режим корекції — ви редагуєте звіт гіда ${report.guide_name}</span>
+      <button class="btn btn-ghost btn-small" id="finExitCorrectionBtn">🔒 Завершити корекцію</button>
+    </div>` : ''}
 
     ${(!readOnly && suggestions.length) ? `<div class="no-print" style="margin-top:12px; background:var(--whitewash-2); border-radius:8px; padding:8px 10px;">
       <p style="font-size:11.5px; color:var(--ink-soft); margin:0 0 6px; text-transform:uppercase; letter-spacing:.03em;">Можна додати одним кліком:</p>
@@ -3757,6 +3799,11 @@ function renderFinanceReport(report){
     report._snapshotChecked = false;
     if(queued) hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет');
     else hbShowToast('🔓 Звіт розпечатано — можна виправляти');
+    renderFinanceReport(report);
+  });
+  const exitCorrectionBtn = document.getElementById('finExitCorrectionBtn');
+  if(exitCorrectionBtn) exitCorrectionBtn.addEventListener('click', ()=>{
+    managerFinanceCorrectionKey = null;
     renderFinanceReport(report);
   });
 
@@ -4300,7 +4347,25 @@ async function renderReportsSection(){
     <div id="reportsFinanceList">${financeHtml}</div>
 
     <p class="fin-section-title">Прибутковість екскурсій по заїзду</p>
-    <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <div class="table-scroll">
+      <table class="report-table" style="font-size:12.5px;">
+        <thead><tr><th>Дата</th><th>Гід 1</th><th>Гід 2</th><th>Гід 3</th></tr></thead>
+        <tbody>${[...TRIPS_DEF].sort((a,b)=>a.start-b.start).map(def=>{
+          const td = state.trips[def.id];
+          const names = td ? td.guides.map(g=>g.name) : [];
+          const guideCell = (n)=> n ? `<span class="reports-guide-link" data-trip="${def.id}" data-guide="${n}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);">${n}</span>` : '—';
+          return `<tr>
+            <td class="reports-overview-row" data-trip="${def.id}" style="cursor:pointer;">${def.label}</td>
+            <td>${guideCell(names[0])}</td>
+            <td>${guideCell(names[1])}</td>
+            <td>${guideCell(names[2])}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+    <p class="report-note" style="margin-top:4px;">Клікніть на заїзд, щоб одразу побачити прибутковість, список збору коштів і фінзвіти по гідах.</p>
+
+    <div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:14px;">
       <select id="reportsExcTripSelect" style="padding:8px 10px; border:2px solid var(--line); border-radius:8px;">
         ${[...TRIPS_DEF].sort((a,b)=>b.start-a.start).map(d=>`<option value="${d.id}">${d.label}</option>`).join('')}
       </select>
@@ -4353,6 +4418,39 @@ async function renderReportsSection(){
       drilldownBtn.disabled = false; drilldownBtn.textContent = '👁 Переглянути по гідах';
     }
   });
+  block.querySelectorAll('.reports-overview-row').forEach(row=> row.addEventListener('click', async ()=>{
+    const tripId = row.dataset.trip;
+    document.getElementById('reportsExcTripSelect').value = tripId;
+    document.getElementById('reportsDrilldownResult').scrollIntoView({behavior:'smooth', block:'start'});
+    await renderReportsGuideDrilldown(tripId);
+  }));
+  block.querySelectorAll('.reports-guide-link').forEach(el=> el.addEventListener('click', (e)=>{
+    let menu = document.getElementById('reportsGuideChoiceMenu');
+    if(menu) menu.remove();
+    menu = document.createElement('div');
+    menu.id = 'reportsGuideChoiceMenu';
+    const rect = e.target.getBoundingClientRect();
+    menu.style.cssText = `position:fixed; top:${rect.bottom+4}px; left:${rect.left}px; z-index:900; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.15); padding:6px; display:flex; flex-direction:column; gap:4px;`;
+    menu.innerHTML = `
+      <button class="btn btn-ghost btn-small" data-target="fin" style="white-space:nowrap;">💰 Фінансовий звіт</button>
+      <button class="btn btn-ghost btn-small" data-target="list" style="white-space:nowrap;">📋 Список збору на екскурсії</button>
+    `;
+    document.body.appendChild(menu);
+    const closeMenu = ()=>{ menu.remove(); document.removeEventListener('click', outsideClick); };
+    const outsideClick = (ev)=>{ if(!menu.contains(ev.target) && ev.target!==e.target) closeMenu(); };
+    setTimeout(()=> document.addEventListener('click', outsideClick), 0);
+    menu.querySelectorAll('button').forEach(btn=> btn.addEventListener('click', async ()=>{
+      const tripId = el.dataset.trip, guide = el.dataset.guide, target = btn.dataset.target;
+      closeMenu();
+      document.getElementById('reportsExcTripSelect').value = tripId;
+      await renderReportsGuideDrilldown(tripId);
+      const anchorId = `guide-${target}-${tripId}-${safePathSlug(guide)}`;
+      const blockEl = document.getElementById(`guide-block-${tripId}-${safePathSlug(guide)}`);
+      if(blockEl) blockEl.open = true;
+      const anchor = document.getElementById(anchorId);
+      if(anchor) anchor.scrollIntoView({behavior:'smooth', block:'start'});
+    }));
+  }));
 
   block.querySelectorAll('[data-role="reportsDownloadFin"]').forEach(btn=> btn.addEventListener('click', ()=>{
     downloadXlsxSnapshot(`${btn.dataset.trip}/finance-report/${safePathSlug(btn.dataset.guide)}/report_${tripFileTag(btn.dataset.trip)}.xlsx`, 'Ще немає збереженої версії цього звіту.');
@@ -4484,11 +4582,11 @@ async function renderReportsGuideDrilldown(tripId){
       </table></div>
     ` : '';
 
-    return `<details style="margin-top:10px; border-top:1px solid var(--line); padding-top:8px;">
+    return `<details style="margin-top:10px; border-top:1px solid var(--line); padding-top:8px;" id="guide-block-${tripId}-${safePathSlug(g)}">
       <summary style="cursor:pointer; font-weight:700; font-size:15px;">${issues.length ? '⚠ ' : ''}${g}${issues.length ? ` <span class="profit-neg" style="font-weight:400; font-size:12.5px;">— ${issues.join(', ')}</span>` : ''}</summary>
-      <p style="font-weight:600; margin:10px 0 4px;">📋 Список збору коштів на екскурсії</p>
+      <p style="font-weight:600; margin:10px 0 4px;" id="guide-list-${tripId}-${safePathSlug(g)}">📋 Список збору коштів на екскурсії</p>
       ${collectionHtml}
-      <p style="font-weight:600; margin:14px 0 4px;">💵 Фінансовий звіт</p>
+      <p style="font-weight:600; margin:14px 0 4px;" id="guide-fin-${tripId}-${safePathSlug(g)}">💵 Фінансовий звіт</p>
       ${finHtml}
       ${mismatchHtml}
     </details>`;
