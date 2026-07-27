@@ -1184,7 +1184,54 @@ async function rtProcessOutbox(){
   }
 }
 window.addEventListener('online', rtProcessOutbox);
+let lastRenderedFinanceReport = null;
+window.addEventListener('online', ()=>{
+  const ctx = lastRenderedFinanceReport;
+  if(!ctx || !ctx.report.submitted) return;
+  ctx.report._snapshotChecked = false; // force a fresh retry now that we're back online
+  saveFinanceReportToStorage(ctx.report, ctx.received, ctx.paid, ctx.totalReceived, ctx.totalPaid, ctx.balance, ctx.handedOver, ctx.def, true)
+    .then(()=>{ ctx.report._snapshotChecked = true; })
+    .catch(()=>{});
+});
 setInterval(rtProcessOutbox, 30000);
+
+/* ---------- Live sync for Прибутковість (Supabase Realtime) ----------
+   Falls back gracefully to the existing 30-sec poll if the realtime
+   connection ever drops — this is additive, not a replacement. */
+let profitRealtimeChannel = null;
+let profitRealtimeTripId = null;
+let profitRealtimeDebounceTimer = null;
+function teardownProfitRealtimeSubscription(){
+  if(profitRealtimeChannel){ sb.removeChannel(profitRealtimeChannel); profitRealtimeChannel = null; }
+  profitRealtimeTripId = null;
+}
+function setupProfitRealtimeSubscription(tripId){
+  teardownProfitRealtimeSubscription();
+  if(!tripId) return;
+  profitRealtimeTripId = tripId;
+  const handleChange = ()=>{
+    clearTimeout(profitRealtimeDebounceTimer);
+    const tryRefresh = ()=>{
+      if(currentTripId !== tripId || currentSection !== 'profit') return;
+      const active = document.activeElement;
+      const wrap = document.getElementById('excursionsWrap');
+      const isTyping = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.tagName==='SELECT') && wrap && wrap.contains(active);
+      if(isTyping){
+        // Don't rebuild the screen out from under someone actively typing a number —
+        // just check again shortly, once they've moved on or paused.
+        profitRealtimeDebounceTimer = setTimeout(tryRefresh, 800);
+        return;
+      }
+      loadTripData(tripId).then(()=> renderAll());
+    };
+    profitRealtimeDebounceTimer = setTimeout(tryRefresh, 400); // small debounce so several near-simultaneous row saves don't each trigger a separate reload
+  };
+  profitRealtimeChannel = sb.channel('profit-live-'+tripId)
+    .on('postgres_changes', { event:'*', schema:'public', table:'excursions', filter:'trip_id=eq.'+tripId }, handleChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'excursion_rows', filter:'trip_id=eq.'+tripId }, handleChange)
+    .on('postgres_changes', { event:'*', schema:'public', table:'trip_guides', filter:'trip_id=eq.'+tripId }, handleChange)
+    .subscribe();
+}
 updateOutboxBadge();
 
 // Generic "write with offline fallback" used by the guide-facing modules
@@ -2578,6 +2625,11 @@ function renderTourSectionGuideChips(){
 }
 
 function renderSectionTabs(){
+  if(currentSection==='profit' && currentTripId){
+    if(profitRealtimeTripId !== currentTripId) setupProfitRealtimeSubscription(currentTripId);
+  } else {
+    teardownProfitRealtimeSubscription();
+  }
   const inTourGroup = ['profit','tourists','finance'].includes(currentSection);
   const isManager = currentProfile && currentProfile.role==='manager';
   const needsTripPick = inTourGroup && isManager && !tourSectionTripChosen;
@@ -3543,6 +3595,12 @@ function renderFinanceReport(report){
   const substituteNote = guideRecord && guideRecord.substituteNote ? ` (заміна: ${guideRecord.substituteNote})` : '';
 
   const readOnly = currentProfile.role !== 'guide';
+
+  lastRenderedFinanceReport = { report, received, paid, totalReceived, totalPaid, balance, handedOver, def };
+  if(report.submitted && navigator.onLine && !report._snapshotChecked){
+    report._snapshotChecked = true;
+    saveFinanceReportToStorage(report, received, paid, totalReceived, totalPaid, balance, handedOver, def, true).catch(()=>{});
+  }
 
   const rowHtml = (e)=>{
     const idx = report.entries.indexOf(e);
