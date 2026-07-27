@@ -3032,11 +3032,16 @@ function renderTouristDetail(){
   if(payBtn) payBtn.addEventListener('click', ()=> payTourist(t.id));
 }
 
+let touristDetailRenderTimer;
+function debouncedRenderTouristDetail(delay=2500){
+  clearTimeout(touristDetailRenderTimer);
+  touristDetailRenderTimer = setTimeout(renderTouristDetail, delay);
+}
 function updateSelectionLocal(touristId, selId, patch, debounce){
   const sels = touristData.selectionsByTourist[touristId];
   const s = sels.find(x=>x.id===selId);
   Object.assign(s, patch);
-  renderTouristDetail();
+  if(debounce) debouncedRenderTouristDetail(); else renderTouristDetail();
   const doPersist = ()=> rtGuideWrite('upsert', 'tourist_excursion_selections', {
     id:s.id, tourist_id:s.tourist_id, trip_id:s.trip_id, excursion_name:s.excursion_name,
     going:s.going, price_mode:s.price_mode, price:Number(s.price)||0,
@@ -3594,7 +3599,7 @@ function renderFinanceReport(report){
   const guideRecord = tripDataForNote.guides.find(g=>g.name===report.guide_name);
   const substituteNote = guideRecord && guideRecord.substituteNote ? ` (заміна: ${guideRecord.substituteNote})` : '';
 
-  const readOnly = currentProfile.role !== 'guide';
+  const readOnly = currentProfile.role !== 'guide' || !!report.accepted;
 
   lastRenderedFinanceReport = { report, received, paid, totalReceived, totalPaid, balance, handedOver, def };
   if(report.submitted && navigator.onLine && !report._snapshotChecked){
@@ -3688,9 +3693,15 @@ function renderFinanceReport(report){
             : `<p class="profit-pos" style="font-size:13px; margin-top:6px;">✓ Здано збігається з балансом</p>`
         }
         <div class="no-print guide-only" style="margin-top:18px; text-align:center;">
-          <button class="btn ${report.submitted?'btn-ghost':'btn-primary'}" id="finSubmitBtn" ${report.submitted?'disabled':''} style="width:100%; padding:14px;">
-            ${report.submitted ? `✅ Відправлено${report.submitted_at ? ' · '+new Date(report.submitted_at).toLocaleString('uk-UA') : ''}` : '📤 Відправити менеджеру'}
-          </button>
+          ${report.accepted ? `
+            <p class="profit-pos" style="font-weight:700; font-size:14px;">🔒 Звіт прийнято керівником${report.accepted_at ? ' · '+new Date(report.accepted_at).toLocaleString('uk-UA') : ''}</p>
+            <p class="muted" style="font-size:12px;">Виправлення більше не можна вносити.</p>
+          ` : `
+            <button class="btn ${report.submitted?'btn-ghost':'btn-primary'}" id="finSubmitBtn" ${report.submitted?'disabled':''} style="width:100%; padding:14px;">
+              ${report.submitted ? `✅ Відправлено${report.submitted_at ? ' · '+new Date(report.submitted_at).toLocaleString('uk-UA') : ''}` : '📤 Відправити менеджеру'}
+            </button>
+            ${report.submitted ? `<button class="btn btn-ghost btn-small" id="finReopenBtn" style="margin-top:8px;">🔓 Виправити і відправити ще раз</button>` : ''}
+          `}
         </div>
       </div>
     </details>
@@ -3718,6 +3729,20 @@ function renderFinanceReport(report){
     report.submitted_at = new Date().toISOString();
     if(queued) hbShowToast('💾 Відправлення збережено локально — надійде менеджеру, коли з\'явиться інтернет');
     else hbShowToast('✅ Звіт відправлено менеджеру');
+    renderFinanceReport(report);
+  });
+  const reopenBtn = document.getElementById('finReopenBtn');
+  if(reopenBtn) reopenBtn.addEventListener('click', async ()=>{
+    if(!confirm('Розпечатати звіт для виправлень? Менеджер побачить, що звіт знову "в роботі", поки ви не відправите його ще раз.')) return;
+    const { error, queued } = await rtGuideWrite('update', 'financial_reports',
+      { submitted: false },
+      { trip_id: report.trip_id, guide_name: report.guide_name }
+    );
+    if(error){ alert(friendlyErrorMessage(error)); return; }
+    report.submitted = false;
+    report._snapshotChecked = false;
+    if(queued) hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет');
+    else hbShowToast('🔓 Звіт розпечатано — можна виправляти');
     renderFinanceReport(report);
   });
 
@@ -4421,6 +4446,10 @@ async function renderReportsGuideDrilldown(tripId){
         <div class="fin-row"><span class="fin-label">Залишок</span><span>${fmt(balance)} €</span></div>
         <div class="fin-row"><span class="fin-label">Здано менеджеру</span><span>${fmt(rep.handed_over||0)} €</span></div>
         <p class="${rep.submitted?'muted':'profit-neg'}" style="font-size:11.5px; margin-top:4px; font-weight:${rep.submitted?'400':'600'};">${rep.submitted ? '✅ Відправлено'+(rep.submitted_at?' · '+new Date(rep.submitted_at).toLocaleString('uk-UA'):'') : '⚠ Ще не відправлено'}</p>
+        ${rep.accepted
+          ? `<p class="profit-pos" style="font-weight:700; margin-top:6px;">🔒 Прийнято${rep.accepted_at ? ' · '+new Date(rep.accepted_at).toLocaleString('uk-UA') : ''}</p>`
+          : rep.submitted ? `<button class="btn btn-primary btn-small no-print" data-role="mrAcceptFinReport" data-guide="${g}" style="margin-top:8px;">✅ Прийняти звіт (заблокувати)</button>` : ''
+        }
       `;
     }
 
@@ -4459,6 +4488,13 @@ async function renderReportsGuideDrilldown(tripId){
     : `<p class="profit-pos" style="font-weight:600; margin-top:14px;">✓ Усі гіди заїзду мають список збору коштів і відправлений фінансовий звіт.</p>`;
 
   container.innerHTML = profitHtml + complianceHtml + guideBlocksHtml;
+  container.querySelectorAll('[data-role="mrAcceptFinReport"]').forEach(btn=> btn.addEventListener('click', async ()=>{
+    const guide = btn.dataset.guide;
+    if(!confirm(`Прийняти фінансовий звіт гіда ${guide}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`)) return;
+    const { error } = await sb.from('financial_reports').update({ accepted:true, accepted_at:new Date().toISOString() }).eq('trip_id', tripId).eq('guide_name', guide);
+    if(error){ alert(friendlyErrorMessage(error)); return; }
+    await renderReportsGuideDrilldown(tripId);
+  }));
 }
 
 function exportExcursionProfitabilityToExcel(tripId){
