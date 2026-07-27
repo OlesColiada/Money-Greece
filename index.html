@@ -2335,7 +2335,7 @@ function showFinanceNotifyList(reports){
   </div>`;
   document.body.appendChild(panel);
   panel.querySelectorAll('[data-role="finNotifyDownload"]').forEach(btn=> btn.addEventListener('click', async ()=>{
-    const path = `${btn.dataset.trip}/finance-report/${btn.dataset.guide}/report_${tripFileTag(btn.dataset.trip)}.xlsx`;
+    const path = `${btn.dataset.trip}/finance-report/${safePathSlug(btn.dataset.guide)}/report_${tripFileTag(btn.dataset.trip)}.xlsx`;
     const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
     if(error){ alert('Немає збереженої версії цього звіту — гід ще не зберігав/відправляв його з цим оновленням.'); return; }
     window.open(data.signedUrl, '_blank');
@@ -4355,7 +4355,7 @@ async function renderReportsSection(){
   });
 
   block.querySelectorAll('[data-role="reportsDownloadFin"]').forEach(btn=> btn.addEventListener('click', ()=>{
-    downloadXlsxSnapshot(`${btn.dataset.trip}/finance-report/${btn.dataset.guide}/report_${tripFileTag(btn.dataset.trip)}.xlsx`, 'Ще немає збереженої версії цього звіту.');
+    downloadXlsxSnapshot(`${btn.dataset.trip}/finance-report/${safePathSlug(btn.dataset.guide)}/report_${tripFileTag(btn.dataset.trip)}.xlsx`, 'Ще немає збереженої версії цього звіту.');
   }));
 }
 
