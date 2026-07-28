@@ -1306,6 +1306,8 @@ function excFromDb(e, rows){
     recipientGuide:e.recipient_guide||"", payerGuide:e.payer_guide||"",
     recipientPaid: !!e.recipient_paid, payerPaid: !!e.payer_paid,
     recipientPaidAt: e.recipient_paid_at||null, payerPaidAt: e.payer_paid_at||null,
+    fromPartnerOverride: (e.from_partner_override===undefined || e.from_partner_override===null) ? '' : e.from_partner_override,
+    toPartnerOverride: (e.to_partner_override===undefined || e.to_partner_override===null) ? '' : e.to_partner_override,
     rows: rows.map(rowFromDb)
   };
 }
@@ -1451,6 +1453,7 @@ function calcTripByGuide(tripData){
 
 /* ---------- Rendering ---------- */
 function fmt(n){ return (Math.round((n+Number.EPSILON)*100)/100).toLocaleString('uk-UA',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function round2(n){ return Math.round(((Number(n)||0)+Number.EPSILON)*100)/100; }
 // Accepts "5120", "5120.50", "5120,50" — comma or period both work as decimal separator.
 function parseDecimalInput(str){
   if(str===null || str===undefined || str==='') return 0;
@@ -2097,7 +2100,9 @@ async function upsertExcursion(tripId, exc){
     id: exc.id, trip_id: tripId, name: exc.name, custom_name: exc.customName,
     bus_owner: exc.busOwner, bus_rate: Number(exc.busRate)||0, km: Number(exc.km)||0,
     guide_fee_default: Number(exc.guideFeeDefault)||0, guide_fee: Number(exc.guideFee)||0,
-    guide_fee_reason: exc.guideFeeReason, recipient_guide: exc.recipientGuide, payer_guide: exc.payerGuide
+    guide_fee_reason: exc.guideFeeReason, recipient_guide: exc.recipientGuide, payer_guide: exc.payerGuide,
+    from_partner_override: (exc.fromPartnerOverride===undefined || exc.fromPartnerOverride===null || exc.fromPartnerOverride==='') ? null : Number(exc.fromPartnerOverride),
+    to_partner_override: (exc.toPartnerOverride===undefined || exc.toPartnerOverride===null || exc.toPartnerOverride==='') ? null : Number(exc.toPartnerOverride)
   });
   if(queued) setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет");
   else setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
@@ -2381,6 +2386,7 @@ function showFinanceNotifyList(reports){
   document.body.appendChild(panel);
   wireItemButtons();
   document.getElementById('finNotifyCloseBtn').addEventListener('click', ()=> panel.remove());
+  panel.addEventListener('click', (e)=>{ if(e.target===panel) panel.remove(); });
 }
 setInterval(()=>{ if(currentProfile && currentProfile.role==='manager') checkFinanceSubmissions(); }, 60000);
 setInterval(async ()=>{
@@ -2566,6 +2572,7 @@ let openTouristId = null;
 let openEditPanels = new Set();
 let priceCorrectionUnlocked = new Set();
 let managerFinanceCorrectionKey = null;
+let profitTableEditUnlocked = false;
 
 let testAccountGuideFilter = null;
 function activeTouristGuideName(){
@@ -4025,6 +4032,24 @@ async function computeOfficeTotalForTrip(tripId){
   return Object.values(perGuide).reduce((s,g)=> s + (g.officeIncome||0), 0);
 }
 
+// Total km driven for excursions on OUR OWN bus this trip — used to split the manager's
+// full-route odometer reading into "clean route" vs "excursions" (already paid for via
+// tourist money in Прибутковість), so the same km never gets expensed twice.
+function computeOwnBusExcursionKm(tripId){
+  const tripData = getTripData(tripId);
+  const rows = [];
+  let total = 0;
+  (tripData.excursions||[]).forEach(exc=>{
+    if(exc.busOwner!=='own') return;
+    const km = Number(exc.km)||0;
+    if(km<=0) return;
+    const label = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+    rows.push({ label, km });
+    total += km;
+  });
+  return { rows, total };
+}
+
 async function pullGuideFinanceLine(tripId, guideName, label){
   const { data } = await sb.from('financial_reports').select('entries').eq('trip_id', tripId).eq('guide_name', guideName).maybeSingle();
   if(!data) return 0;
@@ -4317,7 +4342,7 @@ async function renderReportsSection(){
         <tbody>${[...TRIPS_DEF].sort((a,b)=>a.start-b.start).map(def=>{
           const td = state.trips[def.id];
           const names = td ? td.guides.map(g=>g.name) : [];
-          const guideCell = (n)=> n ? `<span class="reports-guide-link" data-trip="${def.id}" data-guide="${n}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);">${n}</span>` : '—';
+          const guideCell = (n)=> n ? `<span class="reports-guide-link" data-trip="${def.id}" data-guide="${n}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);">${guideDisplayLabel(def.id, n)}</span>` : '—';
           const hasExcursions = td && (td.excursions||[]).length;
           return `<tr>
             <td class="reports-overview-row" data-trip="${def.id}" style="cursor:pointer;">${def.label}</td>
@@ -4422,35 +4447,275 @@ function showTripProfitabilityView(tripId){
   modal.id = 'reportsDrilldownModal';
   modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:800; display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;';
   const def = TRIPS_DEF.find(d=>d.id===tripId);
-  const summary = computeExcursionSummary(tripId);
-  const rowsHtml = summary.rows.map(r=>`<tr>
-    <td style="text-align:left;">${r.excLabel}</td>
-    <td>${fmt(r.collected)} €</td><td>${fmt(r.fromPartner)} €</td><td>${fmt(r.cost)} €</td>
-    <td>${fmt(r.toPartner)} €</td><td>${fmt(r.remain)} €</td><td>${fmt(r.guidesShare)} €</td><td>${fmt(r.officeShare)} €</td>
-  </tr>`).join('') || `<tr><td colspan="8" class="muted">Немає екскурсій.</td></tr>`;
-  modal.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:760px; width:100%; margin:20px 0;">
+  const earningsByGuide = {};
+  const td = state.trips[tripId];
+  (td ? td.excursions||[] : []).forEach(exc=>{
+    const calc = calcExcursion(exc);
+    calc.rowResults.filter(r=>r.isGuide && !r.isTest).forEach(r=>{
+      earningsByGuide[r.person] = (earningsByGuide[r.person]||0) + (Number(r.profit)||0)*GUIDE_SHARE;
+    });
+  });
+  const guideNames = Object.keys(earningsByGuide).sort();
+  const earningsHtml = guideNames.length ? `
+    <table class="report-table" style="font-size:12.5px; width:auto; max-width:320px; margin-top:6px;">
+      <thead><tr><th style="text-align:left;">Гід</th><th>Заробив на екскурсіях</th></tr></thead>
+      <tbody>${guideNames.map(g=>`<tr><td style="text-align:left;">${guideDisplayLabel(tripId, g)}</td><td>${fmt(earningsByGuide[g])} €</td></tr>`).join('')}</tbody>
+    </table>
+  ` : `<p class="report-note">Немає даних.</p>`;
+  modal.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:98vw; width:100%; margin:20px 0;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
       <p class="report-title" style="margin:0;">💰 Прибутковість екскурсій</p>
       <button class="btn btn-ghost btn-small" id="tripProfitCloseBtn">✕ Закрити</button>
     </div>
     <p class="report-note" style="margin-top:0;">${def?def.label:''}</p>
-    <div class="table-scroll"><table class="report-table" style="font-size:12px;">
-      <thead><tr><th style="text-align:left;">Екскурсія</th><th>Зібрано</th><th>Нам платить партнер</th><th>Затрати</th><th>Ми платимо партнеру</th><th>Залишок</th><th>Керівники</th><th>Офіс</th></tr></thead>
-      <tbody>${rowsHtml}
-      <tr style="font-weight:700;"><td style="text-align:left;">РАЗОМ</td><td>${fmt(summary.grand.collected)} €</td><td>${fmt(summary.grand.fromPartner)} €</td><td>${fmt(summary.grand.cost)} €</td><td>${fmt(summary.grand.toPartner)} €</td><td>${fmt(summary.grand.remain)} €</td><td>${fmt(summary.grand.guides)} €</td><td>${fmt(summary.grand.office)} €</td></tr>
-      </tbody>
-    </table></div>
+    <div class="no-print" style="margin-top:6px;">
+      <button class="btn btn-ghost btn-small" id="tripProfitEditToggleBtn">${profitTableEditUnlocked ? '🔒 Заблокувати правки' : '🔓 Дозволити правки (Зібрано / Екскурсовод / Квитки)'}</button>
+      ${profitTableEditUnlocked ? `<span class="muted" style="font-size:12px; margin-left:8px; color:var(--bad, #b91c1c);">Режим правок увімкнено — зміни зберігаються одразу в «Прибутковості».</span>` : ''}
+    </div>
+    <div id="tripProfitDetailWrap" style="margin-top:8px;">${buildTripProfitDetailTableHtml(tripId)}</div>
+
+    <p class="fin-section-title" style="margin-top:16px;">Заробіток наших гідів на екскурсіях</p>
+    ${earningsHtml}
+
+    <details style="margin-top:16px;">
+      <summary style="cursor:pointer; font-weight:700; font-size:14px;">➕ Альтернативний розрахунок (дорога нашого автобуса повертається в офіс)</summary>
+      <p class="report-note" style="margin-top:6px;">Для екскурсій на нашому автобусі — той самий розрахунок, що вище, але до суми «Офіс» додається вартість кілометражу (бо ці кошти зрештою повертає гід через загальний звіт керівника). Для екскурсій на автобусі партнера — без змін.</p>
+      <div id="tripProfitAltWrap" style="margin-top:8px;"></div>
+    </details>
   </div>`;
   document.body.appendChild(modal);
   document.getElementById('tripProfitCloseBtn').addEventListener('click', ()=> modal.remove());
   modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.remove(); });
+  document.getElementById('tripProfitEditToggleBtn').addEventListener('click', ()=>{
+    if(!profitTableEditUnlocked){
+      if(!confirm('Дозволити правки вхідних даних (Зібрано / Екскурсовод / Квитки) прямо тут? Зміни одразу зберігаються в «Прибутковості».')) return;
+    }
+    profitTableEditUnlocked = !profitTableEditUnlocked;
+    showTripProfitabilityView(tripId);
+  });
+  wireTripProfitDetailInputs(tripId);
+  modal.querySelector('details').addEventListener('toggle', function(){
+    if(!this.open) return;
+    document.getElementById('tripProfitAltWrap').innerHTML = buildTripProfitAltTableHtml(tripId);
+    wireTripProfitAltInputs(tripId);
+  }, { once:true });
+}
+
+let profitDetailRerenderTimer;
+function debouncedRerenderProfitDetail(tripId, delay=2000){
+  clearTimeout(profitDetailRerenderTimer);
+  profitDetailRerenderTimer = setTimeout(()=>{
+    const wrap = document.getElementById('tripProfitDetailWrap');
+    if(!wrap) return;
+    wrap.innerHTML = buildTripProfitDetailTableHtml(tripId);
+    wireTripProfitDetailInputs(tripId);
+  }, delay);
+}
+function wireTripProfitDetailInputs(tripId){
+  const wrap = document.getElementById('tripProfitDetailWrap');
+  if(!wrap) return;
+  wrap.querySelectorAll('[data-role="profitEditZibrano"]').forEach(el=> el.addEventListener('input', e=>{
+    const rowId = e.target.dataset.row;
+    const val = parseDecimalInput(e.target.value);
+    const td = state.trips[tripId];
+    for(const exc of (td?td.excursions||[]:[])){
+      const row = (exc.rows||[]).find(r=>r.id===rowId);
+      if(row){ row.zibrano = val; debouncedPersist('excrow:'+rowId, ()=> upsertRow(tripId, exc.id, row)); break; }
+    }
+    debouncedRerenderProfitDetail(tripId);
+  }));
+  wrap.querySelectorAll('[data-role="profitEditQuitky"]').forEach(el=> el.addEventListener('input', e=>{
+    const rowId = e.target.dataset.row;
+    const val = parseDecimalInput(e.target.value);
+    const td = state.trips[tripId];
+    for(const exc of (td?td.excursions||[]:[])){
+      const row = (exc.rows||[]).find(r=>r.id===rowId);
+      if(row){ row.quitky = val; debouncedPersist('excrow:'+rowId, ()=> upsertRow(tripId, exc.id, row)); break; }
+    }
+    debouncedRerenderProfitDetail(tripId);
+  }));
+  wrap.querySelectorAll('[data-role="profitEditGuideFee"]').forEach(el=> el.addEventListener('input', e=>{
+    const excId = e.target.dataset.exc;
+    const val = parseDecimalInput(e.target.value);
+    const td = state.trips[tripId];
+    const exc = (td?td.excursions||[]:[]).find(x=>x.id===excId);
+    if(exc){ exc.guideFee = val; debouncedPersist('exc:'+excId, ()=> upsertExcursion(tripId, exc)); }
+    debouncedRerenderProfitDetail(tripId);
+  }));
+  wrap.querySelectorAll('[data-role="profitEditKm"]').forEach(el=> el.addEventListener('input', e=>{
+    const excId = e.target.dataset.exc;
+    const val = parseDecimalInput(e.target.value);
+    const td = state.trips[tripId];
+    const exc = (td?td.excursions||[]:[]).find(x=>x.id===excId);
+    if(exc){ exc.km = val; debouncedPersist('exc:'+excId, ()=> upsertExcursion(tripId, exc)); }
+    debouncedRerenderProfitDetail(tripId);
+  }));
+  wrap.querySelectorAll('[data-role="profitEditBusRate"]').forEach(el=> el.addEventListener('input', e=>{
+    const excId = e.target.dataset.exc;
+    const val = parseDecimalInput(e.target.value);
+    const td = state.trips[tripId];
+    const exc = (td?td.excursions||[]:[]).find(x=>x.id===excId);
+    if(exc){ exc.busRate = val; debouncedPersist('exc:'+excId, ()=> upsertExcursion(tripId, exc)); }
+    debouncedRerenderProfitDetail(tripId);
+  }));
+  wrap.querySelectorAll('[data-role="profitEditWeOwePartner"]').forEach(el=> el.addEventListener('input', e=>{
+    const excId = e.target.dataset.exc;
+    const val = parseDecimalInput(e.target.value);
+    const td = state.trips[tripId];
+    const exc = (td?td.excursions||[]:[]).find(x=>x.id===excId);
+    if(exc){ exc.toPartnerOverride = val; debouncedPersist('exc:'+excId, ()=> upsertExcursion(tripId, exc)); }
+    debouncedRerenderProfitDetail(tripId);
+  }));
+  wrap.querySelectorAll('[data-role="profitEditPartnerOwesUs"]').forEach(el=> el.addEventListener('input', e=>{
+    const excId = e.target.dataset.exc;
+    const val = parseDecimalInput(e.target.value);
+    const td = state.trips[tripId];
+    const exc = (td?td.excursions||[]:[]).find(x=>x.id===excId);
+    if(exc){ exc.fromPartnerOverride = val; debouncedPersist('exc:'+excId, ()=> upsertExcursion(tripId, exc)); }
+    debouncedRerenderProfitDetail(tripId);
+  }));
+}
+
+let profitAltRerenderTimer;
+function debouncedRerenderProfitAlt(tripId, delay=2000){
+  clearTimeout(profitAltRerenderTimer);
+  profitAltRerenderTimer = setTimeout(()=>{
+    const wrap = document.getElementById('tripProfitAltWrap');
+    if(!wrap) return;
+    wrap.innerHTML = buildTripProfitAltTableHtml(tripId);
+    wireTripProfitAltInputs(tripId);
+  }, delay);
+}
+function wireTripProfitAltInputs(tripId){
+  const wrap = document.getElementById('tripProfitAltWrap');
+  if(!wrap) return;
+  wrap.querySelectorAll('[data-role="profitEditFromPartner"]').forEach(el=> el.addEventListener('input', e=>{
+    const excId = e.target.dataset.exc;
+    const val = parseDecimalInput(e.target.value);
+    const td = state.trips[tripId];
+    const exc = (td?td.excursions||[]:[]).find(x=>x.id===excId);
+    if(exc){ exc.fromPartnerOverride = val; debouncedPersist('exc:'+excId, ()=> upsertExcursion(tripId, exc)); }
+    debouncedRerenderProfitAlt(tripId);
+  }));
+  wrap.querySelectorAll('[data-role="profitEditToPartner"]').forEach(el=> el.addEventListener('input', e=>{
+    const excId = e.target.dataset.exc;
+    const val = parseDecimalInput(e.target.value);
+    const td = state.trips[tripId];
+    const exc = (td?td.excursions||[]:[]).find(x=>x.id===excId);
+    if(exc){ exc.toPartnerOverride = val; debouncedPersist('exc:'+excId, ()=> upsertExcursion(tripId, exc)); }
+    debouncedRerenderProfitAlt(tripId);
+  }));
+}
+
+function buildTripProfitAltTableHtml(tripId){
+  const summary = computeExcursionSummary(tripId);
+  if(!summary.rows.length) return '<p class="report-note">Немає екскурсій.</p>';
+  const ed = profitTableEditUnlocked;
+  const grand = { collected:0, guideFee:0, tickets:0, fromPartner:0, toPartner:0, guidesShare:0, remain:0 };
+  const rowsHtml = summary.rows.map(r=>{
+    const guideFeeCounted = r.isOwnBus ? r.guideFee : 0; // partner's bus already bundles this into "Ми партнеру"
+    const remain = r.collected + r.fromPartner - guideFeeCounted - r.tickets - r.guidesShare - r.toPartner;
+    grand.collected+=r.collected; grand.guideFee+=guideFeeCounted; grand.tickets+=r.tickets;
+    grand.fromPartner+=r.fromPartner; grand.toPartner+=r.toPartner; grand.guidesShare+=r.guidesShare; grand.remain+=remain;
+    const settlementInput = (val, role)=> `<input type="text" inputmode="decimal" class="fin-amount" style="width:100%; font-size:11px; padding:2px 4px;" data-role="${role}" data-exc="${r.excId}" value="${round2(val)}">`;
+    const fromPartnerCell = ed ? settlementInput(r.fromPartner, 'profitEditFromPartner') : `${fmt(r.fromPartner)} €${r.fromPartnerOverridden ? ' ✎' : ''}`;
+    const toPartnerCell = ed ? settlementInput(r.toPartner, 'profitEditToPartner') : `${fmt(r.toPartner)} €${r.toPartnerOverridden ? ' ✎' : ''}`;
+    return `<tr>
+      <td style="text-align:left;">${r.excLabel}</td>
+      <td style="text-align:left; font-size:11px;">${r.isOwnBus ? 'наш' : 'партнерський'}</td>
+      <td>${fmt(r.collected)} €</td><td>${r.isOwnBus ? fmt(guideFeeCounted)+' €' : '—'}</td><td>${fmt(r.tickets)} €</td>
+      <td>${fromPartnerCell}</td><td>${toPartnerCell}</td><td>${fmt(r.guidesShare)} €</td>
+      <td style="font-weight:700;">${fmt(remain)} €</td>
+    </tr>`;
+  }).join('');
+  return `<div class="table-scroll"><table class="report-table" style="font-size:12px;">
+    <thead><tr><th style="text-align:left;">Екскурсія</th><th style="text-align:left;">Автобус</th><th>Зібрано</th><th>Екскурсовод (€)</th><th>Квитки</th><th>Нам партнер</th><th>Ми партнеру</th><th>Гіди (%)</th><th>Залишок</th></tr></thead>
+    <tbody>${rowsHtml}
+    <tr style="font-weight:700;"><td style="text-align:left;">РАЗОМ</td><td></td><td>${fmt(grand.collected)} €</td><td>${fmt(grand.guideFee)} €</td><td>${fmt(grand.tickets)} €</td><td>${fmt(grand.fromPartner)} €</td><td>${fmt(grand.toPartner)} €</td><td>${fmt(grand.guidesShare)} €</td><td>${fmt(grand.remain)} €</td></tr>
+    </tbody>
+  </table></div>`;
+}
+
+function buildTripProfitDetailTableHtml(tripId){
+  const td = state.trips[tripId];
+  if(!td) return '<p class="report-note">Немає даних.</p>';
+  const detailRows = [];
+  let excGroupIdx = -1;
+  (td.excursions||[]).forEach(exc=>{
+    const calc = calcExcursion(exc);
+    const realRows = calc.rowResults.filter(r=>!r.isTest && r.chol>0);
+    if(!realRows.length) return;
+    excGroupIdx++;
+    const excLabel = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+    const guideFeeVal = NO_GUIDE_FEE_EXCURSIONS.includes(exc.name) ? 0 : (Number(exc.guideFee)||0);
+    const isOwnBus = exc.busOwner==='own';
+    let fromPartnerVal = isOwnBus ? calc.partnerShareTotal : 0;
+    let toPartnerVal = isOwnBus ? 0 : calc.guideShareTotal;
+    const fromPartnerOverridden = exc.fromPartnerOverride !== undefined && exc.fromPartnerOverride !== null && exc.fromPartnerOverride !== '';
+    const toPartnerOverridden = exc.toPartnerOverride !== undefined && exc.toPartnerOverride !== null && exc.toPartnerOverride !== '';
+    if(fromPartnerOverridden) fromPartnerVal = Number(exc.fromPartnerOverride)||0;
+    if(toPartnerOverridden) toPartnerVal = Number(exc.toPartnerOverride)||0;
+    realRows.forEach((r,idx)=>{
+      detailRows.push({
+        group: excGroupIdx, excId: exc.id, rowId: r.id,
+        exc: idx===0 ? excLabel : '',
+        bus: idx===0 ? (isOwnBus ? 'наш' : `партнерський`) : '',
+        person: r.label, isGuide: r.isGuide, groupTotal: idx===0 ? calc.totalPeople : '', chol: r.chol,
+        zibrano: r.isGuide ? (Number(r.zibrano)||0) : 0,
+        km: idx===0 ? Number(exc.km)||0 : '', busRate: idx===0 ? Number(exc.busRate)||0 : '',
+        kmInfo: idx===0 ? `(${fmt(calc.busPayment)} €)` : '',
+        isFirst: idx===0, guideFee: idx===0 ? guideFeeVal : '', tickets: calc.ticketsApply ? (Number(r.quitky)||0) : '',
+        ticketsApply: calc.ticketsApply,
+        expenses: idx===0 ? (calc.busPayment+guideFeeVal) : '',
+        perPersonCost: Math.round(r.totalCost*100)/100,
+        weOwePartner: idx===0 ? toPartnerVal : null, partnerOwesUs: idx===0 ? fromPartnerVal : null,
+        fromPartnerOverridden, toPartnerOverridden,
+        profit: r.isGuide ? Math.round(r.profit*100)/100 : null,
+        pct: r.isGuide ? Math.round(r.profit*GUIDE_SHARE*100)/100 : null,
+        office: r.isGuide ? Math.round(r.profit*OFFICE_SHARE*100)/100 : null
+      });
+    });
+  });
+  if(!detailRows.length) return '<p class="report-note">Немає екскурсій.</p>';
+  const ed = profitTableEditUnlocked;
+  const settlementCell = (d, val, role, overridden)=>{
+    if(val===null) return '';
+    if(ed && d.isFirst) return `<input type="text" inputmode="decimal" class="fin-amount" style="width:100%; font-size:10px; padding:2px 4px;" data-role="${role}" data-exc="${d.excId}" value="${round2(val)}">`;
+    return fmt(val)+' €'+(overridden?' ✎':'');
+  };
+  return `<table class="report-table" style="font-size:10.5px; width:100%; table-layout:fixed;">
+    <thead><tr>
+      <th style="text-align:left;">Екскурсія</th><th style="text-align:left;">Автобус</th><th style="text-align:left;">Гід/Партнер</th>
+      <th>Група</th><th>Чол</th><th>Зібрано</th><th>км</th><th>€/км</th><th>Оплата км</th><th>Гід (€)</th><th>Квитки</th>
+      <th>Витрати</th><th>Затрат на гіда</th><th>Ми→парт.</th><th>Парт.→нам</th>
+      <th>Прибуток</th><th>%</th><th>Офіс</th>
+    </tr></thead>
+    <tbody>${detailRows.map(d=>`<tr style="background:${d.group%2===0?'#f5efe0':'#fff'};">
+      <td style="text-align:left;">${d.exc}</td><td style="text-align:left; font-size:9.5px;">${d.bus}</td>
+      <td style="text-align:left;">${d.isGuide ? guideDisplayLabel(tripId, d.person) : d.person}</td><td>${d.groupTotal}</td><td>${d.chol}</td>
+      <td>${(ed && d.isGuide) ? `<input type="text" inputmode="decimal" class="fin-amount" style="width:100%; font-size:10px; padding:2px 4px;" data-role="profitEditZibrano" data-row="${d.rowId}" value="${round2(d.zibrano)}">` : fmt(d.zibrano)+' €'}</td>
+      <td>${d.km===''?'':((ed && d.isFirst) ? `<input type="text" inputmode="decimal" class="fin-amount" style="width:100%; font-size:10px; padding:2px 4px;" data-role="profitEditKm" data-exc="${d.excId}" value="${round2(d.km)}">` : d.km)}</td>
+      <td>${d.busRate===''?'':((ed && d.isFirst) ? `<input type="text" inputmode="decimal" class="fin-amount" style="width:100%; font-size:10px; padding:2px 4px;" data-role="profitEditBusRate" data-exc="${d.excId}" value="${round2(d.busRate)}">` : fmt(d.busRate))}</td>
+      <td style="font-size:9.5px;">${d.kmInfo}</td>
+      <td>${d.guideFee===''?'':((ed && d.isFirst) ? `<input type="text" inputmode="decimal" class="fin-amount" style="width:100%; font-size:10px; padding:2px 4px;" data-role="profitEditGuideFee" data-exc="${d.excId}" value="${round2(d.guideFee)}">` : fmt(d.guideFee)+' €')}</td>
+      <td>${(ed && d.ticketsApply) ? `<input type="text" inputmode="decimal" class="fin-amount" style="width:100%; font-size:10px; padding:2px 4px;" data-role="profitEditQuitky" data-row="${d.rowId}" value="${round2(d.tickets)}">` : (d.tickets===''?'':fmt(d.tickets)+' €')}</td><td>${d.expenses===''?'':fmt(d.expenses)+' €'}</td>
+      <td>${fmt(d.perPersonCost)} €</td><td>${settlementCell(d, d.weOwePartner, 'profitEditWeOwePartner', d.toPartnerOverridden)}</td><td>${settlementCell(d, d.partnerOwesUs, 'profitEditPartnerOwesUs', d.fromPartnerOverridden)}</td>
+      <td>${d.profit===null?'—':fmt(d.profit)+' €'}</td><td>${d.pct===null?'—':fmt(d.pct)+' €'}</td><td>${d.office===null?'—':fmt(d.office)+' €'}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function guideDisplayLabel(tripId, guideName){
+  const td = state.trips[tripId];
+  const guideRecord = td ? (td.guides||[]).find(g=>g.name===guideName) : null;
+  return guideRecord && guideRecord.substituteNote ? `${guideName} (заміна: ${guideRecord.substituteNote})` : guideName;
 }
 
 function computeExcursionSummary(tripId){
   const td = state.trips[tripId];
-  if(!td) return { rows: [], grand: { collected:0, fromPartner:0, cost:0, toPartner:0, remain:0, guides:0, office:0 } };
+  if(!td) return { rows: [], grand: { collected:0, fromPartner:0, guideFee:0, tickets:0, cost:0, toPartner:0, remain:0, guides:0, office:0 } };
   const rows = [];
-  const grand = { collected:0, fromPartner:0, cost:0, toPartner:0, remain:0, guides:0, office:0 };
+  const grand = { collected:0, fromPartner:0, guideFee:0, tickets:0, cost:0, toPartner:0, remain:0, guides:0, office:0 };
   (td.excursions||[]).forEach(exc=>{
     const calc = calcExcursion(exc);
     const realRows = calc.rowResults.filter(r=>!r.isTest);
@@ -4459,14 +4724,21 @@ function computeExcursionSummary(tripId){
     const guideFeeVal = NO_GUIDE_FEE_EXCURSIONS.includes(exc.name) ? 0 : (Number(exc.guideFee)||0);
     const ticketsTotal = calc.ticketsApply ? realRows.reduce((s,r)=>s+(Number(r.quitky)||0),0) : 0;
     const collected = realRows.filter(r=>r.isGuide).reduce((s,r)=>s+(Number(r.zibrano)||0),0);
-    const fromPartner = exc.busOwner==='own' ? calc.partnerShareTotal : 0;
-    const toPartner = exc.busOwner==='own' ? 0 : calc.guideShareTotal;
-    const cost = guideFeeVal + ticketsTotal; // road km deliberately excluded — already covered by the guide's own overall trip mileage report
+    let fromPartner = exc.busOwner==='own' ? calc.partnerShareTotal : 0;
+    let toPartner = exc.busOwner==='own' ? 0 : calc.guideShareTotal;
+    const fromPartnerOverridden = exc.fromPartnerOverride !== undefined && exc.fromPartnerOverride !== null && exc.fromPartnerOverride !== '';
+    const toPartnerOverridden = exc.toPartnerOverride !== undefined && exc.toPartnerOverride !== null && exc.toPartnerOverride !== '';
+    if(fromPartnerOverridden) fromPartner = Number(exc.fromPartnerOverride)||0;
+    if(toPartnerOverridden) toPartner = Number(exc.toPartnerOverride)||0;
+    const cost = guideFeeVal + ticketsTotal; // road km deliberately excluded — either covered by our own overall trip mileage, or already reflected in the partner settlement above
     const remain = collected + fromPartner - cost - toPartner;
-    const guidesShare = realRows.reduce((s,r)=> s + (r.isGuide ? r.profit : (0 - r.totalCost)), 0);
+    const guidesShare = realRows.filter(r=>r.isGuide).reduce((s,r)=> s + r.profit, 0) * GUIDE_SHARE; // "Керівники" = actual 10% guides receive, not the full 100% profit pool
     const officeShare = remain - guidesShare;
-    rows.push({ excLabel, collected, fromPartner, cost, toPartner, remain, guidesShare, officeShare });
-    grand.collected+=collected; grand.fromPartner+=fromPartner; grand.cost+=cost;
+    const isOwnBus = exc.busOwner==='own';
+    const partners = realRows.filter(r=>!r.isGuide && r.chol>0).map(r=>({ name:r.label, count:r.chol }));
+    rows.push({ excId: exc.id, excLabel, collected, fromPartner, guideFee:guideFeeVal, tickets:ticketsTotal, cost, toPartner, remain, guidesShare, officeShare,
+      isOwnBus, busRate: Number(exc.busRate)||0, km: Number(exc.km)||0, roadCost: calc.busPayment, partners, fromPartnerOverridden, toPartnerOverridden });
+    grand.collected+=collected; grand.fromPartner+=fromPartner; grand.guideFee+=guideFeeVal; grand.tickets+=ticketsTotal; grand.cost+=cost;
     grand.toPartner+=toPartner; grand.remain+=remain; grand.guides+=guidesShare; grand.office+=officeShare;
   });
   return { rows, grand };
@@ -4479,7 +4751,7 @@ async function showGuideSingleView(tripId, guideName, target){
   modal.id = 'reportsDrilldownModal';
   modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:800; display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;';
   const def = TRIPS_DEF.find(d=>d.id===tripId);
-  const title = target==='fin' ? `💵 Фінансовий звіт — ${guideName}` : `📋 Список збору коштів — ${guideName}`;
+  const title = target==='fin' ? `💵 Фінансовий звіт — ${guideDisplayLabel(tripId, guideName)}` : `📋 Список збору коштів — ${guideDisplayLabel(tripId, guideName)}`;
   modal.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:560px; width:100%; margin:20px 0;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
       <p class="report-title" style="margin:0;">${title}</p>
@@ -4677,7 +4949,7 @@ async function renderReportsGuideDrilldown(tripId){
     ` : '';
 
     return `<details style="margin-top:10px; border-top:1px solid var(--line); padding-top:8px;" id="guide-block-${tripId}-${safePathSlug(g)}">
-      <summary style="cursor:pointer; font-weight:700; font-size:15px;">${issues.length ? '⚠ ' : ''}${g}${issues.length ? ` <span class="profit-neg" style="font-weight:400; font-size:12.5px;">— ${issues.join(', ')}</span>` : ''}</summary>
+      <summary style="cursor:pointer; font-weight:700; font-size:15px;">${issues.length ? '⚠ ' : ''}${guideDisplayLabel(tripId, g)}${issues.length ? ` <span class="profit-neg" style="font-weight:400; font-size:12.5px;">— ${issues.join(', ')}</span>` : ''}</summary>
       <p style="font-weight:600; margin:10px 0 4px;" id="guide-list-${tripId}-${safePathSlug(g)}">📋 Список збору коштів на екскурсії</p>
       ${collectionHtml}
       <p style="font-weight:600; margin:14px 0 4px;" id="guide-fin-${tripId}-${safePathSlug(g)}">💵 Фінансовий звіт</p>
@@ -4744,11 +5016,13 @@ function exportExcursionProfitabilityToExcel(tripId){
     });
 
     const collected = realRows.filter(r=>r.isGuide).reduce((s,r)=>s+(Number(r.zibrano)||0),0);
-    const fromPartner = exc.busOwner==='own' ? calc.partnerShareTotal : 0;
-    const toPartner = exc.busOwner==='own' ? 0 : calc.guideShareTotal;
+    let fromPartner = exc.busOwner==='own' ? calc.partnerShareTotal : 0;
+    let toPartner = exc.busOwner==='own' ? 0 : calc.guideShareTotal;
+    if(exc.fromPartnerOverride !== undefined && exc.fromPartnerOverride !== null && exc.fromPartnerOverride !== '') fromPartner = Number(exc.fromPartnerOverride)||0;
+    if(exc.toPartnerOverride !== undefined && exc.toPartnerOverride !== null && exc.toPartnerOverride !== '') toPartner = Number(exc.toPartnerOverride)||0;
     const cost = guideFeeVal + ticketsTotal; // road km deliberately excluded — already covered by the guide's own overall trip mileage report
     const remain = collected + fromPartner - cost - toPartner;
-    const guidesShare = realRows.reduce((s,r)=> s + (r.isGuide ? r.profit : (0 - r.totalCost)), 0);
+    const guidesShare = realRows.filter(r=>r.isGuide).reduce((s,r)=> s + r.profit, 0) * GUIDE_SHARE; // "Керівники" = actual 10% guides receive, not the full 100% profit pool
     const officeShare = remain - guidesShare;
 
     summaryRows.push([excLabel, fmt(collected), fmt(fromPartner), fmt(cost), fmt(toPartner), fmt(remain), fmt(guidesShare), fmt(officeShare)]);
@@ -4917,6 +5191,15 @@ function renderManagerReport(report, officeTotal, missing){
     const isOwnBus = !!e.ownBus;
     const isHotel = e.label.startsWith('Готель');
     const isPulled = !!e.guide && !!e.sourceLabel && e.sourceLabel!=='АвтобусФіксовано';
+    let ownBusBreakdownHtml = '';
+    if(isOwnBus){
+      const totalKm = Math.max(0, (e.odoStart||e.odoEnd) ? (e.odoEnd||0)-(e.odoStart||0) : 0);
+      const excInfo = computeOwnBusExcursionKm(currentTripId);
+      const cleanKm = Math.max(0, totalKm - excInfo.total);
+      ownBusBreakdownHtml = `<div class="no-print" style="width:100%; font-size:11px; color:var(--ink-soft); margin-top:2px;">
+        Загальний кілометраж: ${totalKm} км · Екскурсійний (вже враховано в прибутку з екскурсій): ${excInfo.total} км${excInfo.rows.length ? ' ('+excInfo.rows.map(r=>`${r.label} — ${r.km} км`).join(', ')+')' : ''} · <strong>Чисте коло (оплачується тут): ${cleanKm} км</strong>
+      </div>`;
+    }
     return `<div class="fin-row" style="flex-wrap:wrap;">
       <input type="text" class="fin-label-input" data-role="mrExpenseLabel" data-id="${e.id}" value="${e.label}">
       ${isOwnBus ? `
@@ -4925,10 +5208,11 @@ function renderManagerReport(report, officeTotal, missing){
         <span class="muted" style="font-size:11px;">€/км:</span><input type="text" inputmode="decimal" step="0.1" class="fin-amount" style="width:60px;" data-role="mrRate" data-id="${e.id}" value="${e.rate||1.6}">
       ` : ''}
       ${isPulled ? `<button class="edit-toggle-btn no-print" data-role="mrRefreshPulled" data-id="${e.id}" title="Підтягнути актуальну суму з фінзвіту гіда (${e.sourceLabel})" style="font-size:12px;">🔄</button>` : ''}
-      <input type="text" inputmode="decimal" class="fin-amount" data-role="mrExpenseAmount" data-id="${e.id}" value="${e.amount}" ${isOwnBus?'disabled title="Рахується з одометра"':''}> €
+      <input type="text" inputmode="decimal" class="fin-amount" data-role="mrExpenseAmount" data-id="${e.id}" value="${e.amount}" ${isOwnBus?'disabled title="Рахується з чистого кола (без екскурсійних км)"':''}> €
       ${isHotel ? `<input type="file" accept=".xlsx,.xls,.pdf" data-role="mrExpenseFile" data-id="${e.id}" style="width:110px; font-size:11px;">
         ${e.file_name ? `<button class="btn btn-ghost btn-small no-print" data-role="mrViewFile" data-path="${e.file_path}">📎 ${e.file_name.length>14?e.file_name.slice(0,12)+'…':e.file_name}</button>` : ''}` : ''}
       <button class="row-del no-print" data-role="mrExpenseDelete" data-id="${e.id}" title="Видалити">✕</button>
+      ${ownBusBreakdownHtml}
     </div>`;
   };
 
@@ -5072,7 +5356,10 @@ function renderManagerReport(report, officeTotal, missing){
     if(role==='mrOdoStart') ex.odoStart = val;
     if(role==='mrOdoEnd') ex.odoEnd = val;
     if(role==='mrRate') ex.rate = val;
-    ex.amount = Math.max(0, (ex.odoEnd||0)-(ex.odoStart||0)) * (ex.rate||1.6);
+    const totalKm = Math.max(0, (ex.odoEnd||0)-(ex.odoStart||0));
+    const excKm = computeOwnBusExcursionKm(report.trip_id).total;
+    const cleanKm = Math.max(0, totalKm - excKm);
+    ex.amount = cleanKm * (ex.rate||1.6);
     persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
     renderManagerReport(report, officeTotal);
   }));
@@ -7877,6 +8164,7 @@ const INFOLIST_TEMPLATE_B64 = "UEsDBAoAAAAAAFCL81wAAAAAAAAAAAAAAAAFAAAAd29yZC9QS
     });
     document.getElementById('pkgPreviewSeatingBtn').addEventListener('click', ()=> downloadSeatingChartXlsx(guideName));
     document.getElementById('pkgPreviewCloseBtn').addEventListener('click', ()=> panel.remove());
+    panel.addEventListener('click', (e)=>{ if(e.target===panel) panel.remove(); });
   }
 
   function printGuidePackage(guideName){
