@@ -74,6 +74,7 @@
   .section-tab:hover{box-shadow:0 3px 10px rgba(0,0,0,.12); filter:brightness(0.97);}
   .section-tab.active-tab{background:var(--ochre); color:#fff; border-color:var(--ochre);}
   .section-tab.active-tab:hover{background:var(--ochre); color:#fff; border-color:var(--ochre);}
+  .tp-tab-done{background:#ddd3bc !important; color:#4a4033 !important; border-color:#c8bb9c !important;}
 
   .tp-readonly{ position:relative; }
   .tp-readonly button:not(.tp-view-only-ok),
@@ -3327,11 +3328,19 @@ document.getElementById('addExtraTouristBtn').addEventListener('click', async ()
 function parseBulkDate(raw){
   if(!raw) return null;
   raw = raw.trim();
+  let y, mo, d;
   let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/); // YYYY-MM-DD
-  if(m) return raw;
-  m = raw.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/); // DD.MM.YYYY or DD/MM/YYYY
-  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  return null;
+  if(m){ y=+m[1]; mo=+m[2]; d=+m[3]; }
+  else {
+    m = raw.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/); // DD.MM.YYYY or DD/MM/YYYY
+    if(m){ d=+m[1]; mo=+m[2]; y=+m[3]; }
+    else return null;
+  }
+  // Guard against dates that don't actually exist (e.g. "31.11.1960" — November only has 30 days),
+  // which would otherwise crash the whole import when Postgres rejects the row.
+  const dt = new Date(Date.UTC(y, mo-1, d));
+  if(dt.getUTCFullYear()!==y || dt.getUTCMonth()!==mo-1 || dt.getUTCDate()!==d) return null;
+  return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 function excelSerialToDate(serial){
   const utc_days = Math.floor(serial - 25569);
@@ -6182,12 +6191,16 @@ async function importTripPrepFile(file, tripId, targetHotel){
     const city = keyCity ? String(r[keyCity]||'').trim() : '';
     let phoneVal = keyPhone ? String(r[keyPhone]||'').trim() : '';
     if(phoneVal) lastPhone = phoneVal; else phoneVal = lastPhone;
+    const rawBirth = keyBirth ? r[keyBirth] : null;
+    const birthDateParsed = keyBirth ? normalizeDateValue(rawBirth) : null;
+    const birthRawNonEmpty = rawBirth !== null && rawBirth !== undefined && String(rawBirth).trim() !== '';
     return {
       row_order: idx,
       booking_number: booking,
       connected_group: connected,
       full_name: keyName ? String(r[keyName]||'').trim() : '',
-      birth_date: keyBirth ? normalizeDateValue(r[keyBirth]) : null,
+      birth_date: birthDateParsed,
+      _birth_invalid: birthRawNonEmpty && !birthDateParsed,
       passport: keyPassport ? String(r[keyPassport]||'').trim() : '',
       agency: keyAgency ? String(r[keyAgency]||'').trim() : '',
       insurance: keyInsurance ? parseDecimalInput(r[keyInsurance]) : 0,
@@ -6262,7 +6275,7 @@ async function importTripPrepFile(file, tripId, targetHotel){
   if(delErr){ alert('Помилка при очищенні старих даних: '+friendlyErrorMessage(delErr)); return false; }
   const chunkSize = 200;
   for(let i=0;i<parsed.length;i+=chunkSize){
-    const chunk = parsed.slice(i,i+chunkSize).map(r=>({ trip_id: tripId, ...r }));
+    const chunk = parsed.slice(i,i+chunkSize).map(r=>{ const { _birth_invalid, ...rest } = r; return { trip_id: tripId, ...rest }; });
     const { error } = await sb.from('trip_prep_tourists').insert(chunk);
     if(error){ alert('Помилка імпорту: '+friendlyErrorMessage(error)); return false; }
   }
@@ -6271,7 +6284,15 @@ async function importTripPrepFile(file, tripId, targetHotel){
   const cityWarning = missingCity.length
     ? `\n\n⚠️ У ${missingCity.length} чол. не вказано місце посадки (лишено порожнім, нічого не вгадано): ${missingCity.slice(0,8).map(r=>r.full_name).join(', ')}${missingCity.length>8?` та ще ${missingCity.length-8}…`:''}. Перевір і встав вручну в списку.`
     : '';
-  alert(`Імпортовано ${parsed.length} туристів, ${groupCount} непорушних груп.${cityWarning}`);
+  const invalidBirth = keyBirth ? parsed.filter(r=>r.full_name && r._birth_invalid) : [];
+  const invalidBirthWarning = invalidBirth.length
+    ? `\n\n⚠️ У ${invalidBirth.length} чол. дата народження в файлі — НЕІСНУЮЧА дата (наприклад, 31 число в місяці, де його нема) і тому не була імпортована: ${invalidBirth.slice(0,8).map(r=>r.full_name).join(', ')}${invalidBirth.length>8?` та ще ${invalidBirth.length-8}…`:''}. Перевір і виправ у файлі чи вручну в списку.`
+    : '';
+  const missingBirth = keyBirth ? parsed.filter(r=>r.full_name && !r.birth_date && !r._birth_invalid) : [];
+  const birthWarning = missingBirth.length
+    ? `\n\n⚠️ У ${missingBirth.length} чол. дата народження не вказана: ${missingBirth.slice(0,8).map(r=>r.full_name).join(', ')}${missingBirth.length>8?` та ще ${missingBirth.length-8}…`:''}. Перевір і встав вручну в списку.`
+    : '';
+  alert(`Імпортовано ${parsed.length} туристів, ${groupCount} непорушних груп.${cityWarning}${invalidBirthWarning}${birthWarning}`);
   return true;
 }
 
@@ -6329,15 +6350,22 @@ function renderTripPrepView(){
   const def = TRIPS_DEF.find(d=>d.id===currentTripId);
   const isCompleted = def && new Date() > def.end;
   const lockThisView = isCompleted && tripPrepView !== 'docs';
+  const overviewDone = !!(tripPrepData && tripPrepData.tourists && tripPrepData.tourists.length);
+  const groupsForDoneCheck = overviewDone ? tripPrepGroups() : {};
+  const groupKeysForDoneCheck = Object.keys(groupsForDoneCheck);
+  const busesDone = groupKeysForDoneCheck.length>0 && groupKeysForDoneCheck.every(gk=> groupsForDoneCheck[gk][0].assigned_bus || ['самостійно','self','own','власний доїзд',"власний під'їзд",'свій доїзд','самостійний доїзд'].includes(String(groupsForDoneCheck[gk][0].pickup_city||'').trim().toLowerCase()));
+  const hotelDone = Object.values(hbDatabase||{}).some(perHotel=> Object.values(perHotel||{}).some(perPeriod=> perPeriod && Object.keys(perPeriod).length));
+  const tabClass = (view, done)=> tripPrepView===view ? 'active-tab' : (done ? 'tp-tab-done' : '');
   const topBanner = `<div style="padding:8px 14px; background:${lockThisView?'#7c2d12':'var(--ochre)'}; color:#fff; border-radius:10px; font-weight:700; text-align:center; font-size:14px; margin-bottom:12px;">
     📅 Заїзд: ${def ? def.label : 'не обрано'}${lockThisView ? ' · 🔒 заїзд завершено — тільки перегляд' : ''}
   </div>`;
   const navHtml = `${topBanner}
-  <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;">
-    <button class="btn btn-ghost btn-small tp-view-only-ok ${tripPrepView==='overview'?'active-tab':''}" data-tpview="overview">Огляд і імпорт</button>
-    <button class="btn btn-ghost btn-small tp-view-only-ok ${tripPrepView==='rooms'?'active-tab':''}" data-tpview="rooms">Готель</button>
-    <button class="btn btn-ghost btn-small tp-view-only-ok ${tripPrepView==='buses'?'active-tab':''}" data-tpview="buses">Автобуси</button>
+  <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; align-items:center;">
+    <button class="btn btn-ghost btn-small tp-view-only-ok ${tabClass('overview', overviewDone)}" data-tpview="overview">${overviewDone?'✓ ':''}Огляд і імпорт</button>
+    <button class="btn btn-ghost btn-small tp-view-only-ok ${tabClass('rooms', hotelDone)}" data-tpview="rooms">${hotelDone?'✓ ':''}Готель</button>
+    <button class="btn btn-ghost btn-small tp-view-only-ok ${tabClass('buses', busesDone)}" data-tpview="buses">${busesDone?'✓ ':''}Автобуси</button>
     <button class="btn btn-ghost btn-small tp-view-only-ok ${tripPrepView==='docs'?'active-tab':''}" data-tpview="docs">Документи</button>
+    <button class="btn btn-primary btn-small" id="tpHandoverToGuidesBtn" style="margin-left:auto;" title="Копіює розподілених по автобусах туристів у робочий список кожного гіда (без дублів). Роби це, коли список групи по автобусах готовий.">📤 Передати гіду</button>
   </div>
   <div id="tripPrepContent" class="${lockThisView?'tp-readonly':''}"></div>
   <div class="no-print" style="position:sticky; bottom:0; margin-top:20px; padding:10px 14px; background:${lockThisView?'#7c2d12':'var(--ochre)'}; color:#fff; border-radius:10px; font-weight:700; text-align:center; font-size:14px; box-shadow:0 -2px 8px rgba(0,0,0,.15);">
@@ -6345,6 +6373,38 @@ function renderTripPrepView(){
   </div>`;
   block.innerHTML = navHtml;
   block.querySelectorAll('[data-tpview]').forEach(el=> el.addEventListener('click', ()=>{ tripPrepView = el.dataset.tpview; renderTripPrepView(); }));
+  const handoverBtn = document.getElementById('tpHandoverToGuidesBtn');
+  if(handoverBtn) handoverBtn.addEventListener('click', async ()=>{
+    handoverBtn.disabled = true; handoverBtn.textContent = 'Передаю…';
+    try{
+      const busNames = getTripData(currentTripId).guides.map(g=>g.name);
+      let totalAdded = 0;
+      for(const guideName of busNames){
+        const { data: baseTourists, error } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', currentTripId).eq('assigned_bus', guideName);
+        if(error || !baseTourists || !baseTourists.length) continue;
+        const { data: existingTourists } = await sb.from('tourists').select('first_name,last_name').eq('trip_id', currentTripId).eq('guide_name', guideName);
+        const existingNames = new Set((existingTourists||[]).map(t=>(t.last_name+' '+t.first_name).trim().toLowerCase()));
+        const toInsert = [];
+        baseTourists.forEach(t=>{
+          const fullName = (t.full_name||'').trim();
+          if(!fullName) return;
+          const parts = fullName.split(/\s+/);
+          const lastName = parts[0] || '';
+          const firstName = parts.slice(1).join(' ') || '';
+          const key = (lastName+' '+firstName).trim().toLowerCase();
+          if(existingNames.has(key)) return;
+          toInsert.push({ trip_id: currentTripId, guide_name: guideName, first_name: firstName, last_name: lastName, birth_date: t.birth_date||null, passport_data: t.passport||'' });
+        });
+        if(!toInsert.length) continue;
+        const { error: insErr } = await sb.from('tourists').insert(toInsert);
+        if(insErr){ alert(`Не вдалося передати список гіду ${guideName}: ` + friendlyErrorMessage(insErr)); continue; }
+        totalAdded += toInsert.length;
+      }
+      hbShowToast(totalAdded ? `✅ Передано ${totalAdded} чол. по всіх гідах` : 'Усі вже передані — новеньких немає.');
+    } finally {
+      handoverBtn.disabled = false; handoverBtn.textContent = '📤 Передати гіду';
+    }
+  });
   if(tripPrepView==='overview') renderTripPrepOverview();
   else if(tripPrepView==='rooms') renderTripPrepRooms();
   else if(tripPrepView==='buses') renderTripPrepBuses();
@@ -6680,6 +6740,9 @@ async function renderTripPrepBuses(){
   const tripData = getTripData(currentTripId);
   const busNames = tripData.guides.map(g=>g.name);
   const busDef = TRIPS_DEF.find(d=>d.id===currentTripId);
+  const nameWithComment = (m)=> m.comment
+    ? `<span title="💬 ${m.comment.replace(/"/g,'&quot;')}" style="text-decoration:underline dotted; text-decoration-color:var(--ochre, #c17f3e); cursor:help;">${m.full_name}</span>`
+    : m.full_name;
 
   if(!busNames.length){
     content.innerHTML = `<p class="report-note">Спочатку признач гідів цього заїзду у вкладці "Прибутковість".</p>`;
@@ -6711,7 +6774,7 @@ async function renderTripPrepBuses(){
     }
   });
 
-  const isSelfArriving = (m)=> ['самостійно','self','own'].includes(String(m.pickup_city||'').trim().toLowerCase());
+  const isSelfArriving = (m)=> ['самостійно','self','own','власний доїзд','власний під\'їзд','свій доїзд','самостійний доїзд'].includes(String(m.pickup_city||'').trim().toLowerCase());
   const selfArrivingGroups = groupKeys.filter(gk=> groups[gk].every(isSelfArriving));
   const unassigned = groupKeys.filter(gk=> !groups[gk][0].assigned_bus && !selfArrivingGroups.includes(gk));
   const assigned = groupKeys.filter(gk=> groups[gk][0].assigned_bus);
@@ -6769,7 +6832,7 @@ async function renderTripPrepBuses(){
 
     return `<div class="fin-row" style="flex-wrap:wrap; background:${bg}; border:${border}; border-radius:8px; padding:8px; margin-bottom:6px; flex-direction:column; align-items:stretch;">
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-        <span class="fin-label" style="min-width:220px;">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(m=>m.full_name).join(', ')} <span class="muted">(${members.length} ос.${city ? ', '+city : ''})</span></span>
+        <span class="fin-label" style="min-width:220px;">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} <span class="muted">(${members.length} ос.${city ? ', '+city : ''})</span></span>
         <select data-role="tpBusSelect" data-group="${gk}">
           ${busNames.map(b=>`<option value="${b}" ${suggestion===b?'selected':''}>${b} (зараз ${busCount[b]} ос.)</option>`).join('')}
         </select>
@@ -6795,7 +6858,7 @@ async function renderTripPrepBuses(){
         const mismatch = busCorridor && memberColor!=='none' && memberColor!==busCorridor;
         const cities = [...new Set(members.map(m=>m.pickup_city).filter(Boolean))].join(', ');
         return `<div class="fin-row" style="flex-wrap:wrap;">
-        <span class="fin-label">${groups[gk].map(m=>m.full_name).join(', ')}${cities ? ` <span class="muted">(${cities})</span>` : ''}</span>
+        <span class="fin-label">${groups[gk].map(nameWithComment).join(', ')}${cities ? ` <span class="muted">(${cities})</span>` : ''}</span>
         <select data-role="tpBusTransferSelect" data-group="${gk}">
           ${busNames.filter(bn=>bn!==b).map(bn=>`<option value="${bn}">→ ${bn}</option>`).join('')}
         </select>
@@ -6863,14 +6926,13 @@ async function renderTripPrepBuses(){
     const members = groups[gk];
     const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean))].join(', ');
     return `<div class="fin-row" style="background:#f3f4f6; border:1px dashed #9ca3af; border-radius:8px; padding:8px; margin-bottom:6px;">
-      <span class="fin-label">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(m=>m.full_name).join(', ')} <span class="muted">(${members.length} ос.)</span> · 🚶 самостійно</span>
+      <span class="fin-label">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} <span class="muted">(${members.length} ос.)</span> · 🚶 самостійно</span>
     </div>`;
   }).join('') || `<p class="report-note">Немає.</p>`;
 
   content.innerHTML = `
     <div class="step-block no-print" style="margin-bottom:14px;">
-      <button class="btn btn-primary btn-small" id="tpHandoverToGuidesBtn">📤 Передати гіду</button>
-      <p class="report-note" style="margin-top:6px;">Копіює розподілених по автобусах туристів у робочий список кожного гіда (без дублів — вже додані пропускаються). Роби це, коли список групи по автобусах готовий.</p>
+      <p class="report-note" style="margin:0;">«📤 Передати гіду» (кнопка вгорі, поруч із вкладками) копіює розподілених по автобусах туристів у робочий список кожного гіда (без дублів — вже додані пропускаються). Роби це, коли список групи по автобусах готовий.</p>
     </div>
     ${configPanelHtml}
     <p class="fin-section-title">Розподілені по автобусах</p>
@@ -6881,38 +6943,6 @@ async function renderTripPrepBuses(){
     <p class="fin-section-title">🚶 Дістаються самостійно (${selfArrivingGroups.length}, без автобуса)</p>
     ${selfArrivingHtml}
   `;
-
-  const handoverBtn = document.getElementById('tpHandoverToGuidesBtn');
-  if(handoverBtn) handoverBtn.addEventListener('click', async ()=>{
-    handoverBtn.disabled = true; handoverBtn.textContent = 'Передаю…';
-    try{
-      let totalAdded = 0;
-      for(const guideName of busNames){
-        const { data: baseTourists, error } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', currentTripId).eq('assigned_bus', guideName);
-        if(error || !baseTourists || !baseTourists.length) continue;
-        const { data: existingTourists } = await sb.from('tourists').select('first_name,last_name').eq('trip_id', currentTripId).eq('guide_name', guideName);
-        const existingNames = new Set((existingTourists||[]).map(t=>(t.last_name+' '+t.first_name).trim().toLowerCase()));
-        const toInsert = [];
-        baseTourists.forEach(t=>{
-          const fullName = (t.full_name||'').trim();
-          if(!fullName) return;
-          const parts = fullName.split(/\s+/);
-          const lastName = parts[0] || '';
-          const firstName = parts.slice(1).join(' ') || '';
-          const key = (lastName+' '+firstName).trim().toLowerCase();
-          if(existingNames.has(key)) return;
-          toInsert.push({ trip_id: currentTripId, guide_name: guideName, first_name: firstName, last_name: lastName, birth_date: t.birth_date||null, passport_data: t.passport||'' });
-        });
-        if(!toInsert.length) continue;
-        const { error: insErr } = await sb.from('tourists').insert(toInsert);
-        if(insErr){ alert(`Не вдалося передати список гіду ${guideName}: ` + friendlyErrorMessage(insErr)); continue; }
-        totalAdded += toInsert.length;
-      }
-      hbShowToast(totalAdded ? `✅ Передано ${totalAdded} чол. по всіх гідах` : 'Усі вже передані — новеньких немає.');
-    } finally {
-      handoverBtn.disabled = false; handoverBtn.textContent = '📤 Передати гіду';
-    }
-  });
 
   content.querySelectorAll('[data-role="tpSaveBusConfig"]').forEach(el=> el.addEventListener('click', async e=>{
     const b = e.target.dataset.bus;
