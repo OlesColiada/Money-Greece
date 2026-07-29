@@ -507,7 +507,7 @@
 
   <div id="tourSection">
     <div class="step-block manager-only" id="tourSectionGuidePick" style="display:none;">
-      <p class="step-title" style="margin:0 0 8px;">Група якого гіда</p>
+      <p class="step-title" style="margin:0 0 8px;">Гіди цього заїзду — обери, чий список подивитись</p>
       <div class="guide-chips" id="tourSectionGuideChips"></div>
     </div>
     <div class="no-print manager-only" id="tourSectionSubnav" style="display:none; gap:6px; flex-wrap:wrap; margin-bottom:16px;">
@@ -575,7 +575,7 @@
   <div id="touristSection" style="display:none;">
 
     <div class="step-block no-print" id="guideFilterBlock" style="display:none;">
-      <p class="step-title">Група якого гіда</p>
+      <p class="step-title">Гіди цього заїзду — обери, чий список подивитись</p>
       <div class="guide-chips" id="guideFilterChips"></div>
     </div>
 
@@ -2654,7 +2654,7 @@ function renderTourSectionGuideChips(){
     const isActive = tourSectionGuideChosen && currentTourGuideName === g.name;
     chip.className = 'btn btn-ghost btn-small' + (isActive ? ' active-tab' : '');
     if(isActive){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
-    chip.textContent = `Заїзд: ${TRIPS_DEF.find(d=>d.id===currentTripId)?.label || ''} ${g.name}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
+    chip.textContent = g.name + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
     chip.addEventListener('click', ()=>{
       currentTourGuideName = g.name;
       touristGuideFilter = g.name;
@@ -4294,6 +4294,10 @@ async function renderReportsSection(){
 
   await ensureAllTripsLoaded();
 
+  const { data: allFinReports } = await sb.from('financial_reports').select('trip_id,guide_name,submitted,accepted');
+  const finStatusByTripGuide = {};
+  (allFinReports||[]).forEach(r=>{ finStatusByTripGuide[r.trip_id+'|'+r.guide_name] = { submitted: !!r.submitted, accepted: !!r.accepted }; });
+
   // ---- Зведена таблиця прибутковості по екскурсіям (весь сезон) ----
   const byExcName = {};
   TRIPS_DEF.forEach(def=>{
@@ -4342,7 +4346,13 @@ async function renderReportsSection(){
         <tbody>${[...TRIPS_DEF].sort((a,b)=>a.start-b.start).map(def=>{
           const td = state.trips[def.id];
           const names = td ? td.guides.map(g=>g.name) : [];
-          const guideCell = (n)=> n ? `<span class="reports-guide-link" data-trip="${def.id}" data-guide="${n}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);">${guideDisplayLabel(def.id, n)}</span>` : '—';
+          const guideCell = (n)=>{
+            if(!n) return '—';
+            const status = finStatusByTripGuide[def.id+'|'+n];
+            const icon = status && status.accepted ? '🔒 ' : status && status.submitted ? '⏳ ' : '⚠️ ';
+            const title = status && status.accepted ? 'Фінзвіт прийнято' : status && status.submitted ? 'Відправлено, ще не прийнято' : 'Фінзвіт ще не відправлено';
+            return `<span class="reports-guide-link" data-trip="${def.id}" data-guide="${n}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);" title="${title}">${icon}${guideDisplayLabel(def.id, n)}</span>`;
+          };
           const hasExcursions = td && (td.excursions||[]).length;
           return `<tr>
             <td class="reports-overview-row" data-trip="${def.id}" style="cursor:pointer;">${def.label}</td>
