@@ -5738,6 +5738,7 @@ function formatUkrDateAsTyped(value){
 
 function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides, partnerGroups){
   const rows = [['№ п/п', 'Name Surname', 'Date of birth', 'Passport', 'Група']];
+  const boldRowIdx = []; // 0-indexed data rows (excluding header) that should render bold, if the writer supports it
   let n = 1;
   let firstSegment = true;
   const addSeparator = ()=>{ if(!firstSegment) rows.push(['','','','','']); firstSegment = false; };
@@ -5745,7 +5746,10 @@ function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides, p
     if(!groups[g].length) return;
     addSeparator();
     groups[g].forEach(r=>{
-      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'', g]);
+      const isGuideSelf = r.kind==='guide';
+      const nameLabel = `${r.firstName} ${r.lastName}`.trim() + (isGuideSelf ? ' (guide)' : '');
+      if(isGuideSelf) boldRowIdx.push(rows.length);
+      rows.push([n++, nameLabel, formatDateGreek(r.birthDate), r.passport||'', g]);
     });
   });
   Object.keys(partnerGroups||{}).sort().forEach(p=>{
@@ -5758,16 +5762,26 @@ function exportFerryManifestToExcel(tripLabel, groups, drivers, foreignGuides, p
   if((foreignGuides||[]).length){
     addSeparator();
     foreignGuides.forEach(r=>{
-      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'', 'гіди інших компаній']);
+      boldRowIdx.push(rows.length);
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim()+' (guide)', formatDateGreek(r.birthDate), r.passport||'', 'гіди інших компаній']);
     });
   }
   if(drivers.length){
     addSeparator();
     drivers.forEach(r=>{
-      rows.push([n++, `${r.firstName} ${r.lastName}`.trim(), formatDateGreek(r.birthDate), r.passport||'', 'водії']);
+      boldRowIdx.push(rows.length);
+      rows.push([n++, `${r.firstName} ${r.lastName}`.trim()+' (driver)', formatDateGreek(r.birthDate), r.passport||'', 'водії']);
     });
   }
   const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Best-effort bold styling — the writer may not honor cell styles at all (same caveat as elsewhere
+  // in this app), so the "(guide)"/"(driver)" text label above is the guaranteed way to tell rows apart.
+  boldRowIdx.forEach(r=>{
+    for(let c=0;c<5;c++){
+      const ref = XLSX.utils.encode_cell({ r, c });
+      if(ws[ref]) ws[ref].s = { font: { bold:true } };
+    }
+  });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Passenger List');
   XLSX.writeFile(wb, `Elisabet_Cruises_manifest_${tripLabel}.xlsx`);
