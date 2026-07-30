@@ -6604,7 +6604,7 @@ function renderTripPrepOverview(){
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
     hbShowToast(existingMatch
-      ? `✅ ${fullName} додано до заявки №${bookingClean} (${HB_HOTEL_STRUCTURE[hotel].name})`
+      ? `✅ ${fullName} додано до заявки №${bookingClean} (${HB_HOTEL_STRUCTURE[hotel].name}) — автобус признач вручну у вкладці "Автобуси"`
       : `✅ ${fullName} додано до списку (${HB_HOTEL_STRUCTURE[hotel].name})`);
   });
   document.getElementById('tpMergeGroupsBtn').addEventListener('click', async ()=>{
@@ -6723,11 +6723,13 @@ function renderTripPrepOverview(){
       }
     }
 
+    await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('full_name', tourist.full_name);
+
     const { error } = await sb.from('trip_prep_tourists').delete().eq('id', touristId);
     if(error){ alert('Не вдалося видалити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
-    hbShowToast(`🗑️ ${tourist.full_name} видалено`);
+    hbShowToast(`🗑️ ${tourist.full_name} видалено (зі списку, кімнати і місця в автобусі)`);
   }));
 }
 
@@ -6777,9 +6779,11 @@ async function renderTripPrepBuses(){
   });
 
   const isSelfArriving = (m)=> ['самостійно','self','own','власний доїзд','власний під\'їзд','свій доїзд','самостійний доїзд'].includes(String(m.pickup_city||'').trim().toLowerCase());
+  const hasCity = (m)=> !!(m.pickup_city && String(m.pickup_city).trim());
   const selfArrivingGroups = groupKeys.filter(gk=> groups[gk].every(isSelfArriving));
-  const unassigned = groupKeys.filter(gk=> !groups[gk][0].assigned_bus && !selfArrivingGroups.includes(gk));
-  const assigned = groupKeys.filter(gk=> groups[gk][0].assigned_bus);
+  const noCityGroups = groupKeys.filter(gk=> !groups[gk][0].assigned_bus && !selfArrivingGroups.includes(gk) && !hasCity(groups[gk][0]));
+  const unassigned = groupKeys.filter(gk=> !groups[gk][0].assigned_bus && !selfArrivingGroups.includes(gk) && !noCityGroups.includes(gk));
+  const assigned = groupKeys.filter(gk=> groups[gk][0].assigned_bus && !selfArrivingGroups.includes(gk));
 
   const suggestBusForGroup = (city, preferChernivtsiCorridor)=>{
     if(preferChernivtsiCorridor){
@@ -6927,8 +6931,24 @@ async function renderTripPrepBuses(){
   const selfArrivingHtml = selfArrivingGroups.map(gk=>{
     const members = groups[gk];
     const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean))].join(', ');
-    return `<div class="fin-row" style="background:#f3f4f6; border:1px dashed #9ca3af; border-radius:8px; padding:8px; margin-bottom:6px;">
-      <span class="fin-label">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} <span class="muted">(${members.length} ос.)</span> · 🚶 самостійно</span>
+    const currentGuide = members[0].assigned_bus || '';
+    return `<div class="fin-row" style="flex-wrap:wrap; background:#f3f4f6; border:1px dashed #9ca3af; border-radius:8px; padding:8px; margin-bottom:6px;">
+      <span class="fin-label" style="min-width:220px;">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} <span class="muted">(${members.length} ос.)</span> · 🚶 самостійно</span>
+      ${currentGuide
+        ? `<span style="font-size:13px;">Відповідальний гід: <b>${currentGuide}</b></span>
+           <button class="btn btn-danger-ghost btn-small no-print" data-role="tpUnassignSelfArrivingGuide" data-group="${gk}">Скасувати</button>`
+        : `<select data-role="tpSelfArrivingGuideSelect" data-group="${gk}">
+             ${busNames.map(b=>`<option value="${b}">${b}</option>`).join('')}
+           </select>
+           <button class="btn btn-primary btn-small no-print" data-role="tpAssignSelfArrivingGuide" data-group="${gk}">Погодити гіда</button>`}
+    </div>`;
+  }).join('') || `<p class="report-note">Немає.</p>`;
+
+  const noCityHtml = noCityGroups.map(gk=>{
+    const members = groups[gk];
+    const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean))].join(', ');
+    return `<div class="fin-row" style="background:#fff7ed; border:2px solid #fdba74; border-radius:8px; padding:8px; margin-bottom:6px;">
+      <span class="fin-label">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} <span class="muted">(${members.length} ос.)</span> · ❓ місто посадки не вказано</span>
     </div>`;
   }).join('') || `<p class="report-note">Немає.</p>`;
 
@@ -6936,15 +6956,56 @@ async function renderTripPrepBuses(){
     <div class="step-block no-print" style="margin-bottom:14px;">
       <p class="report-note" style="margin:0;">«📤 Передати гіду» (кнопка вгорі, поруч із вкладками) копіює розподілених по автобусах туристів у робочий список кожного гіда (без дублів — вже додані пропускаються). Роби це, коли список групи по автобусах готовий.</p>
     </div>
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">🔍 Знайти учасника (прізвище або номер заявки)</label>
+      <input id="tpBusSearchInput" type="text" placeholder="напр. Коваль або 9653" style="width:100%; max-width:400px; padding:8px 10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
+      <div id="tpBusSearchResults" style="margin-top:8px;"></div>
+    </div>
     ${configPanelHtml}
     <p class="fin-section-title">Розподілені по автобусах</p>
     ${assignedHtml}
     <p class="fin-section-title">Ще не розподілені (${unassigned.length})</p>
     <p class="report-note">🔵 блакитний — Івано-Франківськ/Коломия/Чернівці/Снятин (або пов'язана заявка, де хоч хтось звідти). 🌸 рожевий — Стрий/Мукачево/Ужгород.</p>
     ${unassignedHtml}
+    <p class="fin-section-title">❓ Місто посадки не вказано (${noCityGroups.length}) — спочатку виправ у вкладці "Огляд і імпорт"</p>
+    <p class="report-note">Цих людей не можна призначити на автобус, поки не вказано місто посадки — вони не з'являються у списку вище й не потраплять у розсадку.</p>
+    ${noCityHtml}
     <p class="fin-section-title">🚶 Дістаються самостійно (${selfArrivingGroups.length}, без автобуса)</p>
+    <p class="report-note">Автобуса нема, але признач відповідального гіда — тоді цих людей теж можна буде передати гіду кнопкою "📤 Передати гіду" вгорі, окремо від автобусів.</p>
     ${selfArrivingHtml}
   `;
+
+  const tpBusSearchInput = document.getElementById('tpBusSearchInput');
+  const tpBusSearchResults = document.getElementById('tpBusSearchResults');
+  tpBusSearchInput.addEventListener('input', ()=>{
+    const q = tpBusSearchInput.value.trim().toLowerCase();
+    if(!q){ tpBusSearchResults.innerHTML = ''; return; }
+    const matches = [];
+    groupKeys.forEach(gk=>{
+      groups[gk].forEach(m=>{
+        const bookingClean = (m.booking_number||'').replace(/^#/,'');
+        if(m.full_name.toLowerCase().includes(q) || bookingClean.toLowerCase().includes(q)){
+          matches.push({ m, gk });
+        }
+      });
+    });
+    if(!matches.length){ tpBusSearchResults.innerHTML = `<p class="report-note">Нічого не знайдено.</p>`; return; }
+    tpBusSearchResults.innerHTML = matches.map(({m, gk})=>{
+      let status;
+      if(m.assigned_bus){
+        const seatRow = (tripPrepBusSeatData.assignments||[]).find(a=>a.bus_name===m.assigned_bus && a.full_name===m.full_name);
+        status = `🚌 автобус <b>${m.assigned_bus}</b>${seatRow ? ` · місце ${seatRow.seat_number}` : ' · місце ще не обрано'}`;
+      }
+      else if(selfArrivingGroups.includes(gk)) status = `🚶 дістається самостійно`;
+      else if(noCityGroups.includes(gk)) status = `❓ місто посадки не вказано`;
+      else status = `⏳ ще не розподілено`;
+      const bookingClean = (m.booking_number||'').replace(/^#/,'');
+      return `<div style="padding:6px 8px; margin-bottom:4px; background:#f8f8f3; border-radius:8px; font-size:13px; display:flex; justify-content:space-between; gap:8px;">
+        <span>${bookingClean?`№${bookingClean} — `:''}${m.full_name}</span>
+        <span>${status}</span>
+      </div>`;
+    }).join('');
+  });
 
   content.querySelectorAll('[data-role="tpSaveBusConfig"]').forEach(el=> el.addEventListener('click', async e=>{
     const b = e.target.dataset.bus;
@@ -6996,6 +7057,19 @@ async function renderTripPrepBuses(){
     const gk = e.target.dataset.group;
     const sel = content.querySelector(`[data-role="tpBusSelect"][data-group="${gk}"]`);
     await assignGroupToBus(gk, sel.value);
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepBuses();
+  }));
+  content.querySelectorAll('[data-role="tpAssignSelfArrivingGuide"]').forEach(el=> el.addEventListener('click', async e=>{
+    const gk = e.target.dataset.group;
+    const sel = content.querySelector(`[data-role="tpSelfArrivingGuideSelect"][data-group="${gk}"]`);
+    await assignGroupToBus(gk, sel.value);
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepBuses();
+  }));
+  content.querySelectorAll('[data-role="tpUnassignSelfArrivingGuide"]').forEach(el=> el.addEventListener('click', async e=>{
+    const gk = e.target.dataset.group;
+    await unassignGroupFromBus(gk);
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepBuses();
   }));
