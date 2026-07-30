@@ -7141,16 +7141,26 @@ function computeAutoSeatPlan(busName){
     members.forEach(m=>{
       const pref = parseSeatPreference(m.comment);
       let idx = -1;
-      if(pref.wantsWindow) idx = blockSeats.findIndex(s=>s.isWindow);
-      if(idx<0 && pref.wantsAisle) idx = blockSeats.findIndex(s=>s.isAisle);
-      if(idx<0 && pref.wantsDoor) idx = blockSeats.findIndex(s=>s.isNearDoor);
-      if(idx<0 && pref.wantsBack) idx = blockSeats.findIndex(s=>s.isBackRow);
+      let prefReason = '';
+      if(pref.wantsWindow){ idx = blockSeats.findIndex(s=>s.isWindow); if(idx>=0) prefReason = 'вікно — за коментарем'; }
+      if(idx<0 && pref.wantsAisle){ idx = blockSeats.findIndex(s=>s.isAisle); if(idx>=0) prefReason = 'прохід — за коментарем'; }
+      if(idx<0 && pref.wantsDoor){ idx = blockSeats.findIndex(s=>s.isNearDoor); if(idx>=0) prefReason = 'біля дверей — за коментарем'; }
+      if(idx<0 && pref.wantsBack){ idx = blockSeats.findIndex(s=>s.isBackRow); if(idx>=0) prefReason = 'задній ряд — за коментарем'; }
       if(idx<0) idx = 0;
       const seat = blockSeats.splice(idx,1)[0];
+      const reasonParts = [];
+      if(N>1) reasonParts.push(`разом з компанією (${N} ос.)`);
+      if(Number(m.paid_seats)>0){
+        reasonParts.push((seat.seatNum>=5 && seat.seatNum<=20) ? 'оплатили місце → зона доплати' : 'оплатили місце (вільних місць у зоні доплати вже не було)');
+      }
+      if(prefReason) reasonParts.push(prefReason);
+      if(!reasonParts.length) reasonParts.push('за порядком номера заявки');
       plan.push({
         seatNum: seat.seatNum, full_name: m.full_name,
         booking_number: (m.booking_number||'').replace(/^#/,''),
-        link_group: gk, paid_seat: Number(m.paid_seats) > 0
+        link_group: gk, paid_seat: Number(m.paid_seats) > 0,
+        comment: m.comment || '', pickup_city: m.pickup_city || '',
+        reason: reasonParts.join(' · ')
       });
       const r = rowsMap[seat.rowIdx];
       const ix = r.findIndex(s=>s.seatNum===seat.seatNum);
@@ -7164,6 +7174,71 @@ function computeAutoSeatPlan(busName){
 function closeAutoSeatPlanModal(){
   const el = document.getElementById('tpAutoSeatPlanModal');
   if(el) el.remove();
+}
+
+function renderSeatPlanGrid(busName, plan){
+  const layoutName = tripPrepBusSeatData.layouts[busName] || '';
+  const resolvedLayoutRows = layoutName ? (BUS_LAYOUTS[layoutName] || (tripPrepBusSeatData.customLayouts[layoutName]||{}).rows) : null;
+  if(!resolvedLayoutRows) return { html: '', groupColorMap: {} };
+
+  const existingBySeat = {};
+  tripPrepBusSeatData.assignments.filter(a=>a.bus_name===busName).forEach(a=> existingBySeat[a.seat_number]=a);
+  const planBySeat = {};
+  plan.forEach(p=> planBySeat[p.seatNum]=p);
+
+  const planGroupKeys = [...new Set(plan.map(p=>p.link_group))];
+  const groupColorMap = {};
+  planGroupKeys.forEach((gk,i)=>{
+    const hue = Math.round(360 * i / (planGroupKeys.length || 1));
+    groupColorMap[gk] = { solid: `hsl(${hue}, 65%, 45%)`, tint: `hsla(${hue}, 65%, 45%, 0.14)` };
+  });
+
+  const renderTile = (seatNum)=>{
+    if(seatNum===3 || seatNum===4) return `<div style="width:40px; height:40px; border-radius:7px; background:#1e3a8a; color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700;">${seatNum}</div>`;
+    const existing = existingBySeat[seatNum];
+    const proposed = planBySeat[seatNum];
+    const isDriverZone = (seatNum===1 || seatNum===2);
+    let bg = '#e5e7eb', textColor = '#374151', border = '', label = '';
+    if(existing){ bg = '#9ca3af'; textColor = '#fff'; label = existing.full_name.split(' ')[0]; }
+    else if(proposed){ bg = groupColorMap[proposed.link_group].solid; textColor = '#fff'; border = `box-shadow:0 0 0 2px #16a34a;`; label = proposed.full_name.split(' ')[0]; }
+    else if(isDriverZone){ border = 'border:2px dashed #6b7280;'; }
+    const title = existing ? existing.full_name+' (вже сидить)' : (proposed ? proposed.full_name+' (нове — пропозиція)' : 'Вільне місце '+seatNum);
+    return `<div title="${title}" style="width:40px; height:40px; border-radius:7px; background:${bg}; color:${textColor}; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:8px; text-align:center; padding:1px; ${border}">
+      <div style="font-weight:700;">${seatNum}</div>
+      ${label?`<div style="font-size:6.5px; line-height:1.1;">${label}</div>`:''}
+    </div>`;
+  };
+
+  const isWideRowLocal = (row)=> !row.some(c=>'label' in c) && row.filter(c=>'seat' in c).length >= 5;
+  const allCols = [...new Set(resolvedLayoutRows.flatMap(r=>r.map(c=>c.col)))].sort();
+  const normalRows = resolvedLayoutRows.filter(r=>!isWideRowLocal(r));
+  const colWidths = {};
+  allCols.forEach(col=>{
+    let width = 10;
+    for(const r of normalRows){
+      const cell = r.find(c=>c.col===col);
+      if(cell){ width = ('seat' in cell) ? 40 : (/^серв/i.test(cell.label) ? 12 : 40); break; }
+    }
+    colWidths[col] = width;
+  });
+  const gridTemplateColumns = allCols.map(col=>colWidths[col]+'px').join(' ');
+  const gridCells = [];
+  resolvedLayoutRows.forEach(row=>{
+    if(isWideRowLocal(row)){
+      const inner = row.filter(c=>'seat' in c).sort((a,b)=>a.seat-b.seat).map(c=>renderTile(c.seat)).join('');
+      gridCells.push(`<div style="grid-column:1 / -1; display:flex; justify-content:space-between;">${inner}</div>`);
+      return;
+    }
+    const byCol = {}; row.forEach(c=> byCol[c.col]=c);
+    allCols.forEach(col=>{
+      const c = byCol[col];
+      if(!c){ gridCells.push('<div></div>'); return; }
+      if('seat' in c){ gridCells.push(renderTile(c.seat)); return; }
+      gridCells.push('<div></div>');
+    });
+  });
+  const html = `<div style="display:grid; grid-template-columns:${gridTemplateColumns}; column-gap:4px; row-gap:4px;">${gridCells.join('')}</div>`;
+  return { html, groupColorMap };
 }
 
 function openAutoSeatPlanModal(busName){
@@ -7186,21 +7261,31 @@ function openAutoSeatPlanModal(busName){
   }
 
   const { plan, unplaced } = result;
-  const rowsHtml = plan.length
-    ? [...plan].sort((a,b)=>a.seatNum-b.seatNum).map(p=>`<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #f0f0ea; font-size:13px;">
-        <span>Місце ${p.seatNum}</span><span>${p.paid_seat?'💰 ':''}${p.full_name}</span>
-      </div>`).join('')
+  const { html: gridHtml, groupColorMap } = renderSeatPlanGrid(busName, plan);
+  const listHtml = plan.length
+    ? [...plan].sort((a,b)=>a.seatNum-b.seatNum).map(p=>{
+        const c = groupColorMap[p.link_group] || { solid:'#9ca3af', tint:'#9ca3af22' };
+        return `<div style="padding:6px 8px; margin-bottom:4px; border-left:4px solid ${c.solid}; background:${c.tint}; border-radius:6px; font-size:12px;">
+          <div style="display:flex; justify-content:space-between; gap:6px;">
+            <b>Місце ${p.seatNum}</b><span>${p.paid_seat?'💰 ':''}${p.full_name}</span>
+          </div>
+          <div class="muted" style="font-size:11px;">${p.pickup_city||'❓ місто не вказано'}${p.comment?' · '+p.comment:''}</div>
+          <div style="font-size:11px; color:#0369a1; font-style:italic; margin-top:2px;">💡 ${p.reason}</div>
+        </div>`;
+      }).join('')
     : '<p class="muted" style="font-size:13px;">Немає кого розсаджувати — усі вже на місцях.</p>';
   const unplacedHtml = unplaced.length
     ? `<p style="font-size:12.5px; color:var(--bad); margin-top:10px;">⚠️ Не вистачило вільних місць для: ${unplaced.map(m=>m.full_name).join(', ')}</p>`
     : '';
 
-  panel.innerHTML = `<div class="hb-modal-card" style="max-width:420px;">
+  panel.innerHTML = `<div class="hb-modal-card" style="max-width:880px; width:96vw;">
     <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">🧠 Пропозиція розсадки</h2>
-    <p class="report-note" style="margin-bottom:10px;">Це лише пропозиція — поки нічого не збережено. Перевір і натисни "Застосувати", або "Скасувати", щоб нічого не міняти.</p>
-    <div style="max-height:360px; overflow-y:auto; margin-bottom:10px;">${rowsHtml}</div>
-    ${unplacedHtml}
-    <div style="display:flex; gap:10px; margin-top:10px;">
+    <p class="report-note" style="margin-bottom:10px;">Це лише пропозиція — поки нічого не збережено. Зелена рамка — нові місця з цієї пропозиції, сірі — вже зайняті раніше. Перевір і натисни "Застосувати", або "Скасувати".</p>
+    <div style="display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;">
+      <div style="flex:1; min-width:260px; max-height:440px; overflow:auto;">${gridHtml}</div>
+      <div style="min-width:260px; max-width:320px; max-height:440px; overflow-y:auto; flex-shrink:0;">${listHtml}${unplacedHtml}</div>
+    </div>
+    <div style="display:flex; gap:10px; margin-top:14px;">
       <button class="btn btn-primary" id="tpAutoSeatApplyBtn" style="flex:1;" ${plan.length?'':'disabled'}>✅ Застосувати</button>
       <button class="btn btn-ghost" id="tpAutoSeatCancelBtn" style="flex:1;">Скасувати</button>
     </div>
