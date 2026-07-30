@@ -7057,17 +7057,122 @@ function busSeatPlannerBuildSlots(layoutRows){
   return slots;
 }
 
+const SEAT_PLANNER_RULES_DEFAULT = {
+  windowWords: 'вікн',
+  aisleWords: 'прохід,прохода',
+  doorWords: 'двер',
+  backWords: 'задн,ззаду',
+  paidZoneFrom: 5,
+  paidZoneTo: 20,
+  notes: ''
+};
+
+function getSeatPlannerRules(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('seatPlannerRules') || '{}');
+    return { ...SEAT_PLANNER_RULES_DEFAULT, ...saved };
+  } catch(e){ return { ...SEAT_PLANNER_RULES_DEFAULT }; }
+}
+
+function saveSeatPlannerRules(rules){
+  localStorage.setItem('seatPlannerRules', JSON.stringify(rules));
+}
+
+function buildKeywordRegex(wordsStr){
+  const words = (wordsStr||'').split(',').map(w=>w.trim()).filter(Boolean);
+  if(!words.length) return null;
+  return new RegExp(words.map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'), 'i');
+}
+
 function parseSeatPreference(comment){
   const c = (comment||'').toLowerCase();
+  const rules = getSeatPlannerRules();
+  const test = (wordsStr)=>{ const re = buildKeywordRegex(wordsStr); return re ? re.test(c) : false; };
   return {
-    wantsWindow: /вікн/.test(c),
-    wantsAisle: /прохід|прохода/.test(c),
-    wantsDoor: /двер/.test(c),
-    wantsBack: /задн|ззаду/.test(c),
+    wantsWindow: test(rules.windowWords),
+    wantsAisle: test(rules.aisleWords),
+    wantsDoor: test(rules.doorWords),
+    wantsBack: test(rules.backWords),
   };
 }
 
+function openSeatPlannerRulesModal(busName){
+  const existing = document.getElementById('tpSeatRulesModal');
+  if(existing) existing.remove();
+  const rules = getSeatPlannerRules();
+  const panel = document.createElement('div');
+  panel.id = 'tpSeatRulesModal';
+  panel.className = 'hb-modal-overlay';
+  panel.style.zIndex = '470';
+  panel.addEventListener('click', (e)=>{ if(e.target===panel) panel.remove(); });
+  panel.innerHTML = `<div class="hb-modal-card" style="max-width:460px;">
+    <h2 id="tpSeatRulesHandle" style="font-size:18px; font-weight:700; margin-bottom:4px; cursor:move;">⚙️ Правила автоматичної розсадки</h2>
+    <p class="report-note" style="margin-bottom:12px;">Ключові слова — через кому, регістр не важливий. Планувальник шукає їх у коментарі туриста.</p>
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Слова для "хоче вікно"</label>
+    <input id="tpRuleWindow" style="width:100%; padding:8px; margin-bottom:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;" value="${rules.windowWords}">
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Слова для "хоче прохід"</label>
+    <input id="tpRuleAisle" style="width:100%; padding:8px; margin-bottom:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;" value="${rules.aisleWords}">
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Слова для "біля дверей"</label>
+    <input id="tpRuleDoor" style="width:100%; padding:8px; margin-bottom:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;" value="${rules.doorWords}">
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Слова для "задній ряд"</label>
+    <input id="tpRuleBack" style="width:100%; padding:8px; margin-bottom:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;" value="${rules.backWords}">
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Зона доплати — місця від / до</label>
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <input id="tpRulePaidFrom" type="number" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;" value="${rules.paidZoneFrom}">
+      <input id="tpRulePaidTo" type="number" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;" value="${rules.paidZoneTo}">
+    </div>
+    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Нотатки для себе (поки не впливають на алгоритм — просто пам'ятка)</label>
+    <textarea id="tpRuleNotes" rows="3" style="width:100%; padding:8px; margin-bottom:10px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; resize:vertical;">${rules.notes}</textarea>
+    <p class="report-note" style="margin-bottom:12px; font-size:11.5px;">⚠️ Правила зберігаються в цьому браузері. На іншому пристрої/браузері їх треба буде виставити так само.</p>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-primary" id="tpRuleSaveBtn" style="flex:1;">💾 Зберегти</button>
+      <button class="btn btn-ghost" id="tpRuleCancelBtn" style="flex:1;">Закрити</button>
+    </div>
+  </div>`;
+  document.body.appendChild(panel);
+  makeModalDraggable(panel, panel.querySelector('.hb-modal-card'), document.getElementById('tpSeatRulesHandle'));
+  document.getElementById('tpRuleCancelBtn').addEventListener('click', ()=>panel.remove());
+  document.getElementById('tpRuleSaveBtn').addEventListener('click', ()=>{
+    saveSeatPlannerRules({
+      windowWords: document.getElementById('tpRuleWindow').value,
+      aisleWords: document.getElementById('tpRuleAisle').value,
+      doorWords: document.getElementById('tpRuleDoor').value,
+      backWords: document.getElementById('tpRuleBack').value,
+      paidZoneFrom: parseInt(document.getElementById('tpRulePaidFrom').value) || 5,
+      paidZoneTo: parseInt(document.getElementById('tpRulePaidTo').value) || 20,
+      notes: document.getElementById('tpRuleNotes').value
+    });
+    panel.remove();
+    hbShowToast('✅ Правила збережено — натисни "Переробити розсадку", щоб застосувати їх до пропозиції.');
+  });
+}
+
+function makeModalDraggable(panelEl, cardEl, handleEl){
+  let dragging = false, offsetX = 0, offsetY = 0;
+  if(!handleEl) return;
+  handleEl.style.cursor = 'move';
+  handleEl.addEventListener('mousedown', (e)=>{
+    dragging = true;
+    const rect = cardEl.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    cardEl.style.position = 'fixed';
+    cardEl.style.margin = '0';
+    cardEl.style.left = rect.left+'px';
+    cardEl.style.top = rect.top+'px';
+    e.preventDefault();
+  });
+  panelEl.addEventListener('mousemove', (e)=>{
+    if(!dragging) return;
+    cardEl.style.left = Math.max(0, e.clientX - offsetX)+'px';
+    cardEl.style.top = Math.max(0, e.clientY - offsetY)+'px';
+  });
+  panelEl.addEventListener('mouseup', ()=>{ dragging = false; });
+  panelEl.addEventListener('mouseleave', ()=>{ dragging = false; });
+}
+
 function computeAutoSeatPlan(busName){
+  const rules = getSeatPlannerRules();
   const layoutName = tripPrepBusSeatData.layouts[busName] || '';
   const resolvedLayoutRows = layoutName ? (BUS_LAYOUTS[layoutName] || (tripPrepBusSeatData.customLayouts[layoutName]||{}).rows) : null;
   if(!resolvedLayoutRows) return { error: 'Для цього автобуса не вибрано фізичну схему (вкладка "Автобуси") — авторозсадка недоступна без неї.' };
@@ -7087,6 +7192,8 @@ function computeAutoSeatPlan(busName){
   tripPrepBusSeatData.assignments.filter(a=>a.bus_name===busName).forEach(a=> assignmentsByseat[a.seat_number]=a);
   const seatedNames = new Set(Object.values(assignmentsByseat).map(a=>a.full_name));
   const notYetSeated = inThisBus.flatMap(gk=>groups[gk].map(m=>({...m, __gk:gk}))).filter(m=>!seatedNames.has(m.full_name));
+  const seatDefForAge = TRIPS_DEF.find(d=>d.id===currentTripId);
+  notYetSeated.forEach(m=>{ m.__age = (m.birth_date && seatDefForAge) ? calcAgeAtTrip(m.birth_date, seatDefForAge.start) : null; });
 
   // Same priority order already used for the manual "ще не розсаджені" list:
   // платні компанії спершу, далі за зростанням номера заявки, компанія завжди разом.
@@ -7121,8 +7228,8 @@ function computeAutoSeatPlan(busName){
         const candidates = [];
         for(let start=0; start<=rowFree.length-N; start++) candidates.push(rowFree.slice(start, start+N));
         candidates.sort((a,b)=>{
-          const aPaid = a.filter(s=>s.seatNum>=5 && s.seatNum<=20).length;
-          const bPaid = b.filter(s=>s.seatNum>=5 && s.seatNum<=20).length;
+          const aPaid = a.filter(s=>s.seatNum>=rules.paidZoneFrom && s.seatNum<=rules.paidZoneTo).length;
+          const bPaid = b.filter(s=>s.seatNum>=rules.paidZoneFrom && s.seatNum<=rules.paidZoneTo).length;
           return groupWantsPaid ? (bPaid - aPaid) : (aPaid - bPaid);
         });
         block = candidates[0];
@@ -7151,7 +7258,7 @@ function computeAutoSeatPlan(busName){
       const reasonParts = [];
       if(N>1) reasonParts.push(`разом з компанією (${N} ос.)`);
       if(Number(m.paid_seats)>0){
-        reasonParts.push((seat.seatNum>=5 && seat.seatNum<=20) ? 'оплатили місце → зона доплати' : 'оплатили місце (вільних місць у зоні доплати вже не було)');
+        reasonParts.push((seat.seatNum>=rules.paidZoneFrom && seat.seatNum<=rules.paidZoneTo) ? 'оплатили місце → зона доплати' : 'оплатили місце (вільних місць у зоні доплати вже не було)');
       }
       if(prefReason) reasonParts.push(prefReason);
       if(!reasonParts.length) reasonParts.push('за порядком номера заявки');
@@ -7159,7 +7266,7 @@ function computeAutoSeatPlan(busName){
         seatNum: seat.seatNum, full_name: m.full_name,
         booking_number: (m.booking_number||'').replace(/^#/,''),
         link_group: gk, paid_seat: Number(m.paid_seats) > 0,
-        comment: m.comment || '', pickup_city: m.pickup_city || '',
+        comment: m.comment || '', pickup_city: m.pickup_city || '', age: m.__age,
         reason: reasonParts.join(' · ')
       });
       const r = rowsMap[seat.rowIdx];
@@ -7266,8 +7373,9 @@ function openAutoSeatPlanModal(busName){
     ? [...plan].sort((a,b)=>a.seatNum-b.seatNum).map(p=>{
         const c = groupColorMap[p.link_group] || { solid:'#9ca3af', tint:'#9ca3af22' };
         return `<div style="padding:6px 8px; margin-bottom:4px; border-left:4px solid ${c.solid}; background:${c.tint}; border-radius:6px; font-size:12px;">
-          <div style="display:flex; justify-content:space-between; gap:6px;">
-            <b>Місце ${p.seatNum}</b><span>${p.paid_seat?'💰 ':''}${p.full_name}</span>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">
+            <div style="flex:1; ${p.paid_seat?'font-weight:700;':''}">${p.paid_seat?'💰 ':''}${p.booking_number?`№${p.booking_number} — `:''}${p.full_name}${p.age!=null?` (${p.age}р.)`:''}</div>
+            <b style="white-space:nowrap;">→ місце ${p.seatNum}</b>
           </div>
           <div class="muted" style="font-size:11px;">${p.pickup_city||'❓ місто не вказано'}${p.comment?' · '+p.comment:''}</div>
           <div style="font-size:11px; color:#0369a1; font-style:italic; margin-top:2px;">💡 ${p.reason}</div>
@@ -7278,20 +7386,25 @@ function openAutoSeatPlanModal(busName){
     ? `<p style="font-size:12.5px; color:var(--bad); margin-top:10px;">⚠️ Не вистачило вільних місць для: ${unplaced.map(m=>m.full_name).join(', ')}</p>`
     : '';
 
-  panel.innerHTML = `<div class="hb-modal-card" style="max-width:880px; width:96vw;">
-    <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">🧠 Пропозиція розсадки</h2>
+  panel.innerHTML = `<div class="hb-modal-card" style="max-width:1240px; width:98vw;">
+    <h2 id="tpAutoSeatHandle" style="font-size:18px; font-weight:700; margin-bottom:4px; cursor:move;">🧠 Пропозиція розсадки <span class="muted" style="font-size:11px; font-weight:400;">(тягни за заголовок, щоб перемістити)</span></h2>
     <p class="report-note" style="margin-bottom:10px;">Це лише пропозиція — поки нічого не збережено. Зелена рамка — нові місця з цієї пропозиції, сірі — вже зайняті раніше. Перевір і натисни "Застосувати", або "Скасувати".</p>
     <div style="display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;">
-      <div style="flex:1; min-width:260px; max-height:440px; overflow:auto;">${gridHtml}</div>
-      <div style="min-width:260px; max-width:320px; max-height:440px; overflow-y:auto; flex-shrink:0;">${listHtml}${unplacedHtml}</div>
+      <div style="flex:2; min-width:320px; max-height:560px; overflow:auto;">${gridHtml}</div>
+      <div style="flex:1; min-width:280px; max-width:360px; max-height:560px; overflow-y:auto; flex-shrink:0;">${listHtml}${unplacedHtml}</div>
     </div>
-    <div style="display:flex; gap:10px; margin-top:14px;">
-      <button class="btn btn-primary" id="tpAutoSeatApplyBtn" style="flex:1;" ${plan.length?'':'disabled'}>✅ Застосувати</button>
-      <button class="btn btn-ghost" id="tpAutoSeatCancelBtn" style="flex:1;">Скасувати</button>
+    <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+      <button class="btn btn-primary" id="tpAutoSeatApplyBtn" style="flex:1; min-width:140px;" ${plan.length?'':'disabled'}>✅ Застосувати</button>
+      <button class="btn btn-ghost" id="tpAutoSeatRedoBtn" style="flex:1; min-width:140px;">🔄 Переробити розсадку</button>
+      <button class="btn btn-ghost" id="tpAutoSeatRulesBtn" style="flex:1; min-width:140px;">⚙️ Правила</button>
+      <button class="btn btn-ghost" id="tpAutoSeatCancelBtn" style="flex:1; min-width:140px;">Скасувати</button>
     </div>
   </div>`;
   document.body.appendChild(panel);
+  makeModalDraggable(panel, panel.querySelector('.hb-modal-card'), document.getElementById('tpAutoSeatHandle'));
   document.getElementById('tpAutoSeatCancelBtn').addEventListener('click', closeAutoSeatPlanModal);
+  document.getElementById('tpAutoSeatRedoBtn').addEventListener('click', ()=> openAutoSeatPlanModal(busName));
+  document.getElementById('tpAutoSeatRulesBtn').addEventListener('click', ()=> openSeatPlannerRulesModal(busName));
   document.getElementById('tpAutoSeatApplyBtn').addEventListener('click', async ()=>{
     const btn = document.getElementById('tpAutoSeatApplyBtn');
     btn.disabled = true; btn.textContent = 'Зберігаю…';
@@ -7640,6 +7753,7 @@ function renderBusSeatChart(busName){
     <div class="no-print" style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
       <span style="font-size:13px;">Фізичний автобус: <b>${layoutName || 'загальна схема'}</b> <span class="muted">(змінити — у вкладці "Автобуси")</span></span>
       <button class="btn btn-primary btn-small" id="tpAutoSeatBtn">🧠 Розсадити автоматично</button>
+      <button class="btn btn-ghost btn-small" id="tpSeatRulesMainBtn">⚙️ Правила розсадки</button>
       <button class="btn btn-danger-ghost btn-small" id="tpClearSeatChartBtn">🗑️ Очистити розсадку цього автобуса</button>
     </div>
     <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
@@ -7658,6 +7772,7 @@ function renderBusSeatChart(busName){
 
   document.getElementById('tpBackToBusesBtn').addEventListener('click', ()=>{ tripPrepBusSeatView = null; renderTripPrepBuses(); });
   document.getElementById('tpAutoSeatBtn').addEventListener('click', ()=> openAutoSeatPlanModal(busName));
+  document.getElementById('tpSeatRulesMainBtn').addEventListener('click', ()=> openSeatPlannerRulesModal(busName));
   document.getElementById('tpClearSeatChartBtn').addEventListener('click', async ()=>{
     if(!confirm(`Точно очистити всю розсадку для "${busName}"? Розподіл груп по автобусах не зміниться, тільки конкретні місця.`)) return;
     const { error } = await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName);
