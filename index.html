@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="uk">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0047)file:///C:/Users/38097/Downloads/index_201.html -->
+<html lang="uk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Money-Greece</title>
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="file:///C:/Users/38097/Downloads/manifest.json">
 <meta name="theme-color" content="#1c5a7a">
-<link rel="icon" href="icon-192_1.png">
+<link rel="icon" href="file:///C:/Users/38097/Downloads/icon-192_1.png">
 <!-- iOS "Add to Home Screen" support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Rich Tour">
-<link rel="apple-touch-icon" href="icon-192_1.png">
+<link rel="apple-touch-icon" href="file:///C:/Users/38097/Downloads/icon-192_1.png">
 <script>
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
@@ -20,8 +20,8 @@
     });
   }
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link href="./index_files/css2" rel="stylesheet">
 <style>
   @keyframes fadeInUp{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
   @keyframes tpGroupPulse{ 0%,100%{ box-shadow:0 0 0 3px #111827; } 50%{ box-shadow:0 0 0 3px #fbbf24; } }
@@ -437,11 +437,11 @@
   .hb-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:400; padding:12px; animation: fadeIn 0.18s ease both; }
   .hb-modal-card{ background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:520px; width:100%; padding:20px; max-height:92vh; overflow-y:auto; animation: modalPop 0.2s ease both; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+<script src="./index_files/supabase.min.js.download"></script>
+<script src="./index_files/xlsx.full.min.js.download"></script>
+<script src="./index_files/jszip.min.js.download"></script>
+<script src="./index_files/pdf-lib.min.js.download"></script>
+<script src="./index_files/fontkit.umd.min.js.download"></script>
 <style>
   .login-overlay{
     position:fixed; inset:0; background:var(--whitewash); z-index:1000;
@@ -483,7 +483,7 @@
     </div>
   </div>
 
-  </div>
+  
 </header>
 
 <main class="app-hidden" id="appMain">
@@ -623,14 +623,15 @@
         <details style="margin-top:10px;">
           <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft);">Або вставити текстом (без файлу)</summary>
           <p class="report-note" style="margin-top:8px;">По одному туристу на рядок, розділювач — табуляція (як при копіюванні з таблиці) або крапка з комою, завжди в порядку: <code>Прізвище Ім'я [Tab] Дата народження [Tab] Паспортні дані</code></p>
-          <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Петренко Іван	1990-05-12	ФГ123456&#10;Іваненко Марія	2015-08-03	"></textarea>
+          <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Петренко Іван	1990-05-12	ФГ123456
+Іваненко Марія	2015-08-03	"></textarea>
           <button class="btn btn-ghost btn-small" id="bulkAddTouristBtn" style="margin-top:6px;">Додати список</button>
         </details>
       </details>
     </div>
 
     <section class="step-block" id="touristListBlock" style="margin-top:16px;">
-      <details id="touristListDetails" class="top-accordion" open>
+      <details id="touristListDetails" class="top-accordion" open="">
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Туристи</summary>
         <div style="margin-top:10px;">
           <div style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -822,7 +823,7 @@
     </div>
     <div style="display:flex; gap:10px; margin-top:16px;">
       <button onclick="tpSaveEditTouristModal()" class="btn btn-primary" style="flex:1;">Зберегти</button>
-      <button onclick="document.getElementById('tpEditTouristModal').classList.add('app-hidden')" class="btn btn-ghost" style="flex:1;">Скасувати</button>
+      <button onclick="document.getElementById(&#39;tpEditTouristModal&#39;).classList.add(&#39;app-hidden&#39;)" class="btn btn-ghost" style="flex:1;">Скасувати</button>
     </div>
   </div>
 </div>
@@ -878,8 +879,8 @@
     <div id="hbWizardGroupCard" style="margin-bottom:12px;"></div>
 
     <div style="display:flex; gap:6px; margin-bottom:10px;">
-      <button id="hbWizardTabHotelBtn" onclick="hbWizardSwitchTab('hotel')" class="btn btn-small" style="flex:1;">🏨 Структура готелю</button>
-      <button id="hbWizardTabGroupBtn" onclick="hbWizardSwitchTab('group')" class="btn btn-small" style="flex:1;">👥 Список групи</button>
+      <button id="hbWizardTabHotelBtn" onclick="hbWizardSwitchTab(&#39;hotel&#39;)" class="btn btn-small" style="flex:1;">🏨 Структура готелю</button>
+      <button id="hbWizardTabGroupBtn" onclick="hbWizardSwitchTab(&#39;group&#39;)" class="btn btn-small" style="flex:1;">👥 Список групи</button>
     </div>
 
     <div id="hbWizardTabHotel">
@@ -2608,6 +2609,7 @@ let touristGuideFilter = null; // for manager: which guide's group is being view
 let managerSkiatosCorrectionMode = false; // manager must explicitly confirm before editing guides' Skiatos lists
 let touristData = { tourists: [], selectionsByTourist: {} }; // cache for current (trip, guideFilter)
 let openTouristId = null;
+let touristPaymentCurrencyDraft = {}; // touristId -> {currency, origAmount, rate} — чернетка вибору валюти оплати, поки не натиснуто "Оплатити"
 let openEditPanels = new Set();
 let priceCorrectionUnlocked = new Set();
 let managerFinanceCorrectionKey = null;
@@ -3037,6 +3039,7 @@ function renderTouristDetail(){
   const unpaidSum = activeSels.filter(s=>!s.paid).reduce((sum,s)=> sum + (Number(s.price)||0), 0);
   const allPaid = activeSels.length > 0 && activeSels.every(s=>s.paid);
 
+  const payDraft = touristPaymentCurrencyDraft[t.id] || { currency: 'EUR' };
   block.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:4px;">
       <p class="report-title" style="margin:0;">${(t.last_name+' '+t.first_name).toUpperCase()}</p>
@@ -3049,12 +3052,28 @@ function renderTouristDetail(){
       <div class="label">Вік</div><div class="value">${age!==null ? age : '—'}</div>
     </div>
     <div>${rowsHtml}</div>
+    ${(!allPaid && activeSels.length>0) ? `<div class="no-print" style="margin-top:12px; padding:8px; background:var(--whitewash-2); border-radius:8px; font-size:12.5px;">
+      <span class="muted">Валюта оплати:</span>
+      <select id="touristPayCurrency">
+        <option value="EUR" ${payDraft.currency==='EUR'?'selected':''}>€ EUR</option>
+        <option value="UAH" ${payDraft.currency==='UAH'?'selected':''}>₴ UAH</option>
+        <option value="USD" ${payDraft.currency==='USD'?'selected':''}>$ USD</option>
+      </select>
+      ${payDraft.currency!=='EUR' ? `
+        <span class="muted">Сума в ${payDraft.currency}, яку дав турист</span>
+        <input type="text" inputmode="decimal" class="num-input" id="touristPayOrigAmount" value="${payDraft.origAmount||''}" placeholder="напр. 500">
+        <span class="muted">Курс (${payDraft.currency} за 1 €)</span>
+        <input type="text" inputmode="decimal" class="num-input" id="touristPayRate" value="${payDraft.rate||''}" placeholder="напр. 42">
+        <button class="btn btn-ghost btn-small no-print" id="touristPayFetchNbu">🔄 Курс НБУ</button>
+        <p class="report-note" style="margin:4px 0 0;">Сума до оплати (${fmt(unpaidSum)} €) не міняється — це просто запис для звіту, якою валютою фактично розрахувались.</p>
+      ` : ''}
+    </div>` : ''}
     <div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
       <div><span class="label" style="display:block; font-size:11px; text-transform:uppercase; color:var(--ink-soft);">Сума до оплати</span>
         <span style="font-size:22px; font-weight:700;">${fmt(totalDue)} €</span>
       </div>
       ${allPaid
-        ? `<span class="profit-pos" style="font-weight:700;">✓ Оплачено</span>`
+        ? `<span class="profit-pos" style="font-weight:700;">✓ Оплачено${t.payment_currency && t.payment_currency!=='EUR' ? ` <span class="muted" style="font-weight:400;">(${fmt(t.payment_orig_amount)} ${t.payment_currency}, курс ${t.payment_rate})</span>` : ''}</span>`
         : activeSels.length > 0
           ? `<button class="btn btn-primary no-print" id="payTouristBtn">${unpaidSum>0 ? 'Оплатити '+fmt(unpaidSum)+' €' : 'Підтвердити (безкоштовно)'}</button>`
           : `<span class="muted">Немає обраних екскурсій</span>`
@@ -3124,6 +3143,31 @@ function renderTouristDetail(){
     if(!confirm("Підтвердити, що кошти повернуто туристу?")) return;
     refundSelection(e.target.dataset.sel);
   }));
+  const currencySel = document.getElementById('touristPayCurrency');
+  if(currencySel) currencySel.addEventListener('change', e=>{
+    touristPaymentCurrencyDraft[t.id] = { currency: e.target.value };
+    renderTouristDetail();
+  });
+  const origAmountInput = document.getElementById('touristPayOrigAmount');
+  if(origAmountInput) origAmountInput.addEventListener('input', e=>{
+    touristPaymentCurrencyDraft[t.id] = { ...payDraft, origAmount: e.target.value };
+  });
+  const rateInput = document.getElementById('touristPayRate');
+  if(rateInput) rateInput.addEventListener('input', e=>{
+    touristPaymentCurrencyDraft[t.id] = { ...payDraft, rate: e.target.value };
+  });
+  const fetchNbuBtn = document.getElementById('touristPayFetchNbu');
+  if(fetchNbuBtn) fetchNbuBtn.addEventListener('click', async ()=>{
+    fetchNbuBtn.disabled = true; fetchNbuBtn.textContent = 'Тягну…';
+    try{
+      const rate = Math.round((await fetchNbuRateVsEur(payDraft.currency))*10000)/10000;
+      touristPaymentCurrencyDraft[t.id] = { ...payDraft, rate };
+      renderTouristDetail();
+    } catch(err){
+      alert('Не вдалося отримати курс НБУ: ' + (err && err.message ? err.message : err));
+      fetchNbuBtn.disabled = false; fetchNbuBtn.textContent = '🔄 Курс НБУ';
+    }
+  });
   const payBtn = document.getElementById('payTouristBtn');
   if(payBtn) payBtn.addEventListener('click', ()=> payTourist(t.id));
 }
@@ -3150,8 +3194,16 @@ function updateSelectionLocal(touristId, selId, patch, debounce){
 
 async function payTourist(touristId){
   await flushPendingPersists();
+  const draft = touristPaymentCurrencyDraft[touristId] || { currency: 'EUR' };
+  const isForeign = draft.currency && draft.currency !== 'EUR';
   const { error, queued } = await rtGuideRpc('mark_tourist_paid', { p_tourist_id: touristId });
   if(error){ alert(friendlyErrorMessage(error)); return; }
+  const currencyUpdate = isForeign
+    ? { payment_currency: draft.currency, payment_orig_amount: parseDecimalInput(draft.origAmount), payment_rate: parseDecimalInput(draft.rate) }
+    : { payment_currency: null, payment_orig_amount: null, payment_rate: null };
+  const { error: currErr } = await sb.from('tourists').update(currencyUpdate).eq('id', touristId);
+  if(currErr) console.error(currErr);
+  delete touristPaymentCurrencyDraft[touristId];
   if(queued){
     // Offline — reflect the payment locally right away so the guide sees progress;
     // the real DB update happens automatically once the outbox syncs.
@@ -3532,10 +3584,23 @@ function computeFinanceSuggestions(guideName){
   const touristStats = financeTouristStatsCache[statsKey] || {};
   Object.keys(touristStats).forEach(excName=>{
     if(excNamesWithRowSuggestion.has(excName)) return;
-    const stat = touristStats[excName];
-    if(stat.sum > 0){
-      suggestions.push({ section:'received', label:`Зібрано (зі списку туристів): ${excName} — ${stat.count} чол`, amount: Math.round(stat.sum*100)/100, key:'touristPaid:'+excName });
-    }
+    const byCurrency = touristStats[excName];
+    Object.keys(byCurrency).forEach(currency=>{
+      const stat = byCurrency[currency];
+      if(stat.sum <= 0) return;
+      if(currency === 'EUR'){
+        suggestions.push({ section:'received', label:`Зібрано (зі списку туристів): ${excName} — ${stat.count} чол`, amount: Math.round(stat.sum*100)/100, key:'touristPaid:'+excName+':EUR' });
+      } else {
+        const rate = stat.origSum>0 ? Math.round((stat.origSum/stat.sum)*10000)/10000 : 0;
+        suggestions.push({
+          section:'received',
+          label:`Зібрано (зі списку туристів, ${currency}): ${excName} — ${stat.count} чол`,
+          amount: Math.round(stat.sum*100)/100,
+          key:'touristPaid:'+excName+':'+currency,
+          currency, origAmount: Math.round(stat.origSum*100)/100, rate
+        });
+      }
+    });
   });
   return suggestions;
 }
@@ -3997,7 +4062,9 @@ function renderFinanceReport(report){
     const key = e.target.dataset.key;
     const s = computeFinanceSuggestions(activeFinanceGuideName()).find(x=>x.key===key);
     if(!s) return;
-    report.entries.push({ section:s.section, label:s.label, amount:s.amount, key:s.key });
+    const entry = { section:s.section, label:s.label, amount:s.amount, key:s.key };
+    if(s.currency && s.currency!=='EUR'){ entry.currency = s.currency; entry.origAmount = s.origAmount; entry.rate = s.rate; }
+    report.entries.push(entry);
     persistNow('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
     renderFinanceReport(report);
   }));
@@ -4019,16 +4086,34 @@ function renderFinanceReport(report){
 
 let financeTouristStatsCache = {};
 async function loadFinanceTouristPaidStats(tripId, guideName){
-  const { data: tourists } = await sb.from('tourists').select('id').eq('trip_id', tripId).eq('guide_name', guideName);
+  const { data: tourists } = await sb.from('tourists').select('id, payment_currency, payment_orig_amount, payment_rate').eq('trip_id', tripId).eq('guide_name', guideName);
   if(!tourists || !tourists.length) return {};
+  const touristCurrency = {};
+  tourists.forEach(t=>{ touristCurrency[t.id] = t; });
   const ids = tourists.map(t=>t.id);
   const { data: selections } = await sb.from('tourist_excursion_selections').select('*').in('tourist_id', ids);
-  const byExc = {};
-  (selections||[]).forEach(s=>{
-    if(!(s.going && s.paid && !s.cancelled)) return;
-    if(!byExc[s.excursion_name]) byExc[s.excursion_name] = {count:0, sum:0};
-    byExc[s.excursion_name].count++;
-    byExc[s.excursion_name].sum += Number(s.price)||0;
+  const paidSels = (selections||[]).filter(s=> s.going && s.paid && !s.cancelled);
+
+  // Скільки всього турист сплатив (по всіх екскурсіях разом) — щоб пропорційно розподілити
+  // його загальну суму в іноземній валюті між конкретними екскурсіями.
+  const touristTotalPaid = {};
+  paidSels.forEach(s=>{ touristTotalPaid[s.tourist_id] = (touristTotalPaid[s.tourist_id]||0) + (Number(s.price)||0); });
+
+  const byExc = {}; // excName -> { EUR: {count,sum}, UAH: {count,sum,origSum}, USD: {...} }
+  paidSels.forEach(s=>{
+    const excName = s.excursion_name;
+    const price = Number(s.price)||0;
+    const tc = touristCurrency[s.tourist_id];
+    const currency = (tc && tc.payment_currency) || 'EUR';
+    if(!byExc[excName]) byExc[excName] = {};
+    if(!byExc[excName][currency]) byExc[excName][currency] = {count:0, sum:0, origSum:0};
+    byExc[excName][currency].count++;
+    byExc[excName][currency].sum += price;
+    if(currency !== 'EUR'){
+      const totalPaid = touristTotalPaid[s.tourist_id] || 0;
+      const share = totalPaid>0 ? price/totalPaid : 0;
+      byExc[excName][currency].origSum += (Number(tc.payment_orig_amount)||0) * share;
+    }
   });
   return byExc;
 }
@@ -11338,5 +11423,6 @@ document.addEventListener('blur', function(e){
   if(session) await afterAuthSuccess();
 })();
 </script>
-</body>
-</html>
+
+
+</body></html>
