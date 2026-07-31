@@ -2681,7 +2681,7 @@ async function loadTourists(){
 
 function touristIsProcessed(touristId){
   const sels = touristData.selectionsByTourist[touristId] || [];
-  return sels.some(s=>s.going);
+  return sels.some(s=>s.going && !s.cancelled);
 }
 
 function renderTourSectionGuideChips(){
