@@ -3062,8 +3062,7 @@ function renderTouristDetail(){
         <p class="report-note" style="margin:6px 0 0;">Рахую безпечний курс…</p>
       ` : `
         <div style="margin-top:8px; padding:8px; background:#fefce8; border:2px solid #fde047; border-radius:8px;">
-          <p style="margin:0 0 6px; font-size:13px;"><b>Зібрати з туриста: ${payDraft.origAmount ? fmt(payDraft.origAmount) : '?'} ${payDraft.currency}</b></p>
-          <p class="report-note" style="margin:0;">Курс НБУ ${payDraft.nbuRate||'?'} + 5% запас на втрати в обміннику = ${payDraft.rate||'?'} ${payDraft.currency} за 1€. Так гарантовано вистачить обміняти назад на ${fmt(unpaidSum)} €.</p>
+          <p style="margin:0; font-size:13px;"><b>${fmt(unpaidSum)}€ = ${payDraft.origAmount ? fmt(payDraft.origAmount) : '?'} ${payDraft.currency}</b></p>
         </div>
         <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <span class="muted">Фактично отримав(ла) (${payDraft.currency})</span>
