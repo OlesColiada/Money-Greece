@@ -3051,7 +3051,7 @@ function renderTouristDetail(){
       <div class="label">Вік</div><div class="value">${age!==null ? age : '—'}</div>
     </div>
     <div>${rowsHtml}</div>
-    ${(!allPaid && activeSels.length>0) ? `<div class="no-print" style="margin-top:12px; padding:8px; background:var(--whitewash-2); border-radius:8px; font-size:12.5px;">
+    ${(!allPaid && activeSels.length>0) ? `<div class="no-print" style="margin-top:12px; padding:8px; background:var(--whitewash-2); border-radius:8px; font-size:12.5px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
       <span class="muted">Валюта оплати:</span>
       <select id="touristPayCurrency">
         <option value="EUR" ${payDraft.currency==='EUR'?'selected':''}>€ EUR</option>
@@ -3059,16 +3059,11 @@ function renderTouristDetail(){
         <option value="USD" ${payDraft.currency==='USD'?'selected':''}>$ USD</option>
       </select>
       ${payDraft.currency!=='EUR' ? (payDraft.loadingRate ? `
-        <p class="report-note" style="margin:6px 0 0;">Рахую безпечний курс…</p>
+        <span class="muted">Рахую безпечний курс…</span>
       ` : `
-        <div style="margin-top:8px; padding:8px; background:#fefce8; border:2px solid #fde047; border-radius:8px;">
-          <p style="margin:0; font-size:13px;"><b>${fmt(unpaidSum)}€ = ${payDraft.origAmount ? fmt(payDraft.origAmount) : '?'} ${payDraft.currency}</b></p>
-        </div>
-        <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-          <span class="muted">Фактично отримав(ла) (${payDraft.currency})</span>
-          <input type="text" inputmode="decimal" style="width:110px; padding:6px 8px; border:2px solid var(--line); border-radius:6px; text-align:right;" id="touristPayOrigAmount" value="${payDraft.origAmount||''}">
-        </div>
-        <p class="report-note" style="margin:4px 0 0;">Якщо турист дав іншу суму, ніж пропонує програма — виправ поле вище. Сума до оплати (${fmt(unpaidSum)} €) сама не міняється, це тільки запис для звіту.</p>
+        <span id="touristPayEquationDisplay" style="font-weight:700; font-size:13px;">${fmt(unpaidSum)}€ = ${payDraft.origAmount ? fmt(payDraft.origAmount) : '?'} ${payDraft.currency}</span>
+        <button class="btn btn-ghost btn-small no-print" id="touristPayEditAmountBtn" title="Виправити суму" style="padding:2px 8px;">✏️</button>
+        <input type="text" inputmode="decimal" style="display:none; width:90px; padding:4px 6px; border:2px solid var(--line); border-radius:6px; text-align:right; font-weight:700; font-size:13px;" id="touristPayOrigAmount" value="${payDraft.origAmount||''}">
       `) : ''}
     </div>` : ''}
     <div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -3166,6 +3161,16 @@ function renderTouristDetail(){
   const origAmountInput = document.getElementById('touristPayOrigAmount');
   if(origAmountInput) origAmountInput.addEventListener('input', e=>{
     touristPaymentCurrencyDraft[t.id] = { ...payDraft, origAmount: e.target.value };
+    const displaySpan = document.getElementById('touristPayEquationDisplay');
+    if(displaySpan) displaySpan.textContent = `${fmt(unpaidSum)}€ = ${e.target.value || '?'} ${payDraft.currency}`;
+  });
+  const editAmountBtn = document.getElementById('touristPayEditAmountBtn');
+  if(editAmountBtn) editAmountBtn.addEventListener('click', ()=>{
+    document.getElementById('touristPayEquationDisplay').style.display = 'none';
+    editAmountBtn.style.display = 'none';
+    origAmountInput.style.display = 'inline-block';
+    origAmountInput.focus();
+    origAmountInput.select();
   });
   const payBtn = document.getElementById('payTouristBtn');
   if(payBtn) payBtn.addEventListener('click', ()=> payTourist(t.id));
