@@ -24,6 +24,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
   @keyframes fadeInUp{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+  @keyframes tpGroupPulse{ 0%,100%{ box-shadow:0 0 0 3px #111827; } 50%{ box-shadow:0 0 0 3px #fbbf24; } }
+  .tp-group-pulse{ animation: tpGroupPulse 1s ease-in-out infinite; border-radius:6px; }
   @keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
   @keyframes toastIn{ from{ opacity:0; transform:translate(-50%,-10px); } to{ opacity:1; transform:translate(-50%,0); } }
   @keyframes toastOut{ from{ opacity:1; transform:translate(-50%,0); } to{ opacity:0; transform:translate(-50%,-10px); } }
@@ -1015,6 +1017,16 @@ let state = { trips: {} };       // local cache: state.trips[tripId] = { guides:
 let TRIPS_DEF = [];              // fetched from Supabase 'trips' table, RLS-filtered per role
 let currentTripId = null;
 let currentProfile = null;       // { role:'manager'|'guide', guide_name, login }
+
+// Візуальна підміна імені — ТІЛЬКИ на екранах самого гіда, коли це саме він/вона залогінені.
+// Дані в базі, документи для туристів і вигляд у менеджера лишаються з реальним іменем.
+const GUIDE_NAME_DISPLAY_OVERRIDE = { 'Іра': 'Ірен' };
+function dispGuideName(name){
+  if(currentProfile && currentProfile.role==='guide' && currentProfile.guide_name===name && GUIDE_NAME_DISPLAY_OVERRIDE[name]){
+    return GUIDE_NAME_DISPLAY_OVERRIDE[name];
+  }
+  return name;
+}
 function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2,10)); }
 // Supabase Storage keys don't reliably accept Cyrillic characters (fails with "Invalid key").
 // Use this to turn a guide name (or any free-text segment) into a safe ASCII path piece.
@@ -1458,11 +1470,35 @@ function calcTripByGuide(tripData){
 function fmt(n){ return (Math.round((n+Number.EPSILON)*100)/100).toLocaleString('uk-UA',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function round2(n){ return Math.round(((Number(n)||0)+Number.EPSILON)*100)/100; }
 // Accepts "5120", "5120.50", "5120,50" — comma or period both work as decimal separator.
+function distinctGroupColor(i){
+  // Золотий кут (137.508°) розкидає сусідні відтінки набагато контрастніше, ніж рівний поділ 360°/N —
+  // навіть перші кілька кольорів вже сильно відрізняються, і це не псується зі зростанням кількості груп.
+  const hue = Math.round((i * 137.508) % 360);
+  const lightness = [40, 55, 32][i % 3]; // чергування трьох рівнів яскравості — додаткова відмінність при великій кількості груп
+  return { solid: `hsl(${hue}, 72%, ${lightness}%)`, tint: `hsla(${hue}, 72%, ${lightness}%, 0.14)` };
+}
+
 function parseDecimalInput(str){
   if(str===null || str===undefined || str==='') return 0;
   const cleaned = String(str).trim().replace(',', '.').replace(/[^0-9.\-]/g,'');
   const n = parseFloat(cleaned);
   return isNaN(n) ? 0 : n;
+}
+
+async function fetchNbuUahRate(valcode){
+  const resp = await fetch(`https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=${valcode}&json`);
+  if(!resp.ok) throw new Error(`НБУ повернув помилку (${resp.status})`);
+  const data = await resp.json();
+  if(!data || !data[0] || !data[0].rate) throw new Error('НБУ не повернув курс для ' + valcode);
+  return Number(data[0].rate); // скільки гривень за 1 одиницю цієї валюти
+}
+
+// Курс "currency за 1 EUR" — саме так, як і вводиться вручну в полі "Курс".
+async function fetchNbuRateVsEur(currency){
+  const eurInUah = await fetchNbuUahRate('EUR');
+  if(currency === 'UAH') return eurInUah;
+  if(currency === 'USD'){ const usdInUah = await fetchNbuUahRate('USD'); return eurInUah / usdInUah; }
+  throw new Error('Непідтримувана валюта: ' + currency);
 }
 
 function renderTripGrid(){
@@ -2338,7 +2374,7 @@ function showFinanceNotifyList(reports){
       <summary style="cursor:pointer; font-weight:700;">${r.guide_name} <span class="muted" style="font-weight:400; font-size:12px;">(${label}) · ${time}</span></summary>
       <div style="margin-top:10px;">
         <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Отримано</p>
-        <div class="fin-panel" style="margin-bottom:8px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+        <div class="fin-panel" style="margin-bottom:8px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}${e.currency && e.currency!=='EUR' ? ` <span class="muted" style="font-size:11px;">(${fmt(e.origAmount)} ${e.currency}, курс ${e.rate})</span>` : ''}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
         <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Затрати</p>
         <div class="fin-panel" style="margin-bottom:8px;">${paid.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
         <div class="fin-row"><span class="fin-label">Залишок</span><span>${fmt(balance)} €</span></div>
@@ -2788,7 +2824,7 @@ function renderGuideFilterChips(){
     const active = activeTouristGuideName() === g.name;
     chip.className = 'btn btn-ghost btn-small tp-view-only-ok';
     if(active){ chip.style.background = guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor = guideColor(g.name); }
-    chip.textContent = g.name === currentProfile.guide_name ? `${g.name} (я сам)` : g.name;
+    chip.textContent = g.name === currentProfile.guide_name ? `${dispGuideName(g.name)} (я сам)` : g.name;
     chip.addEventListener('click', async ()=>{
       testAccountGuideFilter = g.name;
       openTouristId = null;
@@ -2816,7 +2852,7 @@ function renderGuideFilterChipsOld(){
     const chip = document.createElement('button');
     chip.className = 'btn btn-ghost btn-small' + (touristGuideFilter===g.name ? ' active-tab' : '');
     if(touristGuideFilter===g.name){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
-    chip.textContent = `Заїзд: ${def.label} ${g.name}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
+    chip.textContent = `Заїзд: ${def.label} ${dispGuideName(g.name)}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
     chip.addEventListener('click', async ()=>{ touristGuideFilter = g.name; openTouristId=null; await loadTourists(); renderTouristSection(); });
     wrap.appendChild(chip);
   });
@@ -3572,7 +3608,7 @@ function renderFinanceGuideFilterChips(){
     const active = activeFinanceGuideName() === g.name;
     chip.className = 'btn btn-ghost btn-small tp-view-only-ok';
     if(active){ chip.style.background = guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor = guideColor(g.name); }
-    chip.textContent = g.name === currentProfile.guide_name ? `${g.name} (я сам)` : g.name;
+    chip.textContent = g.name === currentProfile.guide_name ? `${dispGuideName(g.name)} (я сам)` : g.name;
     chip.addEventListener('click', async ()=>{
       testAccountGuideFilter = g.name;
       await renderFinanceSection();
@@ -3596,7 +3632,7 @@ function renderFinanceGuideFilterChipsOld(){
     const chip = document.createElement('button');
     chip.className = 'btn btn-ghost btn-small';
     if(financeGuideFilter===g.name){ chip.style.background=guideColor(g.name); chip.style.color='#fff'; chip.style.borderColor=guideColor(g.name); }
-    chip.textContent = `Заїзд: ${def.label} ${g.name}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
+    chip.textContent = `Заїзд: ${def.label} ${dispGuideName(g.name)}` + (g.substituteNote ? ` (заміна: ${g.substituteNote})` : '');
     chip.addEventListener('click', async ()=>{ financeGuideFilter=g.name; await renderFinanceSection(); });
     wrap.appendChild(chip);
   });
@@ -3620,7 +3656,7 @@ async function saveFinanceReportToStorage(report, received, paid, totalReceived,
     rows.push(['Керівник туру', report.guide_name]);
     rows.push([]);
     rows.push(['ОТРИМАВ']);
-    received.forEach(e=> rows.push([e.label, fmt(Number(e.amount)||0)+' €']));
+    received.forEach(e=> rows.push([e.label + (e.currency && e.currency!=='EUR' ? ` (${fmt(e.origAmount)} ${e.currency}, курс ${e.rate})` : ''), fmt(Number(e.amount)||0)+' €']));
     rows.push(['Разом отримано', fmt(totalReceived)+' €']);
     rows.push([]);
     rows.push(['ВИДАТКИ']);
@@ -3682,11 +3718,14 @@ function renderFinanceReport(report){
     const isHotel = e.label==='Готель';
     const isPercent = e.label==='% гіда';
     const isBus = e.label==='Автобус';
+    const isReceived = e.section==='received';
+    const isForeignCurrency = isReceived && e.currency && e.currency!=='EUR';
     if(readOnly){
       const extraBits = [
         isPerDiem ? (e.kpi ? 'KPI виконано' : 'KPI не виконано') : '',
         isHotel && e.hotel ? e.hotel : '',
-        isBus ? `${e.start_km||0} → ${e.end_km||0} км` : ''
+        isBus ? `${e.start_km||0} → ${e.end_km||0} км` : '',
+        isForeignCurrency ? `${fmt(e.origAmount)} ${e.currency}, курс ${e.rate}` : ''
       ].filter(Boolean).join(' · ');
       return `<div class="fin-list-row">
         <span style="flex:1; font-weight:600;">${e.label}</span>
@@ -3696,10 +3735,10 @@ function renderFinanceReport(report){
     }
     return `<div class="fin-list-row">
       <input type="text" class="fin-label-input" data-role="finLabel" data-idx="${idx}" value="${e.label}">
-      <input type="text" inputmode="decimal" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem||isBus?'disabled':''} title="${isPerDiem?'Змінюється чекбоксом KPI':isBus?'Рахується автоматично з км':''}">
+      <input type="text" inputmode="decimal" class="fin-amount" data-role="finAmount" data-idx="${idx}" value="${e.amount}" ${isPerDiem||isBus||isForeignCurrency?'disabled':''} title="${isPerDiem?'Змінюється чекбоксом KPI':isBus?'Рахується автоматично з км':isForeignCurrency?'Рахується автоматично з суми та курсу нижче':''}">
       ${isPercent ? `<button class="edit-toggle-btn no-print" data-role="finRefreshPercent" data-idx="${idx}" title="Підтягнути суму комісії з прибутковості">🔄</button>` : ''}
       <button class="row-del no-print" data-role="finDelete" data-idx="${idx}" title="Видалити пункт">✕</button>
-      ${isPerDiem || isHotel || isBus ? `<div class="fin-list-sub">
+      ${isPerDiem || isHotel || isBus || isReceived ? `<div class="fin-list-sub">
         ${isPerDiem ? `<label class="fin-card-checkbox"><input type="checkbox" data-role="finKpi" data-idx="${idx}" ${e.kpi?'checked':''}> KPI виконано</label>` : ''}
         ${isHotel ? `<select data-role="finHotel" data-idx="${idx}">
             <option value="" ${!e.hotel?'selected':''}>— обрати готель —</option>
@@ -3709,6 +3748,19 @@ function renderFinanceReport(report){
         ${isBus ? `<span class="muted">Поч. км</span><input type="text" inputmode="decimal" class="num-input" data-role="finBusStartKm" data-idx="${idx}" value="${e.start_km||''}">
           <span class="muted">Кін. км</span><input type="text" inputmode="decimal" class="num-input" data-role="finBusEndKm" data-idx="${idx}" value="${e.end_km||''}">
           <span class="muted">× 1,6 €/км</span>` : ''}
+        ${isReceived ? `<span class="muted">Валюта:</span>
+          <select data-role="finCurrency" data-idx="${idx}">
+            <option value="EUR" ${(!e.currency||e.currency==='EUR')?'selected':''}>€ EUR</option>
+            <option value="UAH" ${e.currency==='UAH'?'selected':''}>₴ UAH (грн)</option>
+            <option value="USD" ${e.currency==='USD'?'selected':''}>$ USD</option>
+          </select>` : ''}
+        ${isForeignCurrency ? `
+          <span class="muted">Сума в ${e.currency}</span>
+          <input type="text" inputmode="decimal" class="num-input" data-role="finOrigAmount" data-idx="${idx}" value="${e.origAmount||''}" placeholder="напр. 500">
+          <span class="muted">Курс (${e.currency} за 1 €)</span>
+          <input type="text" inputmode="decimal" class="num-input" data-role="finRate" data-idx="${idx}" value="${e.rate||''}" placeholder="напр. 42">
+          <button class="btn btn-ghost btn-small no-print" data-role="finFetchNbuRate" data-idx="${idx}" data-currency="${e.currency}" title="Підтягнути офіційний курс НБУ на сьогодні">🔄 Курс НБУ</button>
+        ` : ''}
       </div>` : ''}
     </div>`;
   };
@@ -3716,7 +3768,7 @@ function renderFinanceReport(report){
   block.innerHTML = `
     <div>
       <p class="report-title" style="margin:0;">Фінансовий звіт</p>
-      <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${report.guide_name}${substituteNote}</p>
+      <p class="report-note" style="margin:2px 0 0;">Тур: ${def?def.label:''} · Дата виїзду: ${def? def.start.toLocaleDateString('uk-UA'):''} · Керівник туру: ${dispGuideName(report.guide_name)}${substituteNote}</p>
       <p class="report-note" style="margin:6px 0 0;">Це облік грошей туру, що пройшли через твої руки — не твоя зарплата. «Отримано» — все, що ти отримав. «Затрати» — усі витрати туру, включно з твоєю добовою й відсотком. Різниця — те, що маєш здати менеджеру.</p>
     </div>
 
@@ -3825,6 +3877,50 @@ function renderFinanceReport(report){
     renderFinanceReport(report);
   });
 
+  const recalcForeignAmount = (idx)=>{
+    const entry = report.entries[idx];
+    const orig = Number(entry.origAmount)||0;
+    const rate = Number(entry.rate)||0;
+    entry.amount = rate>0 ? Math.round((orig/rate)*100)/100 : 0;
+  };
+  block.querySelectorAll('[data-role="finFetchNbuRate"]').forEach(el=> el.addEventListener('click', async e=>{
+    const btn = e.target;
+    const idx = Number(btn.dataset.idx);
+    const currency = btn.dataset.currency;
+    btn.disabled = true; btn.textContent = 'Тягну курс…';
+    try{
+      const rate = await fetchNbuRateVsEur(currency);
+      report.entries[idx].rate = Math.round(rate*10000)/10000;
+      recalcForeignAmount(idx);
+      persistNow('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+      renderFinanceReport(report);
+    } catch(err){
+      alert('Не вдалося отримати курс НБУ: ' + (err && err.message ? err.message : err));
+      btn.disabled = false; btn.textContent = '🔄 Курс НБУ';
+    }
+  }));
+  block.querySelectorAll('[data-role="finCurrency"]').forEach(el=> el.addEventListener('change', e=>{
+    const idx = Number(e.target.dataset.idx);
+    report.entries[idx].currency = e.target.value;
+    if(e.target.value==='EUR'){ report.entries[idx].origAmount = null; report.entries[idx].rate = null; }
+    else recalcForeignAmount(idx);
+    persistNow('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    renderFinanceReport(report);
+  }));
+  block.querySelectorAll('[data-role="finOrigAmount"]').forEach(el=> el.addEventListener('input', e=>{
+    const idx = Number(e.target.dataset.idx);
+    report.entries[idx].origAmount = parseDecimalInput(e.target.value);
+    recalcForeignAmount(idx);
+    debouncedPersist('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    debouncedFinanceRerender(report);
+  }));
+  block.querySelectorAll('[data-role="finRate"]').forEach(el=> el.addEventListener('input', e=>{
+    const idx = Number(e.target.dataset.idx);
+    report.entries[idx].rate = parseDecimalInput(e.target.value);
+    recalcForeignAmount(idx);
+    debouncedPersist('fin:'+report.trip_id+':'+report.guide_name, ()=> saveFinanceReport(report));
+    debouncedFinanceRerender(report);
+  }));
   block.querySelectorAll('[data-role="finAmount"]').forEach(el=> el.addEventListener('input', e=>{
     const idx = Number(e.target.dataset.idx);
     report.entries[idx].amount = parseDecimalInput(e.target.value);
@@ -4835,7 +4931,7 @@ async function showGuideSingleView(tripId, guideName, target){
   const balance = totalReceived - totalPaid;
   container.innerHTML = `
     <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Отримано</p>
-    <div class="fin-panel" style="margin-bottom:8px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+    <div class="fin-panel" style="margin-bottom:8px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}${e.currency && e.currency!=='EUR' ? ` <span class="muted" style="font-size:11px;">(${fmt(e.origAmount)} ${e.currency}, курс ${e.rate})</span>` : ''}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
     <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Затрати</p>
     <div class="fin-panel" style="margin-bottom:8px;">${paid.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
     <div class="fin-row"><span class="fin-label">Залишок</span><span>${fmt(balance)} €</span></div>
@@ -4939,7 +5035,7 @@ async function renderReportsGuideDrilldown(tripId){
       const balance = totalReceived - totalPaid;
       finHtml = `
         <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Отримано</p>
-        <div class="fin-panel" style="margin-bottom:8px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+        <div class="fin-panel" style="margin-bottom:8px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}${e.currency && e.currency!=='EUR' ? ` <span class="muted" style="font-size:11px;">(${fmt(e.origAmount)} ${e.currency}, курс ${e.rate})</span>` : ''}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
         <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Затрати</p>
         <div class="fin-panel" style="margin-bottom:8px;">${paid.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
         <div class="fin-row"><span class="fin-label">Залишок</span><span>${fmt(balance)} €</span></div>
@@ -6516,17 +6612,32 @@ function renderTripPrepOverview(){
   const otherKeys = groupKeys.filter(gk=>!['konstantin','greataleksander'].includes(groups[gk][0].target_hotel));
 
   const unrecognizedForGate = getUnrecognizedCityList(tripPrepData.tourists);
+  const missingCityForGate = getMissingCityGroups(tripPrepData.tourists);
   const tripDefForGate = TRIPS_DEF.find(d=>d.id===currentTripId);
   const overviewConfirmed = tripDefForGate ? tripDefForGate.overviewConfirmed : false;
+  const missingCityBlockHtml = missingCityForGate.map(item=>`
+    <div style="margin-top:8px; padding:8px; background:#fff7ed; border:2px solid #fdba74; border-radius:8px; font-size:12.5px;">
+      ❓ ${item.bookingNumbers?`Заявка <b>${item.bookingNumbers}</b> — `:''}${item.names.join(', ')} — місто посадки не вказано
+      <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; align-items:center;">
+        <select data-role="tpMissingCitySelect" data-group="${item.gk}" style="padding:4px 6px; border:2px solid var(--line); border-radius:6px;">
+          <option value="">— обрати місто —</option>
+          ${allKnownCities().map(c=>`<option value="${c}">${c}</option>`).join('')}
+          <option value="самостійно">🚶 Без автобуса (самостійно)</option>
+        </select>
+        <button class="btn btn-ghost btn-small no-print" data-role="tpApplyMissingCity" data-group="${item.gk}">Застосувати</button>
+      </div>
+    </div>`).join('');
+
   const cityGateHtml = !overviewConfirmed
-    ? (unrecognizedForGate.length
+    ? (unrecognizedForGate.length || missingCityForGate.length
         ? `<div class="step-block no-print" style="margin-top:14px; background:#fff7ed; border-color:#fdba74;">
-            <p class="step-title" style="margin:0 0 6px;">❗ Є ${unrecognizedForGate.length} нерозпізнаних міст посадки</p>
-            <p class="report-note">Поки їх не розпізнано, недоступні вкладки "Готель", "Автобуси" і "Документи".</p>
-            <button class="btn btn-primary btn-small" id="tpOpenCityWizardBtn" style="margin-top:6px;">🏙 Розпізнати міста</button>
+            <p class="step-title" style="margin:0 0 6px;">❗ Є ${unrecognizedForGate.length ? unrecognizedForGate.length+' нерозпізнаних міст' : ''}${unrecognizedForGate.length && missingCityForGate.length ? ' і ' : ''}${missingCityForGate.length ? missingCityForGate.length+' заявок без міста' : ''}</p>
+            <p class="report-note">Поки їх не виправлено, недоступні вкладки "Готель", "Автобуси" і "Документи".</p>
+            ${unrecognizedForGate.length ? `<button class="btn btn-primary btn-small" id="tpOpenCityWizardBtn" style="margin-top:6px;">🏙 Розпізнати нерозпізнані міста</button>` : ''}
+            ${missingCityBlockHtml}
           </div>`
         : `<div class="step-block no-print" style="margin-top:14px; background:#f0fdf4; border-color:#86efac;">
-            <p class="report-note" style="margin:0 0 8px;">Усі міста посадки розпізнані. Натисни, щоб підтвердити список і відкрити решту вкладок.</p>
+            <p class="report-note" style="margin:0 0 8px;">Усі міста посадки розпізнані і вказані. Натисни, щоб підтвердити список і відкрити решту вкладок.</p>
             <button class="btn btn-primary btn-small" id="tpConfirmOverviewBtn">✅ Таблиці скореговані</button>
           </div>`)
     : `<div class="step-block no-print" style="margin-top:14px;">
@@ -6544,7 +6655,9 @@ function renderTripPrepOverview(){
                   <button class="btn btn-ghost btn-small no-print" data-role="tpAddCityInline" data-raw="${item.raw}">🆕 Це нове місто</button>
                 </div>
               </div>`).join('')
-            : `<p class="report-note" style="margin-top:8px;">Зараз усі міста розпізнані.</p>`}
+            : ''}
+          ${missingCityBlockHtml}
+          ${(!unrecognizedForGate.length && !missingCityForGate.length) ? `<p class="report-note" style="margin-top:8px;">Зараз усі міста розпізнані і вказані.</p>` : ''}
         </details>
       </div>`;
 
@@ -6672,6 +6785,18 @@ function renderTripPrepOverview(){
     addCustomCity(raw);
     renderTripPrepOverview();
     hbShowToast(`✅ "${raw}" додано як нове місто`);
+  }));
+  content.querySelectorAll('[data-role="tpApplyMissingCity"]').forEach(el=> el.addEventListener('click', async e=>{
+    const gk = e.target.dataset.group;
+    const sel = content.querySelector(`[data-role="tpMissingCitySelect"][data-group="${gk}"]`);
+    if(!sel.value){ alert('Спочатку обери місто зі списку.'); return; }
+    const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===gk && !String(t.pickup_city||'').trim()).map(t=>t.id);
+    if(!ids.length) return;
+    const { error } = await sb.from('trip_prep_tourists').update({ pickup_city: sel.value }).in('id', ids);
+    if(error){ alert('Не вдалося застосувати: ' + friendlyErrorMessage(error)); return; }
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepOverview();
+    hbShowToast(`✅ Місто "${sel.value}" встановлено`);
   }));
   document.getElementById('tpAddManualTouristBtn').addEventListener('click', async ()=>{
     const fullName = document.getElementById('tpManualFullName').value.trim();
@@ -7525,10 +7650,7 @@ function renderSeatPlanGrid(busName, plan){
 
   const planGroupKeys = [...new Set(plan.map(p=>p.link_group))];
   const groupColorMap = {};
-  planGroupKeys.forEach((gk,i)=>{
-    const hue = Math.round(360 * i / (planGroupKeys.length || 1));
-    groupColorMap[gk] = { solid: `hsl(${hue}, 65%, 45%)`, tint: `hsla(${hue}, 65%, 45%, 0.14)` };
-  });
+  planGroupKeys.forEach((gk,i)=>{ groupColorMap[gk] = distinctGroupColor(i); });
 
   const renderTile = (seatNum)=>{
     if(seatNum===3 || seatNum===4) return `<div style="width:40px; height:40px; border-radius:7px; background:#1e3a8a; color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700;">${seatNum}</div>`;
@@ -7744,6 +7866,16 @@ function getUnrecognizedCityList(tourists){
   return Object.keys(byRaw).map(raw=>({ raw, names: byRaw[raw] }));
 }
 
+function getMissingCityGroups(tourists){
+  const groups = tripPrepGroups();
+  const result = [];
+  Object.keys(groups).forEach(gk=>{
+    const missing = groups[gk].filter(m=> !String(m.pickup_city||'').trim());
+    if(missing.length) result.push({ gk, names: missing.map(m=>m.full_name), bookingNumbers: [...new Set(missing.map(m=>m.booking_number).filter(Boolean))].join(', ') });
+  });
+  return result;
+}
+
 let cityWizardList = [];
 let cityWizardIndex = 0;
 
@@ -7841,6 +7973,7 @@ function classifyCorridor(cities){
 
 let tripPrepBusSeatDataLoadedForTrip = null;
 let tpSelectedSeatPerson = null; // { id, busName } — обрана людина зі списку "ще не розсаджені", очікує кліку на місце
+let tpPulseGroupKey = null; // link_group, чиї інші учасники ще не розсаджені — підсвітити пульсацією
 async function loadBusSeatData(tripId, force){
   if(!force && tripPrepBusSeatDataLoadedForTrip === tripId) return; // already cached — avoid redundant network round-trips
   const { data: assignments } = await sb.from('bus_seat_assignments').select('*').eq('trip_id', tripId);
@@ -7881,8 +8014,15 @@ async function hbAssignSelectedPersonToSeat(busName, seatNum){
   }, { onConflict: 'trip_id,bus_name,seat_number' });
   if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); renderBusSeatChart(busName); return; }
   await loadBusSeatData(currentTripId, true);
+  updatePulseGroupAfterAssign(t.link_group || t.id, busName);
   renderBusSeatChart(busName);
   hbShowToast(`✅ ${t.full_name} посаджений на місце ${seatNum}`);
+}
+
+function updatePulseGroupAfterAssign(linkGroup, busName){
+  const seatedNames = new Set((tripPrepBusSeatData.assignments||[]).filter(a=>a.bus_name===busName).map(a=>a.full_name));
+  const companionsLeft = tripPrepData.tourists.some(x=> (x.link_group||x.id)===linkGroup && x.assigned_bus===busName && !seatedNames.has(x.full_name));
+  tpPulseGroupKey = companionsLeft ? linkGroup : null;
 }
 
 
@@ -7986,11 +8126,7 @@ function renderBusSeatChart(busName){
   });
   const stableGroupOrderForColor = [...inThisBus].sort((a,b)=> groupMinBookingForColor[a]-groupMinBookingForColor[b]);
   const groupColorMap = {};
-  const totalGroupsForColor = stableGroupOrderForColor.length || 1;
-  stableGroupOrderForColor.forEach((gk,i)=>{
-    const hue = Math.round(360 * i / totalGroupsForColor);
-    groupColorMap[gk] = { solid: `hsl(${hue}, 65%, 45%)`, tint: `hsla(${hue}, 65%, 45%, 0.12)` };
-  });
+  stableGroupOrderForColor.forEach((gk,i)=>{ groupColorMap[gk] = distinctGroupColor(i); });
   const getGroupColor = (gk)=> (groupColorMap[gk] || { solid:'#9ca3af', tint:'#9ca3af15' }).solid;
   const getGroupTint = (gk)=> (groupColorMap[gk] || { solid:'#9ca3af', tint:'#9ca3af15' }).tint;
 
@@ -8080,9 +8216,10 @@ function renderBusSeatChart(busName){
     const groupColor = getGroupColor(m.__gk);
     const bookingLabel = (m.booking_number||'').replace(/^#/,'');
     const isSelected = tpSelectedSeatPerson && tpSelectedSeatPerson.id === m.id;
-    return `<div style="padding:6px 8px; margin-bottom:4px; border-left:4px solid ${groupColor}; background:${isSelected ? '#16a34a25' : getGroupTint(m.__gk)}; border-radius:6px; font-size:12px; ${isSelected ? 'outline:2px solid #16a34a;' : ''}">
+    const isPulsing = tpPulseGroupKey && m.__gk === tpPulseGroupKey && !isSelected;
+    return `<div class="${isPulsing ? 'tp-group-pulse' : ''}" style="padding:6px 8px; margin-bottom:4px; border-left:4px solid ${groupColor}; background:${isSelected ? '#16a34a25' : getGroupTint(m.__gk)}; border-radius:6px; font-size:12px; ${isSelected ? 'outline:2px solid #16a34a;' : ''}">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">
-        <div onclick="hbSelectSeatPerson('${m.id}','${busName}')" style="cursor:pointer; flex:1; ${isPaid?'font-weight:700;':''}">${isSelected?'👉 ':''}${isPaid?'💰 ':''}${bookingLabel?`№${bookingLabel} — `:''}${m.full_name}${m.__age!==null?` (${m.__age}р.)`:''}</div>
+        <div onclick="hbSelectSeatPerson('${m.id}','${busName}')" style="cursor:pointer; flex:1; ${isPaid?'font-weight:700;':''}">${isSelected?'👉 ':''}${isPulsing?'⚡ ':''}${isPaid?'💰 ':''}${bookingLabel?`№${bookingLabel} — `:''}${m.full_name}${m.__age!==null?` (${m.__age}р.)`:''}</div>
         <button onclick="hbEditSeatPersonFields('${m.id}')" title="Виправити місто/платні місця" class="no-print" style="border:none; background:none; cursor:pointer; font-size:12px; padding:0;">✏️</button>
       </div>
       <div class="muted" style="font-size:11px;">${m.pickup_city||'❓ місто не вказано'}${m.comment?' · '+m.comment:''}</div>
@@ -8225,6 +8362,7 @@ function openSeatActionModal(busName, seatNum, existing){
       }, { onConflict: 'trip_id,bus_name,seat_number' });
       if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
       await loadBusSeatData(currentTripId, true);
+      if(matchGk) updatePulseGroupAfterAssign(matchGk, busName);
       renderBusSeatChart(busName);
       closeSeatActionModal();
       hbShowToast(`✅ ${name} посаджений на місце ${seatNum}`);
