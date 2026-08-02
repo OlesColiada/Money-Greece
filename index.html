@@ -65,6 +65,29 @@
   body.guide-mode .manager-only{display:none !important;}
   .guide-only{display:none;}
   body.guide-mode .guide-only{display:block !important;}
+
+  /* "Перегляд як гід" (менеджер) — рамка телефону навколо всього застосунку */
+  body.guide-preview-mode{ background:#2b2b2b; }
+  body.guide-preview-mode #appMain{
+    max-width:390px; margin:24px auto; padding:16px 14px 90px;
+    border:10px solid #111; border-radius:38px;
+    box-shadow:0 0 0 2px #444, 0 24px 60px rgba(0,0,0,.5);
+    background:var(--paper, #fff); min-height:80vh; max-height:88vh; overflow-y:auto;
+    position:relative;
+  }
+  body.guide-preview-mode #appMain::before{
+    content:''; position:sticky; top:-16px; display:block; margin:-16px -14px 10px;
+    width:100%; height:26px; background:#111;
+    border-radius:0 0 14px 14px;
+  }
+  body.guide-preview-mode header.top{ max-width:390px; margin:0 auto; border-radius:0 0 16px 16px; }
+  body.guide-preview-mode::after{
+    content:'📱 Тестовий перегляд — так це бачить гід на телефоні. Натисніть «Керівник напрямку» вгорі, щоб вийти.';
+    position:fixed; top:8px; left:50%; transform:translateX(-50%);
+    background:#fbbf24; color:#111; font-size:12px; font-weight:700;
+    padding:6px 14px; border-radius:20px; z-index:2000; box-shadow:0 4px 12px rgba(0,0,0,.3);
+    max-width:90vw; text-align:center;
+  }
   .season-only{display:none;}
   body.manager-mode .season-only{display:revert;}
   body.guide-mode .season-only{display:none !important;}
@@ -224,8 +247,9 @@
   .exc-head-summary::before{content:'▸'; margin-right:6px; color:var(--aegean); transition:transform 0.15s ease; display:inline-block;}
   details[open] > .exc-head-summary::before{transform:rotate(90deg);}
   .exc-title-text{flex:1;}
-  .exc-head{display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line); background:var(--whitewash-2); flex-wrap:wrap;}
-  .exc-name-select{font-weight:600; font-size:15px; min-width:150px; flex:1;}
+  .exc-edit-name-icon{font-size:13px; opacity:0.55; margin-left:4px; cursor:pointer;}
+  .exc-edit-name-icon:hover{opacity:1;}
+  .exc-del-btn{padding:5px 9px; font-size:14px; line-height:1; flex-shrink:0;}
   .field-group{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft);}
   .km-input, .rate-input, .guidefee-input{width:76px; text-align:right;}
   .exc-body{padding:14px 16px 16px;}
@@ -249,6 +273,10 @@
   .row-card{ border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--whitewash); animation: fadeInUp 0.2s ease both; }
   .row-card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px; }
   .row-card-top .person-select{ width:100%; }
+  .row-card-summary{ display:flex; align-items:center; gap:10px; row-gap:6px; flex-wrap:wrap; cursor:pointer; }
+  .row-summary-mid{ flex:1; font-size:12.5px; }
+  .row-summary-result{ font-size:13.5px; font-weight:700; flex-shrink:0; }
+  .person-chip{ border-radius:6px; padding:5px 9px; font-weight:600; font-size:12.5px; color:#fff; flex-shrink:0; }
   .row-card-fields{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
   .row-card-fields label{ display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:var(--ink-soft); flex:1; min-width:78px; }
   .row-card-fields input{ width:100%; box-sizing:border-box; }
@@ -291,7 +319,6 @@
     .step-block{box-shadow:none; border:none; page-break-inside:avoid;}
   }
   @media (max-width:560px){
-    .exc-name-select{min-width:120px;}
     table.rows-table{font-size:12px;}
     .num-input{width:54px;}
     .num-input-wide{width:78px;}
@@ -324,9 +351,6 @@
     .guide-chips{gap:8px;}
     .guide-chip{padding:7px 10px; font-size:12.5px; flex:1 1 calc(50% - 8px);}
 
-    .exc-head{padding:11px 12px; gap:8px;}
-    .exc-name-select{font-size:14px; min-width:0; width:100%; order:1;}
-    .exc-head .btn-danger-ghost{order:2; margin-left:0 !important; width:100%;}
     .field-group{width:100%; flex-wrap:wrap; font-size:12px;}
     .km-input, .rate-input, .guidefee-input{width:88px;}
     .exc-body{padding:12px;}
@@ -1313,7 +1337,8 @@ async function fetchTrips(){
 }
 
 function rowFromDb(r){
-  return { id:r.id, personType:r.person_type, person:r.person, customPartnerName:r.custom_partner_name||"", chol:r.chol, zibrano:r.zibrano, quitky:r.quitky, isTest: !!r.is_test };
+  return { id:r.id, personType:r.person_type, person:r.person, customPartnerName:r.custom_partner_name||"", chol:r.chol, zibrano:r.zibrano, quitky:r.quitky, isTest: !!r.is_test,
+    received: !!r.received, receivedBy: r.received_by||"", receivedAt: r.received_at||null };
 }
 function excFromDb(e, rows){
   return {
@@ -1370,7 +1395,7 @@ function getOrCreateTripData(tripId){
 }
 
 function newRow(){
-  return { id: uid(), personType:"", person:"", customPartnerName:"", chol:0, zibrano:0, quitky:0 };
+  return { id: uid(), personType:"", person:"", customPartnerName:"", chol:0, zibrano:0, quitky:0, received:false, receivedBy:"", receivedAt:null };
 }
 function newExcursion(tripGuides, presetName){
   const name = presetName || EXCURSIONS[0];
@@ -1753,7 +1778,6 @@ function renderExcursions(){
     const card = document.createElement('details');
     card.className = 'exc-card';
     card.open = !!excOpenState[exc.id];
-    const nameOptions = EXCURSIONS.map(n=>`<option value="${n}" ${n===exc.name?'selected':''}>${n}</option>`).join('');
     const feeDiffers = Number(exc.guideFee) !== Number(exc.guideFeeDefault);
     const noGuideFee = NO_GUIDE_FEE_EXCURSIONS.includes(exc.name);
     const displayName = exc.name==="Інше..." ? (exc.customName || "Інше") : exc.name;
@@ -1761,23 +1785,19 @@ function renderExcursions(){
 
     card.innerHTML = `
       <summary class="exc-head-summary">
-        <span class="exc-title-text">${displayName}</span>
+        <span class="exc-title-text">${displayName} <span class="exc-edit-name-icon no-print" data-role="editExcName" title="Змінити назву екскурсії">✏️</span></span>
         <span class="muted" style="font-size:12.5px;">${calc.totalPeople} чол · <span class="${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span></span>
+        <button class="btn btn-danger-ghost no-print exc-del-btn" data-role="delExc" title="Видалити екскурсію">🗑️</button>
       </summary>
-      <div class="exc-head">
-        <select class="exc-name-select" data-role="excName">${nameOptions}</select>
-        ${exc.name==="Інше..." ? `<input type="text" placeholder="Назва екскурсії" value="${exc.customName||''}" data-role="customName" style="min-width:120px;">` : ''}
-        <button class="btn btn-danger-ghost no-print" data-role="delExc" style="margin-left:auto;">Видалити екскурсію</button>
-      </div>
       <div class="exc-body">
         <div class="subgrid">
-          <div class="field-group">
-            <span>Автобус:</span>
-            <select data-role="busOwner">
+          <div class="field-group" style="flex-wrap:nowrap;">
+            <span style="flex-shrink:0;">Автобус:</span>
+            <select data-role="busOwner" style="flex:1; min-width:0;">
               <option value="own" ${exc.busOwner==='own'?'selected':''}>наш (1.6 €/км)</option>
               <option value="partner" ${exc.busOwner==='partner'?'selected':''}>партнерський</option>
             </select>
-            ${exc.busOwner==='partner' ? `<select class="rate-input" data-role="busRate">${BUS_RATES.map(r=>`<option value="${r}" ${Number(exc.busRate)===r?'selected':''}>${r.toFixed(1)}</option>`).join('')}</select>` : ''}
+            ${exc.busOwner==='partner' ? `<select class="rate-input" data-role="busRate" style="flex-shrink:0;">${BUS_RATES.map(r=>`<option value="${r}" ${Number(exc.busRate)===r?'selected':''}>${r.toFixed(1)}</option>`).join('')}</select>` : ''}
           </div>
           <div class="field-group">
             <span>Км екскурсії:</span>
@@ -1787,49 +1807,12 @@ function renderExcursions(){
         </div>
 
         <div class="subgrid">
-          ${noGuideFee ? `<div class="field-group"><span class="muted">На Скіатосі супровід гіда не потрібен — лише спільний автобус, квитки кожен оплачує сам.</span></div>` : `
+          ${noGuideFee ? `` : `
           <div class="field-group" style="flex-direction:column; align-items:flex-start; gap:6px;">
             <span>Екскурсовод, €${exc.guideFeeDefault ? ` (стандарт ${exc.guideFeeDefault})` : ''}:</span>
             <input type="text" inputmode="decimal" class="guidefee-input" data-role="guideFee" value="${exc.guideFee}">
             ${feeDiffers ? `<input type="text" class="reason-input" placeholder="Причина зміни стандартної ціни" value="${exc.guideFeeReason||''}" data-role="guideFeeReason">` : ''}
           </div>`}
-          ${(()=>{
-            const isOwn = exc.busOwner==='own';
-            const assignedGuide = isOwn ? exc.recipientGuide : exc.payerGuide;
-            const paid = isOwn ? exc.recipientPaid : exc.payerPaid;
-            const paidAt = isOwn ? exc.recipientPaidAt : exc.payerPaidAt;
-            const amount = calc.settlementAmount;
-            if(amount <= 0) return ''; // nothing to settle on this excursion — no point showing the box
-            const verb = isOwn ? 'отримати від партнерів' : 'сплатити партнеру';
-            const canConfirm = currentProfile.role==='manager' || (currentProfile.role==='guide' && tripGuideNames.includes(currentProfile.guide_name));
-            // Breakdown: who makes up this amount — partner rows when it's our bus,
-            // our own guides' rows when it's a partner's bus.
-            const breakdownRows = calc.rowResults.filter(r => isOwn ? !r.isGuide : r.isGuide);
-            const breakdownHtml = breakdownRows.length > 1
-              ? `<div class="muted" style="width:100%; font-size:11.5px; margin-top:2px;">
-                  ${breakdownRows.map(r=> `${r.label}: ${fmt(isOwn ? r.settlement : r.share)} €`).join(' · ')}
-                 </div>`
-              : '';
-            let statusHtml;
-            if(paid){
-              const dateStr = paidAt ? new Date(paidAt).toLocaleString('uk-UA') : '';
-              statusHtml = `<span class="profit-pos">✓ Оплачено ${fmt(amount)} € (${assignedGuide}${dateStr ? ', '+dateStr : ''})</span>`
-                + (currentProfile.role==='manager' ? ` <button class="btn btn-ghost btn-small no-print" data-role="unmarkPaid">Скасувати</button>` : '');
-            } else {
-              statusHtml = `Потрібно ${verb}: <b>${fmt(amount)} €</b> — <span class="muted">довідково, поки не підтверджено</span>`
-                + (canConfirm ? ` <button class="btn btn-primary btn-small no-print" data-role="markPaid">Оплатити</button>` : ` <span class="muted">(підтвердити може лише ${assignedGuide})</span>`);
-            }
-            return `<div class="settlement-note">
-              <div>
-                ${isOwn
-                  ? `Партнери оплачують нам — кому з гідів зараховується: <select data-role="recipientGuide">${tripGuideNames.map(g=>`<option value="${g}" ${exc.recipientGuide===g?'selected':''}>${g}</option>`).join('')}</select>`
-                  : `Ми оплачуємо партнеру за наших учасників — хто оплатив: <select data-role="payerGuide">${tripGuideNames.map(g=>`<option value="${g}" ${exc.payerGuide===g?'selected':''}>${g}</option>`).join('')}</select>`
-                }
-              </div>
-              ${statusHtml}
-              ${breakdownHtml}
-            </div>`;
-          })()}
         </div>
 
         <div class="rows-cards" data-role="rowsBody"></div>
@@ -1838,6 +1821,13 @@ function renderExcursions(){
         <div class="exc-summary">
           <div class="stat"><span class="label">Всього людей</span><span class="value">${calc.totalPeople}</span></div>
           <div class="stat"><span class="label">Затрати/особу (без квитків)</span><span class="value">${fmt(calc.costPerPerson)} €</span></div>
+          ${(()=>{
+            if(!(currentProfile && currentProfile.role==='guide' && currentProfile.guide_name)) return '';
+            const myRows = calc.rowResults.filter(r=> r.isGuide && r.person===currentProfile.guide_name && !r.isTest);
+            if(!myRows.length) return '';
+            const myEarn = myRows.reduce((s,r)=> s + (Number(r.gInc)||0), 0);
+            return `<div class="stat"><span class="label">Ваш заробіток</span><span class="value ${myEarn>=0?'profit-pos':'profit-neg'}">${fmt(myEarn)} €</span></div>`;
+          })()}
         </div>
       </div>
     `;
@@ -1855,9 +1845,7 @@ function renderExcursions(){
     calc.rowResults.forEach(r=>{
       const tr = document.createElement('div');
       tr.className = 'row-card';
-      const editable = canEditRow(r);
       const hasPerson = !!r.person;
-      const amountsEditable = editable && hasPerson;
       const resultHtml = !hasPerson
             ? `<span class="muted">оберіть гіда/партнера</span>`
             : r.isGuide
@@ -1865,68 +1853,39 @@ function renderExcursions(){
               : (exc.busOwner==='own'
                   ? `<span class="muted">винен нам ${fmt(r.settlement)} €</span>`
                   : `<span class="muted">розрахунок з партнером</span>`);
+      const showReceived = hasPerson && !r.isGuide && exc.busOwner==='own' && r.settlement > 0;
+      const receivedHtml = !showReceived ? '' : r.received
+        ? `<span class="profit-pos no-print" style="font-size:11.5px; flex-shrink:0;" title="${r.receivedBy ? 'Підтвердив(ла): '+r.receivedBy+(r.receivedAt?', '+new Date(r.receivedAt).toLocaleString('uk-UA'):'') : ''}">✓ Отримано</span>`
+        : `<button class="btn btn-primary btn-small no-print" data-role="markReceived" data-row-id="${r.id}" style="flex-shrink:0;">Отримано</button>`;
       tr.innerHTML = `
-        <div class="row-card-top">
-          <div style="flex:1; min-width:0;">
-            <select class="person-select" data-role="person" style="background:${hasPerson?personColor(r):'#c9cdbe'}" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, exc.rows.filter(other=>other.id!==r.id && other.personType==='guide').map(other=>other.person))}</select>
-            ${r.isTest ? `<div style="font-size:10px; color:#b45309; font-weight:700; margin-top:2px;">🧪 ТЕСТ — не враховується в реальних розрахунках</div>` : ''}
-            ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" value="${r.customPartnerName||''}" data-role="customPartnerName" style="margin-top:4px; width:100%; max-width:160px;" ${editable?'':'disabled'}>` : ''}
-            ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" data-role="fillFromTourists" title="Заповнити чол/суму з даних гіда в списку туристів" style="display:block; margin-top:4px; font-size:11px;">📋 зі списку туристів</button>` : ''}
-          </div>
-          ${editable ? `<button class="row-del no-print" data-role="delRow">✕</button>` : ''}
+        <div class="row-card-summary" data-role="rowOpen" data-row-id="${r.id}">
+          <span class="person-chip" style="background:${hasPerson?personColor(r):'#c9cdbe'}">${hasPerson ? r.label : 'оберіть гіда/партнера'}</span>
+          <span class="row-summary-mid muted">${hasPerson ? fmt(r.chol)+' чол' : ''}${hasPerson && r.isGuide ? ' · '+fmt(r.zibrano)+' €' : ''}</span>
+          <span class="row-summary-result">${resultHtml}</span>
+          ${receivedHtml}
         </div>
-        <div class="row-card-fields">
-          <label>Чол<input type="text" inputmode="decimal" class="num-input" data-role="chol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></label>
-          <label>Зібрано €${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input num-input-wide" data-role="zibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted" style="display:block; padding:6px 0;">—</span>`}</label>
-          ${calc.ticketsApply ? `<label>Квитки €${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input" data-role="quitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted" style="display:block; padding:6px 0;">—</span>`}</label>` : ''}
-        </div>
-        <div class="row-card-result">
-          <span class="muted">Затрати: ${hasPerson ? fmt(r.totalCost)+' €' : '—'}</span>
-          <span>${resultHtml}</span>
-        </div>
-        ${hasPerson && r.isGuide ? `<div class="row-card-split muted">Гід 10%: ${fmt(r.gInc)} € · Офіс 90%: ${fmt(r.oInc)} €</div>` : ''}
       `;
       tbody.appendChild(tr);
-
-      const fillBtn = tr.querySelector('[data-role="fillFromTourists"]');
-      if(fillBtn) fillBtn.addEventListener('click', async ()=>{
-        fillBtn.disabled = true; fillBtn.textContent = 'Перевіряю…';
-        const byGuideExc = await loadTripGuideExcursionStats();
-        const stats = (byGuideExc[r.person]||{})[exc.name];
-        if(!stats || stats.count<=0){
-          alert('У списку туристів поки немає даних для цієї екскурсії у гіда '+r.person+'.');
-          fillBtn.disabled = false; fillBtn.textContent = '📋 зі списку туристів';
-          return;
-        }
-        if(confirm(`Підставити з списку туристів: ${stats.count} чол, ${fmt(stats.sum)} €?\n\n(Поточні значення: ${r.chol} чол, ${fmt(r.zibrano)} €)`)){
-          updateRow(exc.id, r.id, { chol: stats.count, zibrano: stats.sum });
-        } else {
-          fillBtn.disabled = false; fillBtn.textContent = '📋 зі списку туристів';
-        }
-      });
-
-      tr.querySelector('[data-role="person"]').addEventListener('change', e=>{
-        if(!e.target.value) return;
-        const [ptype, pname] = e.target.value.split('::');
-        updateRow(exc.id, r.id, { personType: ptype, person: pname });
-      });
-      const cpEl = tr.querySelector('[data-role="customPartnerName"]');
-      if(cpEl) cpEl.addEventListener('input', e=> updateRow(exc.id, r.id, {customPartnerName:e.target.value}, {debounceRender:true}));
-      tr.querySelector('[data-role="chol"]').addEventListener('input', e=> updateRow(exc.id, r.id, {chol:parseDecimalInput(e.target.value)}, {debounceRender:true}));
-      const zEl = tr.querySelector('[data-role="zibrano"]');
-      if(zEl) zEl.addEventListener('input', e=> updateRow(exc.id, r.id, {zibrano:parseDecimalInput(e.target.value)}, {debounceRender:true}));
-      const qEl = tr.querySelector('[data-role="quitky"]');
-      if(qEl) qEl.addEventListener('input', e=> updateRow(exc.id, r.id, {quitky:parseDecimalInput(e.target.value)}, {debounceRender:true}));
-      const delBtn = tr.querySelector('[data-role="delRow"]');
-      if(delBtn) delBtn.addEventListener('click', ()=> deleteRow(exc.id, r.id));
+    });
+    // Single delegated handler on the stable rowsBody container — per-row listeners on
+    // freshly created elements have previously proven unreliable on Android/Chrome taps.
+    tbody.addEventListener('click', e=>{
+      const recBtn = e.target.closest('[data-role="markReceived"]');
+      if(recBtn){
+        e.preventDefault(); e.stopPropagation();
+        const who = (currentProfile && (currentProfile.login || currentProfile.guide_name)) || 'manager';
+        updateRow(exc.id, recBtn.dataset.rowId, { received:true, receivedBy: who, receivedAt: new Date().toISOString() });
+        return;
+      }
+      const openEl = e.target.closest('[data-role="rowOpen"]');
+      if(openEl) openRowDetailModal(exc.id, openEl.dataset.rowId);
     });
 
-    card.querySelector('[data-role="excName"]').addEventListener('change', e=>{
-      const name = e.target.value;
-      updateExcursion(exc.id, { name, guideFeeDefault: DEFAULT_GUIDE_FEE[name]||0, guideFee: DEFAULT_GUIDE_FEE[name]||0, guideFeeReason:"" });
+
+    card.querySelector('[data-role="editExcName"]').addEventListener('click', e=>{
+      e.preventDefault(); e.stopPropagation();
+      openExcNameModal(exc.id);
     });
-    const cn = card.querySelector('[data-role="customName"]');
-    if(cn) cn.addEventListener('input', e=> updateExcursion(exc.id, {customName:e.target.value}, {debounceRender:true}));
     card.querySelector('[data-role="busOwner"]').addEventListener('change', e=> updateExcursion(exc.id, {busOwner:e.target.value, busRate: e.target.value==='own'?OWN_BUS_RATE:exc.busRate}));
     const brEl = card.querySelector('[data-role="busRate"]');
     if(brEl) brEl.addEventListener('change', e=> updateExcursion(exc.id, {busRate:Number(e.target.value)}));
@@ -1935,15 +1894,10 @@ function renderExcursions(){
     if(gfEl) gfEl.addEventListener('input', e=> updateExcursion(exc.id, {guideFee:parseDecimalInput(e.target.value)}, {debounceRender:true}));
     const grEl = card.querySelector('[data-role="guideFeeReason"]');
     if(grEl) grEl.addEventListener('input', e=> updateExcursion(exc.id, {guideFeeReason:e.target.value}, {debounceRender:true}));
-    const recEl = card.querySelector('[data-role="recipientGuide"]');
-    if(recEl) recEl.addEventListener('change', e=> updateExcursion(exc.id, {recipientGuide:e.target.value}));
-    const payEl = card.querySelector('[data-role="payerGuide"]');
-    if(payEl) payEl.addEventListener('change', e=> updateExcursion(exc.id, {payerGuide:e.target.value}));
-    const paidBtn = card.querySelector('[data-role="markPaid"]');
-    if(paidBtn) paidBtn.addEventListener('click', ()=> markSettlementPaid(exc.id, exc.busOwner==='own' ? 'recipient' : 'payer'));
-    const unpaidBtn = card.querySelector('[data-role="unmarkPaid"]');
-    if(unpaidBtn) unpaidBtn.addEventListener('click', ()=> unmarkSettlementPaid(exc.id, exc.busOwner==='own' ? 'recipient' : 'payer'));
-    card.querySelector('[data-role="delExc"]').addEventListener('click', ()=> deleteExcursion(exc.id));
+    card.querySelector('[data-role="delExc"]').addEventListener('click', e=>{
+      e.preventDefault(); e.stopPropagation();
+      deleteExcursion(exc.id);
+    });
     card.querySelector('[data-role="addRow"]').addEventListener('click', ()=> addRow(exc.id));
   });
 }
@@ -2154,7 +2108,8 @@ async function upsertRow(tripId, excId, row){
     id: row.id, excursion_id: excId, trip_id: tripId,
     person_type: row.personType, person: row.person, custom_partner_name: row.customPartnerName,
     chol: Number(row.chol)||0, zibrano: Number(row.zibrano)||0, quitky: Number(row.quitky)||0,
-    is_test: !!(currentProfile && currentProfile.is_test_account)
+    is_test: !!(currentProfile && currentProfile.is_test_account),
+    received: !!row.received, received_by: row.receivedBy||null, received_at: row.receivedAt||null
   });
   if(queued) setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет");
   else setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
@@ -2260,6 +2215,46 @@ function updateExcursion(excId, patch, opts={}){
   if(opts.debounceRender) debouncedPersist('exc:'+excId, ()=> upsertExcursion(tripId, exc));
   else persistNow('exc:'+excId, ()=> upsertExcursion(tripId, exc));
 }
+function openExcNameModal(excId){
+  const tripData = getTripData(currentTripId);
+  const exc = tripData.excursions.find(e=>e.id===excId);
+  if(!exc) return;
+  const existing = document.getElementById('excNameModal');
+  if(existing) existing.remove();
+  const nameOptions = EXCURSIONS.map(n=>`<option value="${n}" ${n===exc.name?'selected':''}>${n}</option>`).join('');
+  const modal = document.createElement('div');
+  modal.id = 'excNameModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = '900';
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:360px;">
+    <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">Назва екскурсії</h2>
+    <select id="excNameModalSelect" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; font-weight:600;">${nameOptions}</select>
+    <input type="text" id="excNameModalCustom" placeholder="Назва екскурсії" value="${exc.customName||''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; margin-top:10px; ${exc.name==='Інше...'?'':'display:none;'}">
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button class="btn btn-primary" id="excNameModalSaveBtn" style="flex:1;">💾 Зберегти</button>
+      <button class="btn btn-ghost" id="excNameModalCancelBtn" style="flex:1;">Скасувати</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  document.getElementById('excNameModalCancelBtn').addEventListener('click', ()=> modal.remove());
+  const selectEl = document.getElementById('excNameModalSelect');
+  const customEl = document.getElementById('excNameModalCustom');
+  selectEl.addEventListener('change', ()=>{
+    customEl.style.display = selectEl.value==='Інше...' ? '' : 'none';
+  });
+  document.getElementById('excNameModalSaveBtn').addEventListener('click', ()=>{
+    const name = selectEl.value;
+    updateExcursion(excId, {
+      name,
+      customName: name==='Інше...' ? customEl.value : "",
+      guideFeeDefault: DEFAULT_GUIDE_FEE[name]||0,
+      guideFee: DEFAULT_GUIDE_FEE[name]||0,
+      guideFeeReason: ""
+    });
+    modal.remove();
+  });
+}
 function updateRow(excId, rowId, patch, opts={}){
   const tripId = currentTripId;
   const tripData = getTripData(tripId);
@@ -2269,6 +2264,127 @@ function updateRow(excId, rowId, patch, opts={}){
   if(opts.debounceRender) debouncedRenderAll(); else renderAll();
   if(opts.debounceRender) debouncedPersist('row:'+rowId, ()=> upsertRow(tripId, excId, row));
   else persistNow('row:'+rowId, ()=> upsertRow(tripId, excId, row));
+}
+function openRowDetailModal(excId, rowId){
+  const tripData = getTripData(currentTripId);
+  const exc = tripData.excursions.find(e=>e.id===excId);
+  if(!exc) return;
+  const rawRow = exc.rows.find(x=>x.id===rowId);
+  if(!rawRow) return;
+  const tripGuideNames = tripData.guides.map(g=>g.name);
+  const takenGuides = exc.rows.filter(other=>other.id!==rowId && other.personType==='guide').map(other=>other.person);
+  const editable = canEditRow(rawRow);
+  // Local draft — nothing is written back until "Зберегти" is pressed.
+  const draft = { ...rawRow };
+
+  const existing = document.getElementById('rowDetailModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'rowDetailModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = '900';
+
+  function preview(){
+    const tempExc = { ...exc, rows: exc.rows.map(x=> x.id===rowId ? draft : x) };
+    return calcExcursion(tempExc).rowResults.find(x=>x.id===rowId);
+  }
+
+  function draw(){
+    const r = preview();
+    const hasPerson = !!r.person;
+    const amountsEditable = editable && hasPerson;
+    const resultHtml = !hasPerson
+          ? `<span class="muted">оберіть гіда/партнера</span>`
+          : r.isGuide
+            ? `<span class="${r.profit>=0?'profit-pos':'profit-neg'}">${fmt(r.profit)} €</span>`
+            : (exc.busOwner==='own'
+                ? `<span class="muted">винен нам ${fmt(r.settlement)} €</span>`
+                : `<span class="muted">розрахунок з партнером</span>`);
+    modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
+      <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">Учасник екскурсії</h2>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <select class="person-select" id="rdmPerson" style="flex:1; min-width:0; box-sizing:border-box; background:${hasPerson?personColor(r):'#c9cdbe'};" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, takenGuides)}</select>
+        ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" id="rdmFillTourists" style="flex-shrink:0; font-size:12px; white-space:nowrap;" title="Заповнити чол/суму з даних гіда в списку туристів">📋 зі списку туристів</button>` : ''}
+      </div>
+      ${r.isTest ? `<div style="font-size:11px; color:#b45309; font-weight:700; margin-bottom:8px;">🧪 ТЕСТ — не враховується в реальних розрахунках</div>` : ''}
+      ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" id="rdmCustomName" value="${r.customPartnerName||''}" style="width:100%; box-sizing:border-box; margin-bottom:8px;" ${editable?'':'disabled'}>` : ''}
+      <div class="row-card-fields">
+        <label>Чол<input type="text" inputmode="decimal" class="num-input" id="rdmChol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></label>
+        <label>Зібрано €${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input num-input-wide" id="rdmZibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted" style="display:block; padding:6px 0;">—</span>`}</label>
+        ${calcExcursion(exc).ticketsApply ? `<label>Квитки €${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input" id="rdmQuitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted" style="display:block; padding:6px 0;">—</span>`}</label>` : ''}
+      </div>
+      ${(()=>{
+        const isGuideViewer = currentProfile && currentProfile.role==='guide';
+        if(isGuideViewer && r.isGuide && hasPerson){
+          return `<div class="row-card-result">
+            <span class="muted">Затрати: ${fmt(r.totalCost)} €</span>
+            <span class="profit-pos">Гід 10%: ${fmt(r.gInc)} €</span>
+          </div>`;
+        }
+        return `<div class="row-card-result">
+          <span class="muted">Затрати: ${hasPerson ? fmt(r.totalCost)+' €' : '—'}</span>
+          <span>${resultHtml}</span>
+        </div>
+        ${hasPerson && r.isGuide ? `<div class="row-card-split muted">Гід 10%: ${fmt(r.gInc)} € · Офіс 90%: ${fmt(r.oInc)} €</div>` : ''}`;
+      })()}
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        ${editable ? `<button class="btn btn-primary" id="rdmSaveBtn" style="flex:1;">💾 Зберегти</button>` : ''}
+        <button class="btn btn-ghost" id="rdmCloseBtn" style="flex:1;">Закрити</button>
+        ${editable ? `<button class="btn btn-danger-ghost" id="rdmDeleteBtn" title="Видалити рядок">🗑️</button>` : ''}
+      </div>
+    </div>`;
+
+    document.getElementById('rdmCloseBtn').addEventListener('click', ()=> modal.remove());
+    const personSel = document.getElementById('rdmPerson');
+    if(personSel) personSel.addEventListener('change', e=>{
+      if(!e.target.value) return;
+      const [ptype, pname] = e.target.value.split('::');
+      Object.assign(draft, {personType:ptype, person:pname});
+      draw();
+    });
+    const custEl = document.getElementById('rdmCustomName');
+    if(custEl) custEl.addEventListener('input', e=>{ draft.customPartnerName = e.target.value; });
+    const cholEl = document.getElementById('rdmChol');
+    if(cholEl) cholEl.addEventListener('input', e=>{ draft.chol = parseDecimalInput(e.target.value); });
+    const zEl = document.getElementById('rdmZibrano');
+    if(zEl) zEl.addEventListener('input', e=>{ draft.zibrano = parseDecimalInput(e.target.value); });
+    const qEl = document.getElementById('rdmQuitky');
+    if(qEl) qEl.addEventListener('input', e=>{ draft.quitky = parseDecimalInput(e.target.value); });
+    const fillBtn = document.getElementById('rdmFillTourists');
+    if(fillBtn) fillBtn.addEventListener('click', async ()=>{
+      fillBtn.disabled = true; fillBtn.textContent = 'Перевіряю…';
+      const byGuideExc = await loadTripGuideExcursionStats();
+      const stats = (byGuideExc[draft.person]||{})[exc.name];
+      if(!stats || stats.count<=0){
+        alert('У списку туристів поки немає даних для цієї екскурсії у гіда '+draft.person+'.');
+        fillBtn.disabled = false; fillBtn.textContent = '📋 зі списку туристів';
+        return;
+      }
+      if(confirm(`Підставити з списку туристів: ${stats.count} чол, ${fmt(stats.sum)} €?\n\n(Поточні значення: ${draft.chol} чол, ${fmt(draft.zibrano)} €)`)){
+        draft.chol = stats.count; draft.zibrano = stats.sum;
+        draw();
+      } else {
+        fillBtn.disabled = false; fillBtn.textContent = '📋 зі списку туристів';
+      }
+    });
+    const saveBtn = document.getElementById('rdmSaveBtn');
+    if(saveBtn) saveBtn.addEventListener('click', ()=>{
+      updateRow(excId, rowId, {
+        personType: draft.personType, person: draft.person, customPartnerName: draft.customPartnerName,
+        chol: draft.chol, zibrano: draft.zibrano, quitky: draft.quitky
+      });
+      modal.remove();
+    });
+    const delBtn = document.getElementById('rdmDeleteBtn');
+    if(delBtn) delBtn.addEventListener('click', ()=>{
+      modal.remove();
+      deleteRow(excId, rowId);
+    });
+  }
+
+  document.body.appendChild(modal);
+  draw();
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
 }
 function deleteRow(excId, rowId){
   if(!confirm('Видалити цей рядок?')) return;
@@ -2431,7 +2547,9 @@ function showFinanceNotifyList(reports){
 }
 setInterval(()=>{ if(currentProfile && currentProfile.role==='manager') checkFinanceSubmissions(); }, 60000);
 setInterval(async ()=>{
-  if(currentSection==='profit' && currentTripId && document.visibilityState==='visible'){
+  const activeTag = document.activeElement && document.activeElement.tagName;
+  const userIsTyping = activeTag==='INPUT' || activeTag==='TEXTAREA' || activeTag==='SELECT';
+  if(currentSection==='profit' && currentTripId && document.visibilityState==='visible' && !userIsTyping){
     await loadTripData(currentTripId);
     renderAll();
   }
@@ -2440,8 +2558,12 @@ setInterval(async ()=>{
 document.getElementById('tabManagerBtn').addEventListener('click', ()=>{
   if(currentProfile.role !== 'manager') return; // hidden for guides anyway; RLS blocks regardless
   localStorage.setItem(MODE_KEY,'manager'); applyMode('manager');
+  document.body.classList.remove('guide-preview-mode');
 });
-document.getElementById('tabGuideBtn').addEventListener('click', ()=>{ localStorage.setItem(MODE_KEY,'guide'); applyMode('guide'); });
+document.getElementById('tabGuideBtn').addEventListener('click', ()=>{
+  localStorage.setItem(MODE_KEY,'guide'); applyMode('guide');
+  document.body.classList.add('guide-preview-mode');
+});
 
 function renderGuideTripSelect(){
   const sel = document.getElementById('guideTripSelect');
@@ -2532,6 +2654,7 @@ async function afterAuthSuccess(){
         applyMode('guide');
       } else {
         applyMode(localStorage.getItem(MODE_KEY) === 'guide' ? 'guide' : 'manager');
+        document.body.classList.toggle('guide-preview-mode', localStorage.getItem(MODE_KEY) === 'guide');
       }
       revealApp();
     }
@@ -2552,6 +2675,7 @@ async function afterAuthSuccess(){
     applyMode('guide');
   } else {
     applyMode(localStorage.getItem(MODE_KEY) === 'guide' ? 'guide' : 'manager');
+        document.body.classList.toggle('guide-preview-mode', localStorage.getItem(MODE_KEY) === 'guide');
   }
 
   revealApp();
@@ -3622,15 +3746,38 @@ function openFinPartnerModal(report, section){
   });
 }
 
-function openFinGuideFeeModalFixed(report, excName){
+async function openFinGuideFeeModalFixed(report, excName){
   const existing = document.getElementById('finGuideFeeModal');
   if(existing) existing.remove();
   const itemKey = 'guidefee_'+excName;
   const current = finEntriesByKey(report.entries, itemKey)[0];
+
+  let lockedBy = null;
+  if(!current){
+    const { data: otherReports } = await sb.from('financial_reports').select('guide_name,entries').eq('trip_id', report.trip_id).neq('guide_name', report.guide_name);
+    const already = (otherReports||[]).find(r=> (r.entries||[]).some(e=> e.itemKey===itemKey && Number(e.amount)>0));
+    if(already){
+      const theirAmt = (already.entries.find(e=>e.itemKey===itemKey)||{}).amount||0;
+      lockedBy = { guide: already.guide_name, amount: theirAmt };
+    }
+  }
+
   const modal = document.createElement('div');
   modal.id = 'finGuideFeeModal';
   modal.className = 'hb-modal-overlay';
   modal.style.zIndex = '900';
+  if(lockedBy){
+    modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
+      <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">🧑‍✈️ Екскурсовод — ${excName}</h2>
+      <p style="font-size:13.5px; margin-bottom:6px;">Цей гонорар уже записаний у звіті гіда <b>${lockedBy.guide}</b> (${fmt(lockedBy.amount)} €).</p>
+      <p class="report-note">Тому тут він заблокований і лишається 0 € — щоб не задвоїти витрату. Якщо це помилка, попроси ${lockedBy.guide} виправити у своєму звіті.</p>
+      <button class="btn btn-ghost" id="finGuideFeeCancelBtn" style="width:100%; margin-top:10px;">Закрити</button>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+    document.getElementById('finGuideFeeCancelBtn').addEventListener('click', ()=> modal.remove());
+    return;
+  }
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
     <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">🧑‍✈️ Екскурсовод — ${excName}</h2>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Сума (€)</label>
@@ -3650,7 +3797,9 @@ function openFinGuideFeeModalFixed(report, excName){
       const already = (otherReports||[]).find(r=> (r.entries||[]).some(e=> e.itemKey===itemKey && Number(e.amount)>0));
       if(already){
         const theirAmt = (already.entries.find(e=>e.itemKey===itemKey)||{}).amount||0;
-        if(!confirm(`Гонорар за "${excName}" уже записаний у звіті гіда ${already.guide_name} (${fmt(theirAmt)} €). Все одно додати ще раз?`)) return;
+        alert(`Поки ти заповнював(ла) — гід ${already.guide_name} уже встиг записати цей гонорар (${fmt(theirAmt)} €). Твій запис не збережено.`);
+        modal.remove();
+        return;
       }
     }
     if(current){ current.amount = amount; }
@@ -4252,12 +4401,43 @@ async function saveFinanceReportToStorage(report, received, paid, totalReceived,
   }
 }
 
+let financeOpenSectionKey = null; // 'received' | 'paid' | 'summary' | null — переживає перемальовки звіту
+
 function finOutsideClickHandler(e){
   const block = document.getElementById('financeReportBlock');
   if(!block) return;
   const detailsEls = block.querySelectorAll('details.fin-top-accordion');
   const clickedInside = [...detailsEls].some(d=> d.contains(e.target));
-  if(!clickedInside) detailsEls.forEach(d=> d.open = false);
+  if(!clickedInside){
+    detailsEls.forEach(d=> d.open = false);
+    financeOpenSectionKey = null;
+  }
+}
+
+function finBlockDelegatedClickHandler(e){
+  const el = e.target.closest('[data-role="finLeafOpen"]');
+  if(!el) return;
+  const report = lastRenderedFinanceReport && lastRenderedFinanceReport.report;
+  if(!report) return;
+  const modalType = el.dataset.modal;
+  if(modalType==='office') openFinSimpleAmountModal(report, 'office', 'Офіс', 'received');
+  else if(modalType==='debt') openFinDebtModal(report);
+  else if(modalType==='collected') openFinCollectedModal(report);
+  else if(modalType==='partner_received') openFinPartnerListModal(report, 'received');
+  else if(modalType==='partner_paid') openFinPartnerListModal(report, 'paid');
+  else if(modalType==='handoff') openFinHandoffModal(report);
+  else if(modalType==='hotel') openFinHotelModal(report);
+  else if(modalType==='bus') openFinBusModal(report);
+  else if(modalType==='borders') openFinSimpleAmountModal(report, 'borders', 'Кордони', 'paid');
+  else if(modalType==='phone') openFinSimpleAmountModal(report, 'phone', 'Телефон', 'paid');
+  else if(modalType==='perdiem') openFinPerdiemModal(report);
+  else if(modalType==='guidefee') openFinGuideFeeModalFixed(report, el.dataset.exc);
+  else if(modalType==='gift') openFinGiftModal(report);
+  else if(modalType==='tickets') openFinTicketsModal(report);
+  else if(modalType==='integration') openFinSimpleAmountModal(report, 'integration', 'Інтеграція', 'paid');
+  else if(modalType==='integration_hotel_prepay') openFinSimpleAmountModal(report, 'integration_hotel_prepay', 'Передоплата за готель', 'paid');
+  else if(modalType==='integration_bus_prepay') openFinSimpleAmountModal(report, 'integration_bus_prepay', 'Передоплата за автобус', 'paid');
+  else if(modalType==='custom') openFinCustomModal(report);
 }
 
 function renderFinanceReport(report){
@@ -4357,7 +4537,7 @@ function renderFinanceReport(report){
       <button class="btn btn-ghost btn-small" id="finExitCorrectionBtn">🔒 Завершити корекцію</button>
     </div>` : ''}
 
-    <details class="fin-top-accordion" style="margin-top:14px;">
+    <details class="fin-top-accordion" data-section-key="received" style="margin-top:14px;" ${financeOpenSectionKey==='received'?'open':''}>
       <summary style="cursor:pointer; font-weight:700; font-size:15px;">💰 Отримано — скільки грошей у мене на руках</summary>
       <div style="margin-top:8px;">
         <div class="fin-panel">${receivedAccordionHtml}</div>
@@ -4365,7 +4545,7 @@ function renderFinanceReport(report){
       </div>
     </details>
 
-    <details class="fin-top-accordion" style="margin-top:10px;">
+    <details class="fin-top-accordion" data-section-key="paid" style="margin-top:10px;" ${financeOpenSectionKey==='paid'?'open':''}>
       <summary style="cursor:pointer; font-weight:700; font-size:15px;">💸 Затрати — куди пішли ці гроші (включно з моєю винагородою)</summary>
       <div style="margin-top:8px;">
         <div class="fin-panel">${paidAccordionHtml}</div>
@@ -4373,7 +4553,7 @@ function renderFinanceReport(report){
       </div>
     </details>
 
-    <details class="fin-top-accordion" style="margin-top:10px;">
+    <details class="fin-top-accordion" data-section-key="summary" style="margin-top:10px;" ${financeOpenSectionKey==='summary'?'open':''}>
       <summary style="cursor:pointer; font-weight:700; font-size:15px;">✅ Підсумок</summary>
       <div style="margin-top:8px; padding-top:14px; border-top:1px dashed var(--line);">
         <div class="fin-total-row"><span>Залишок (маю бути на руках)</span><span>${fmt(balance)} €</span></div>
@@ -4447,35 +4627,22 @@ function renderFinanceReport(report){
   });
 
   // Три головні розділи (Отримано / Затрати / Підсумок) — тільки один відкритий одночасно,
-  // клік поза ними закриває всі.
+  // клік поза ними закриває всі. Стан відкритого розділу зберігається між перемальовками
+  // (наприклад, після збереження суми в модалці), щоб розділ не згортався сам собою.
   const finTopDetailsEls = block.querySelectorAll('details.fin-top-accordion');
   finTopDetailsEls.forEach(d=> d.addEventListener('toggle', ()=>{
-    if(d.open) finTopDetailsEls.forEach(other=>{ if(other!==d) other.open = false; });
+    if(d.open){
+      finTopDetailsEls.forEach(other=>{ if(other!==d) other.open = false; });
+      financeOpenSectionKey = d.dataset.sectionKey;
+    } else if(financeOpenSectionKey === d.dataset.sectionKey){
+      financeOpenSectionKey = null;
+    }
   }));
   document.removeEventListener('click', finOutsideClickHandler);
   document.addEventListener('click', finOutsideClickHandler);
 
-  block.querySelectorAll('[data-role="finLeafOpen"]').forEach(el=> el.addEventListener('click', ()=>{
-    const modalType = el.dataset.modal;
-    if(modalType==='office') openFinSimpleAmountModal(report, 'office', 'Офіс', 'received');
-    else if(modalType==='debt') openFinDebtModal(report);
-    else if(modalType==='collected') openFinCollectedModal(report);
-    else if(modalType==='partner_received') openFinPartnerListModal(report, 'received');
-    else if(modalType==='partner_paid') openFinPartnerListModal(report, 'paid');
-    else if(modalType==='handoff') openFinHandoffModal(report);
-    else if(modalType==='hotel') openFinHotelModal(report);
-    else if(modalType==='bus') openFinBusModal(report);
-    else if(modalType==='borders') openFinSimpleAmountModal(report, 'borders', 'Кордони', 'paid');
-    else if(modalType==='phone') openFinSimpleAmountModal(report, 'phone', 'Телефон', 'paid');
-    else if(modalType==='perdiem') openFinPerdiemModal(report);
-    else if(modalType==='guidefee') openFinGuideFeeModalFixed(report, el.dataset.exc);
-    else if(modalType==='gift') openFinGiftModal(report);
-    else if(modalType==='tickets') openFinTicketsModal(report);
-    else if(modalType==='integration') openFinSimpleAmountModal(report, 'integration', 'Інтеграція', 'paid');
-    else if(modalType==='integration_hotel_prepay') openFinSimpleAmountModal(report, 'integration_hotel_prepay', 'Передоплата за готель', 'paid');
-    else if(modalType==='integration_bus_prepay') openFinSimpleAmountModal(report, 'integration_bus_prepay', 'Передоплата за автобус', 'paid');
-    else if(modalType==='custom') openFinCustomModal(report);
-  }));
+  block.removeEventListener('click', finBlockDelegatedClickHandler);
+  block.addEventListener('click', finBlockDelegatedClickHandler);
   const handedOverInput = document.getElementById('finHandedOver');
   if(handedOverInput) handedOverInput.addEventListener('input', e=>{
     report.handed_over = parseDecimalInput(e.target.value);
@@ -5339,6 +5506,161 @@ async function renderReportsSection(){
   }));
 }
 
+function computeProfitExcursionGroups(tripId){
+  const td = state.trips[tripId];
+  if(!td) return [];
+  const groups = [];
+  (td.excursions||[]).forEach(exc=>{
+    const calc = calcExcursion(exc);
+    const realRows = calc.rowResults.filter(r=>!r.isTest && r.chol>0);
+    if(!realRows.length) return;
+    const excLabel = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+    const guideFeeVal = NO_GUIDE_FEE_EXCURSIONS.includes(exc.name) ? 0 : (Number(exc.guideFee)||0);
+    const isOwnBus = exc.busOwner==='own';
+    let fromPartnerVal = isOwnBus ? calc.partnerShareTotal : 0;
+    let toPartnerVal = isOwnBus ? 0 : calc.guideShareTotal;
+    const fromPartnerOverridden = exc.fromPartnerOverride !== undefined && exc.fromPartnerOverride !== null && exc.fromPartnerOverride !== '';
+    const toPartnerOverridden = exc.toPartnerOverride !== undefined && exc.toPartnerOverride !== null && exc.toPartnerOverride !== '';
+    if(fromPartnerOverridden) fromPartnerVal = Number(exc.fromPartnerOverride)||0;
+    if(toPartnerOverridden) toPartnerVal = Number(exc.toPartnerOverride)||0;
+    const guideRows = realRows.map(r=>({
+      rowId: r.id, person: r.label, isGuide: r.isGuide, chol: r.chol,
+      zibrano: r.isGuide ? (Number(r.zibrano)||0) : 0,
+      tickets: calc.ticketsApply ? (Number(r.quitky)||0) : '',
+      perPersonCost: Math.round(r.totalCost*100)/100,
+      profit: r.isGuide ? Math.round(r.profit*100)/100 : null,
+      pct: r.isGuide ? Math.round(r.profit*GUIDE_SHARE*100)/100 : null,
+      office: r.isGuide ? Math.round(r.profit*OFFICE_SHARE*100)/100 : null
+    }));
+    const totalProfit = guideRows.reduce((s,r)=>s+(r.profit||0),0);
+    groups.push({
+      excId: exc.id, excLabel, isOwnBus, ticketsApply: calc.ticketsApply,
+      km: Number(exc.km)||0, busRate: Number(exc.busRate)||0, busPayment: calc.busPayment,
+      guideFee: guideFeeVal, expenses: calc.busPayment+guideFeeVal,
+      weOwePartner: toPartnerVal, partnerOwesUs: fromPartnerVal, fromPartnerOverridden, toPartnerOverridden,
+      totalPeople: calc.totalPeople, totalProfit, guideRows
+    });
+  });
+  return groups;
+}
+
+function buildProfitExcursionListHtml(tripId){
+  const groups = computeProfitExcursionGroups(tripId);
+  if(!groups.length) return '<p class="report-note">Немає екскурсій.</p>';
+  const visibleGroups = profitTableGuideFilter ? groups.filter(g=> g.guideRows.some(r=>r.isGuide && r.person===profitTableGuideFilter)) : groups;
+  if(!visibleGroups.length) return '<p class="report-note">У цього гіда немає екскурсій.</p>';
+  return visibleGroups.map(g=>`
+    <div class="fin-list-row" data-role="profitExcOpen" data-exc="${g.excId}" style="cursor:pointer;">
+      <span style="flex:1;">${g.excLabel} <span class="muted" style="font-size:11px;">(${g.isOwnBus?'наш автобус':'партнерський'} · ${g.totalPeople} чол)</span></span>
+      <span class="${g.totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(g.totalProfit)} €</span>
+    </div>
+  `).join('');
+}
+
+function openProfitExcursionDetailModal(tripId, excId){
+  const groups = computeProfitExcursionGroups(tripId);
+  const g = groups.find(x=>x.excId===excId);
+  if(!g) return;
+  const existing = document.getElementById('profitExcDetailModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'profitExcDetailModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = '850';
+
+  const guideRowsHtml = g.guideRows.map(r=>{
+    const dimmed = profitTableGuideFilter && !(r.isGuide && r.person===profitTableGuideFilter);
+    return `<div style="padding:8px 0; border-bottom:1px solid #f0f0ea; ${dimmed?'opacity:.3;':''}">
+      <div style="display:flex; justify-content:space-between; font-weight:600;">
+        <span>${r.isGuide ? guideDisplayLabel(tripId, r.person) : r.person}</span><span>${r.chol} чол</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-top:2px; flex-wrap:wrap; gap:6px;">
+        <span data-role="profitFieldOpen" data-field="zibrano" data-row="${r.rowId}" style="cursor:pointer; text-decoration:underline dotted;">Зібрано: ${fmt(r.zibrano)} €</span>
+        ${g.ticketsApply ? `<span data-role="profitFieldOpen" data-field="tickets" data-row="${r.rowId}" style="cursor:pointer; text-decoration:underline dotted;">Квитки: ${fmt(r.tickets||0)} €</span>` : ''}
+      </div>
+      ${r.isGuide ? `<div style="display:flex; justify-content:space-between; font-size:12px; margin-top:2px; color:var(--ink-soft); flex-wrap:wrap; gap:6px;">
+        <span>Прибуток: ${fmt(r.profit)} €</span><span>10%: ${fmt(r.pct)} €</span><span>Офіс: ${fmt(r.office)} €</span>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:460px;">
+    <h2 style="font-size:17px; font-weight:700; margin-bottom:4px;">${g.excLabel}</h2>
+    <p class="report-note" style="margin-top:0;">${g.isOwnBus?'Наш автобус':'Партнерський автобус'} · ${g.totalPeople} чол</p>
+
+    <div class="fin-panel" style="margin-top:8px;">
+      <div class="fin-list-row" data-role="profitFieldOpen" data-field="km" style="cursor:pointer;"><span style="flex:1;">км</span><span>${fmt(g.km)}</span></div>
+      <div class="fin-list-row" data-role="profitFieldOpen" data-field="busRate" style="cursor:pointer;"><span style="flex:1;">€/км</span><span>${fmt(g.busRate)}</span></div>
+      <div class="fin-list-row"><span style="flex:1;">Оплата км (авто)</span><span>${fmt(g.busPayment)} €</span></div>
+      <div class="fin-list-row" data-role="profitFieldOpen" data-field="guideFee" style="cursor:pointer;"><span style="flex:1;">Гонорар гіда</span><span>${fmt(g.guideFee)} €</span></div>
+      ${g.isOwnBus
+        ? `<div class="fin-list-row" data-role="profitFieldOpen" data-field="partnerOwesUs" style="cursor:pointer;"><span style="flex:1;">Партнер→нам${g.fromPartnerOverridden?' ✎':''}</span><span>${fmt(g.partnerOwesUs)} €</span></div>`
+        : `<div class="fin-list-row" data-role="profitFieldOpen" data-field="weOwePartner" style="cursor:pointer;"><span style="flex:1;">Ми→партнеру${g.toPartnerOverridden?' ✎':''}</span><span>${fmt(g.weOwePartner)} €</span></div>`
+      }
+    </div>
+
+    <p class="fin-section-title" style="margin-top:12px;">По гідах</p>
+    ${guideRowsHtml}
+
+    <div class="fin-total-row" style="margin-top:10px;"><span>Прибуток екскурсії</span><span class="${g.totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(g.totalProfit)} €</span></div>
+    <button class="btn btn-ghost" id="profitExcDetailCloseBtn" style="width:100%; margin-top:14px;">Закрити</button>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  document.getElementById('profitExcDetailCloseBtn').addEventListener('click', ()=> modal.remove());
+  modal.querySelectorAll('[data-role="profitFieldOpen"]').forEach(el=> el.addEventListener('click', ()=>{
+    openProfitFieldEditModal(tripId, excId, el.dataset.field, el.dataset.row);
+  }));
+}
+
+function openProfitFieldEditModal(tripId, excId, field, rowId){
+  const existing = document.getElementById('profitFieldModal');
+  if(existing) existing.remove();
+  const td = state.trips[tripId];
+  const exc = (td?td.excursions||[]:[]).find(x=>x.id===excId);
+  if(!exc) return;
+  const row = rowId ? (exc.rows||[]).find(r=>r.id===rowId) : null;
+  const fieldMeta = {
+    km: { label:'км', current: exc.km },
+    busRate: { label:'€/км', current: exc.busRate },
+    guideFee: { label:'Гонорар гіда (€)', current: exc.guideFee },
+    weOwePartner: { label:'Ми → партнеру (€)', current: exc.toPartnerOverride },
+    partnerOwesUs: { label:'Партнер → нам (€)', current: exc.fromPartnerOverride },
+    zibrano: { label:'Зібрано (€)', current: row?row.zibrano:0 },
+    tickets: { label:'Квитки (€)', current: row?row.quitky:0 }
+  }[field];
+  if(!fieldMeta) return;
+  const modal = document.createElement('div');
+  modal.id = 'profitFieldModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = '900';
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:340px;">
+    <h2 style="font-size:16px; font-weight:700; margin-bottom:10px;">${fieldMeta.label}</h2>
+    <input type="text" inputmode="decimal" id="profitFieldValue" value="${fieldMeta.current||''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button class="btn btn-primary" id="profitFieldSaveBtn" style="flex:1;">💾 Зберегти</button>
+      <button class="btn btn-ghost" id="profitFieldCancelBtn" style="flex:1;">Скасувати</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  document.getElementById('profitFieldCancelBtn').addEventListener('click', ()=> modal.remove());
+  document.getElementById('profitFieldSaveBtn').addEventListener('click', async ()=>{
+    const val = parseDecimalInput(document.getElementById('profitFieldValue').value);
+    if(field==='km'){ exc.km = val; await upsertExcursion(tripId, exc); }
+    else if(field==='busRate'){ exc.busRate = val; await upsertExcursion(tripId, exc); }
+    else if(field==='guideFee'){ exc.guideFee = val; await upsertExcursion(tripId, exc); }
+    else if(field==='weOwePartner'){ exc.toPartnerOverride = val; await upsertExcursion(tripId, exc); }
+    else if(field==='partnerOwesUs'){ exc.fromPartnerOverride = val; await upsertExcursion(tripId, exc); }
+    else if(field==='zibrano'){ if(row){ row.zibrano = val; await upsertRow(tripId, exc.id, row); } }
+    else if(field==='tickets'){ if(row){ row.quitky = val; await upsertRow(tripId, exc.id, row); } }
+    modal.remove();
+    const listWrap = document.getElementById('tripProfitListWrap');
+    if(listWrap) listWrap.innerHTML = buildProfitExcursionListHtml(tripId);
+    openProfitExcursionDetailModal(tripId, excId);
+  });
+}
+
 function showTripProfitabilityView(tripId){
   let modal = document.getElementById('reportsDrilldownModal');
   if(modal) modal.remove();
@@ -5346,8 +5668,8 @@ function showTripProfitabilityView(tripId){
   modal.id = 'reportsDrilldownModal';
   modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:800; display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;';
   const def = TRIPS_DEF.find(d=>d.id===tripId);
-  const earningsByGuide = {};
   const td = state.trips[tripId];
+  const earningsByGuide = {};
   (td ? td.excursions||[] : []).forEach(exc=>{
     const calc = calcExcursion(exc);
     calc.rowResults.filter(r=>r.isGuide && !r.isTest).forEach(r=>{
@@ -5361,47 +5683,31 @@ function showTripProfitabilityView(tripId){
       <tbody>${guideNames.map(g=>`<tr><td style="text-align:left;">${guideDisplayLabel(tripId, g)}</td><td>${fmt(earningsByGuide[g])} €</td></tr>`).join('')}</tbody>
     </table>
   ` : `<p class="report-note">Немає даних.</p>`;
-  modal.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:98vw; width:100%; margin:20px 0;">
+  modal.innerHTML = `<div style="background:#fff; border-radius:12px; padding:20px; max-width:560px; width:100%; margin:20px 0;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
       <p class="report-title" style="margin:0;">💰 Прибутковість екскурсій</p>
       <button class="btn btn-ghost btn-small" id="tripProfitCloseBtn">✕ Закрити</button>
     </div>
     <p class="report-note" style="margin-top:0;">${def?def.label:''}</p>
     <div class="no-print" style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-      <button class="btn btn-ghost btn-small" id="tripProfitEditToggleBtn">${profitTableEditUnlocked ? '🔒 Заблокувати правки' : '🔓 Дозволити правки (Зібрано / Екскурсовод / Квитки)'}</button>
       <button class="btn btn-ghost btn-small" id="tripProfitPrintBtn">🖨 Друк</button>
       <span class="muted">Показати тільки:</span>
       <select id="tripProfitGuideFilter">
         <option value="">Усіх гідів</option>
         ${(td ? td.guides||[] : []).map(g=>`<option value="${g.name}" ${profitTableGuideFilter===g.name?'selected':''}>${g.name}</option>`).join('')}
       </select>
-      ${profitTableEditUnlocked ? `<span class="muted" style="font-size:12px; color:var(--bad, #b91c1c);">Режим правок увімкнено — зміни зберігаються одразу в «Прибутковості».</span>` : ''}
     </div>
-    <div id="tripProfitDetailWrap" style="margin-top:8px;">${buildTripProfitDetailTableHtml(tripId)}</div>
+    <div id="tripProfitListWrap" class="fin-panel" style="margin-top:10px;">${buildProfitExcursionListHtml(tripId)}</div>
 
-    <p class="fin-section-title" style="margin-top:16px;">Заробіток наших гідів на екскурсіях</p>
-    ${earningsHtml}
-
-    <details style="margin-top:16px;">
-      <summary style="cursor:pointer; font-weight:700; font-size:14px;">➕ Альтернативний розрахунок (дорога нашого автобуса повертається в офіс)</summary>
-      <p class="report-note" style="margin-top:6px;">Для екскурсій на нашому автобусі — той самий розрахунок, що вище, але до суми «Офіс» додається вартість кілометражу (бо ці кошти зрештою повертає гід через загальний звіт керівника). Для екскурсій на автобусі партнера — без змін.</p>
-      <div id="tripProfitAltWrap" style="margin-top:8px;"></div>
-    </details>
+    <div class="fin-list-row" data-role="profitEarningsOpen" style="cursor:pointer; margin-top:10px;"><span style="flex:1;">📊 Заробіток наших гідів на екскурсіях</span></div>
+    <div class="fin-list-row" data-role="profitAltOpen" style="cursor:pointer;"><span style="flex:1;">➕ Альтернативний розрахунок (дорога нашого автобуса повертається в офіс)</span></div>
   </div>`;
   document.body.appendChild(modal);
   document.getElementById('tripProfitCloseBtn').addEventListener('click', ()=> modal.remove());
   modal.addEventListener('click', (e)=>{ if(e.target===modal) modal.remove(); });
-  document.getElementById('tripProfitEditToggleBtn').addEventListener('click', ()=>{
-    if(!profitTableEditUnlocked){
-      if(!confirm('Дозволити правки вхідних даних (Зібрано / Екскурсовод / Квитки) прямо тут? Зміни одразу зберігаються в «Прибутковості».')) return;
-    }
-    profitTableEditUnlocked = !profitTableEditUnlocked;
-    showTripProfitabilityView(tripId);
-  });
   document.getElementById('tripProfitGuideFilter').addEventListener('change', e=>{
     profitTableGuideFilter = e.target.value || null;
-    document.getElementById('tripProfitDetailWrap').innerHTML = buildTripProfitDetailTableHtml(tripId);
-    wireTripProfitDetailInputs(tripId);
+    document.getElementById('tripProfitListWrap').innerHTML = buildProfitExcursionListHtml(tripId);
   });
   document.getElementById('tripProfitPrintBtn').addEventListener('click', ()=>{
     docOpenPrintWindow(`Прибутковість екскурсій — ${def?def.label:''}`, `
@@ -5414,12 +5720,40 @@ function showTripProfitabilityView(tripId){
       ${buildTripProfitAltTableHtml(tripId)}
     `);
   });
-  wireTripProfitDetailInputs(tripId);
-  modal.querySelector('details').addEventListener('toggle', function(){
-    if(!this.open) return;
+  document.getElementById('tripProfitListWrap').querySelectorAll('[data-role="profitExcOpen"]').forEach(el=> el.addEventListener('click', ()=>{
+    openProfitExcursionDetailModal(tripId, el.dataset.exc);
+  }));
+  modal.querySelector('[data-role="profitEarningsOpen"]').addEventListener('click', ()=>{
+    const detail = document.createElement('div');
+    detail.id = 'profitEarningsModal';
+    detail.className = 'hb-modal-overlay';
+    detail.style.zIndex = '850';
+    detail.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
+      <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">📊 Заробіток наших гідів на екскурсіях</h2>
+      ${earningsHtml}
+      <button class="btn btn-ghost" id="profitEarningsCloseBtn" style="width:100%; margin-top:14px;">Закрити</button>
+    </div>`;
+    document.body.appendChild(detail);
+    detail.addEventListener('click', e=>{ if(e.target===detail) detail.remove(); });
+    document.getElementById('profitEarningsCloseBtn').addEventListener('click', ()=> detail.remove());
+  });
+  modal.querySelector('[data-role="profitAltOpen"]').addEventListener('click', ()=>{
+    const detail = document.createElement('div');
+    detail.id = 'profitAltModal';
+    detail.className = 'hb-modal-overlay';
+    detail.style.zIndex = '850';
+    detail.innerHTML = `<div class="hb-modal-card" style="max-width:600px;">
+      <h2 style="font-size:17px; font-weight:700; margin-bottom:6px;">➕ Альтернативний розрахунок</h2>
+      <p class="report-note" style="margin-top:0;">Для екскурсій на нашому автобусі — той самий розрахунок, але до суми «Офіс» додається вартість кілометражу (бо ці кошти зрештою повертає гід через загальний звіт керівника). Для екскурсій на автобусі партнера — без змін.</p>
+      <div id="tripProfitAltWrap" style="margin-top:8px;"></div>
+      <button class="btn btn-ghost" id="profitAltCloseBtn" style="width:100%; margin-top:14px;">Закрити</button>
+    </div>`;
+    document.body.appendChild(detail);
+    detail.addEventListener('click', e=>{ if(e.target===detail) detail.remove(); });
+    document.getElementById('profitAltCloseBtn').addEventListener('click', ()=> detail.remove());
     document.getElementById('tripProfitAltWrap').innerHTML = buildTripProfitAltTableHtml(tripId);
     wireTripProfitAltInputs(tripId);
-  }, { once:true });
+  });
 }
 
 let profitDetailRerenderTimer;
