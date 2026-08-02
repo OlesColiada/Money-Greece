@@ -273,10 +273,11 @@
   .row-card{ border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:var(--whitewash); animation: fadeInUp 0.2s ease both; }
   .row-card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px; }
   .row-card-top .person-select{ width:100%; }
-  .row-card-summary{ display:flex; align-items:center; gap:8px; row-gap:6px; flex-wrap:wrap; cursor:pointer; }
-  .row-summary-mid{ flex:1; font-size:12px; white-space:nowrap; }
-  .row-summary-result{ font-size:12.5px; font-weight:700; flex-shrink:0; white-space:nowrap; }
-  .person-chip{ border-radius:6px; padding:4px 8px; font-weight:600; font-size:12px; color:#fff; flex-shrink:0; white-space:nowrap; }
+  .row-card-summary{ display:flex; align-items:center; gap:6px; row-gap:6px; flex-wrap:nowrap; cursor:pointer; }
+  .row-summary-mid{ flex:1; min-width:0; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row-summary-result{ font-size:12px; font-weight:700; flex-shrink:0; white-space:nowrap; }
+  .person-chip{ border-radius:6px; padding:4px 7px; font-weight:600; font-size:12px; color:#fff; flex-shrink:0; white-space:nowrap; }
+  .row-card-summary .btn-small{ padding:3px 7px; font-size:11px; min-height:0; }
   .row-card-fields{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
   .row-card-fields label{ display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:var(--ink-soft); flex:1; min-width:78px; }
   .row-card-fields input{ width:100%; box-sizing:border-box; }
@@ -1851,7 +1852,7 @@ function renderExcursions(){
             : r.isGuide
               ? `<span class="${r.profit>=0?'profit-pos':'profit-neg'}">${fmt(r.profit)} €</span>`
               : (exc.busOwner==='own'
-                  ? `<span class="muted">винен нам ${fmt(r.settlement)} €</span>`
+                  ? `<span class="muted">винен нам ${Math.round(Number(r.settlement)||0)} €</span>`
                   : `<span class="muted">розрахунок з партнером</span>`);
       const showReceived = hasPerson && !r.isGuide && exc.busOwner==='own' && r.settlement > 0;
       const receivedHtml = !showReceived ? '' : r.received
