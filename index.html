@@ -1786,13 +1786,14 @@ function renderExcursions(){
 
     card.innerHTML = `
       <summary class="exc-head-summary">
-        <span class="exc-title-text">${displayName} <span class="exc-edit-name-icon no-print" data-role="editExcName" title="Змінити назву екскурсії">✏️</span></span>
+        <span class="exc-title-text">${displayName}</span>
         <span class="muted" style="font-size:12.5px;">${calc.totalPeople} чол · <span class="${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span></span>
+        <span class="exc-edit-name-icon no-print" data-role="editExcName" title="Змінити назву екскурсії">✏️</span>
         <button class="btn btn-danger-ghost no-print exc-del-btn" data-role="delExc" title="Видалити екскурсію">🗑️</button>
       </summary>
       <div class="exc-body">
         <div class="row-card-summary bus-fee-summary" data-role="openBusFeeModal" style="margin-bottom:12px;">
-          <span class="row-summary-mid muted">🚌 ${exc.busOwner==='own' ? 'наш' : 'партнерський ('+Number(exc.busRate).toFixed(1)+' €/км)'} · ${String(exc.km).replace('.',',')} км → ${fmt(calc.busPayment)} €${noGuideFee ? '' : ' · Екскурсовод ' + fmt(exc.guideFee) + ' €'}</span>
+          <span class="row-summary-mid muted">🚌 <b>Автобус і Екскурсовод:</b> ${exc.busOwner==='own' ? 'наш' : 'партнерський ('+Number(exc.busRate).toFixed(1)+' €/км)'} · ${String(exc.km).replace('.',',')} км → ${fmt(calc.busPayment)} €${noGuideFee ? '' : ' · ' + fmt(exc.guideFee) + ' €'}</span>
           <span class="exc-edit-name-icon no-print">✏️</span>
         </div>
 
@@ -2327,7 +2328,6 @@ function openRowDetailModal(excId, rowId){
   const editable = canEditRow(rawRow);
   // Local draft — nothing is written back until "Зберегти" is pressed.
   const draft = { ...rawRow };
-  let personPickerOpen = !draft.person; // new/unassigned rows go straight to picking
 
   const existing = document.getElementById('rowDetailModal');
   if(existing) existing.remove();
@@ -2355,9 +2355,9 @@ function openRowDetailModal(excId, rowId){
     modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
       <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">Учасник екскурсії</h2>
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        ${personPickerOpen
-          ? `<select class="person-select" id="rdmPerson" style="flex:1; min-width:0; box-sizing:border-box; background:${hasPerson?personColor(r):'#c9cdbe'};" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, takenGuides)}</select>`
-          : `<span class="person-chip" style="background:${personColor(r)};">${r.label}${editable ? ` <span class="exc-edit-name-icon no-print" id="rdmChangePerson" title="Змінити гіда/партнера">✏️</span>` : ''}</span>`
+        ${!hasPerson
+          ? `<select class="person-select" id="rdmPerson" style="flex:1; min-width:0; box-sizing:border-box; background:#c9cdbe;" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, takenGuides)}</select>`
+          : `<span class="person-chip" style="background:${personColor(r)};">${r.label}</span>`
         }
         ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" id="rdmFillTourists" style="flex-shrink:0; font-size:12px; white-space:nowrap;" title="Заповнити чол/суму з даних гіда в списку туристів">📋 зі списку туристів</button>` : ''}
       </div>
@@ -2395,12 +2395,6 @@ function openRowDetailModal(excId, rowId){
       if(!e.target.value) return;
       const [ptype, pname] = e.target.value.split('::');
       Object.assign(draft, {personType:ptype, person:pname});
-      personPickerOpen = false;
-      draw();
-    });
-    const changePersonBtn = document.getElementById('rdmChangePerson');
-    if(changePersonBtn) changePersonBtn.addEventListener('click', ()=>{
-      personPickerOpen = true;
       draw();
     });
     const custEl = document.getElementById('rdmCustomName');
