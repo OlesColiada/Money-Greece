@@ -249,6 +249,7 @@
   .exc-title-text{flex:1;}
   .exc-edit-name-icon{font-size:13px; opacity:0.55; margin-left:4px; cursor:pointer;}
   .exc-edit-name-icon:hover{opacity:1;}
+  .bus-fee-summary{ border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:var(--whitewash); justify-content:space-between; }
   .exc-del-btn{padding:5px 9px; font-size:14px; line-height:1; flex-shrink:0;}
   .field-group{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft);}
   .km-input, .rate-input, .guidefee-input{width:76px; text-align:right;}
@@ -1779,7 +1780,6 @@ function renderExcursions(){
     const card = document.createElement('details');
     card.className = 'exc-card';
     card.open = !!excOpenState[exc.id];
-    const feeDiffers = Number(exc.guideFee) !== Number(exc.guideFeeDefault);
     const noGuideFee = NO_GUIDE_FEE_EXCURSIONS.includes(exc.name);
     const displayName = exc.name==="Інше..." ? (exc.customName || "Інше") : exc.name;
     const totalProfit = calc.rowResults.filter(r=>r.isGuide && !r.isTest).reduce((s,r)=>s+(Number(r.profit)||0),0);
@@ -1791,29 +1791,9 @@ function renderExcursions(){
         <button class="btn btn-danger-ghost no-print exc-del-btn" data-role="delExc" title="Видалити екскурсію">🗑️</button>
       </summary>
       <div class="exc-body">
-        <div class="subgrid">
-          <div class="field-group" style="flex-wrap:nowrap;">
-            <span style="flex-shrink:0;">Автобус:</span>
-            <select data-role="busOwner" style="flex:1; min-width:0;">
-              <option value="own" ${exc.busOwner==='own'?'selected':''}>наш (1.6 €/км)</option>
-              <option value="partner" ${exc.busOwner==='partner'?'selected':''}>партнерський</option>
-            </select>
-            ${exc.busOwner==='partner' ? `<select class="rate-input" data-role="busRate" style="flex-shrink:0;">${BUS_RATES.map(r=>`<option value="${r}" ${Number(exc.busRate)===r?'selected':''}>${r.toFixed(1)}</option>`).join('')}</select>` : ''}
-          </div>
-          <div class="field-group">
-            <span>Км екскурсії:</span>
-            <input type="text" inputmode="decimal" pattern="[0-9]*[,\.]?[0-9]*" class="km-input" data-role="km" value="${String(exc.km).replace('.',',')}">
-            <span class="muted">→ ${fmt(calc.busPayment)} €</span>
-          </div>
-        </div>
-
-        <div class="subgrid">
-          ${noGuideFee ? `` : `
-          <div class="field-group" style="flex-direction:column; align-items:flex-start; gap:6px;">
-            <span>Екскурсовод, €${exc.guideFeeDefault ? ` (стандарт ${exc.guideFeeDefault})` : ''}:</span>
-            <input type="text" inputmode="decimal" class="guidefee-input" data-role="guideFee" value="${exc.guideFee}">
-            ${feeDiffers ? `<input type="text" class="reason-input" placeholder="Причина зміни стандартної ціни" value="${exc.guideFeeReason||''}" data-role="guideFeeReason">` : ''}
-          </div>`}
+        <div class="row-card-summary bus-fee-summary" data-role="openBusFeeModal" style="margin-bottom:12px;">
+          <span class="row-summary-mid muted">🚌 ${exc.busOwner==='own' ? 'наш' : 'партнерський ('+Number(exc.busRate).toFixed(1)+' €/км)'} · ${String(exc.km).replace('.',',')} км → ${fmt(calc.busPayment)} €${noGuideFee ? '' : ' · Екскурсовод ' + fmt(exc.guideFee) + ' €'}</span>
+          <span class="exc-edit-name-icon no-print">✏️</span>
         </div>
 
         <div class="rows-cards" data-role="rowsBody"></div>
@@ -1887,14 +1867,10 @@ function renderExcursions(){
       e.preventDefault(); e.stopPropagation();
       openExcNameModal(exc.id);
     });
-    card.querySelector('[data-role="busOwner"]').addEventListener('change', e=> updateExcursion(exc.id, {busOwner:e.target.value, busRate: e.target.value==='own'?OWN_BUS_RATE:exc.busRate}));
-    const brEl = card.querySelector('[data-role="busRate"]');
-    if(brEl) brEl.addEventListener('change', e=> updateExcursion(exc.id, {busRate:Number(e.target.value)}));
-    card.querySelector('[data-role="km"]').addEventListener('input', e=> updateExcursion(exc.id, {km:e.target.value.replace(',','.')}, {debounceRender:true}));
-    const gfEl = card.querySelector('[data-role="guideFee"]');
-    if(gfEl) gfEl.addEventListener('input', e=> updateExcursion(exc.id, {guideFee:parseDecimalInput(e.target.value)}, {debounceRender:true}));
-    const grEl = card.querySelector('[data-role="guideFeeReason"]');
-    if(grEl) grEl.addEventListener('input', e=> updateExcursion(exc.id, {guideFeeReason:e.target.value}, {debounceRender:true}));
+    card.querySelector('[data-role="openBusFeeModal"]').addEventListener('click', e=>{
+      e.preventDefault(); e.stopPropagation();
+      openBusFeeModal(exc.id);
+    });
     card.querySelector('[data-role="delExc"]').addEventListener('click', e=>{
       e.preventDefault(); e.stopPropagation();
       deleteExcursion(exc.id);
@@ -2256,6 +2232,80 @@ function openExcNameModal(excId){
     modal.remove();
   });
 }
+function openBusFeeModal(excId){
+  const tripData = getTripData(currentTripId);
+  const exc = tripData.excursions.find(e=>e.id===excId);
+  if(!exc) return;
+  const noGuideFee = NO_GUIDE_FEE_EXCURSIONS.includes(exc.name);
+  const draft = { busOwner: exc.busOwner, busRate: exc.busRate, km: exc.km, guideFee: exc.guideFee, guideFeeReason: exc.guideFeeReason||"" };
+
+  const existing = document.getElementById('busFeeModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'busFeeModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = '900';
+
+  function preview(){
+    return calcExcursion({ ...exc, busOwner:draft.busOwner, busRate:draft.busRate, km:draft.km, guideFee:draft.guideFee });
+  }
+
+  function draw(){
+    const calc = preview();
+    const feeDiffers = Number(draft.guideFee) !== Number(exc.guideFeeDefault);
+    modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
+      <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">Автобус і гід</h2>
+      <div class="field-group" style="flex-wrap:nowrap; margin-bottom:10px;">
+        <span style="flex-shrink:0;">Автобус:</span>
+        <select id="bfmBusOwner" style="flex:1; min-width:0;">
+          <option value="own" ${draft.busOwner==='own'?'selected':''}>наш (1.6 €/км)</option>
+          <option value="partner" ${draft.busOwner==='partner'?'selected':''}>партнерський</option>
+        </select>
+        ${draft.busOwner==='partner' ? `<select class="rate-input" id="bfmBusRate" style="flex-shrink:0;">${BUS_RATES.map(r=>`<option value="${r}" ${Number(draft.busRate)===r?'selected':''}>${r.toFixed(1)}</option>`).join('')}</select>` : ''}
+      </div>
+      <div class="field-group" style="margin-bottom:10px;">
+        <span>Км екскурсії:</span>
+        <input type="text" inputmode="decimal" pattern="[0-9]*[,\\.]?[0-9]*" class="km-input" id="bfmKm" value="${String(draft.km).replace('.',',')}">
+        <span class="muted">→ ${fmt(calc.busPayment)} €</span>
+      </div>
+      ${noGuideFee ? '' : `
+      <div class="field-group" style="flex-direction:column; align-items:flex-start; gap:6px; margin-bottom:10px;">
+        <span>Екскурсовод, €${exc.guideFeeDefault ? ` (стандарт ${exc.guideFeeDefault})` : ''}:</span>
+        <input type="text" inputmode="decimal" class="guidefee-input" id="bfmGuideFee" value="${draft.guideFee}">
+        ${feeDiffers ? `<input type="text" class="reason-input" placeholder="Причина зміни стандартної ціни" id="bfmGuideFeeReason" value="${draft.guideFeeReason||''}">` : ''}
+      </div>`}
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn btn-primary" id="bfmSaveBtn" style="flex:1;">💾 Зберегти</button>
+        <button class="btn btn-ghost" id="bfmCloseBtn" style="flex:1;">Закрити</button>
+      </div>
+    </div>`;
+
+    document.getElementById('bfmCloseBtn').addEventListener('click', ()=> modal.remove());
+    document.getElementById('bfmBusOwner').addEventListener('change', e=>{
+      draft.busOwner = e.target.value;
+      if(draft.busOwner==='own') draft.busRate = OWN_BUS_RATE;
+      draw();
+    });
+    const rateEl = document.getElementById('bfmBusRate');
+    if(rateEl) rateEl.addEventListener('change', e=>{ draft.busRate = Number(e.target.value); draw(); });
+    document.getElementById('bfmKm').addEventListener('input', e=>{ draft.km = e.target.value.replace(',','.'); draw(); });
+    const gfEl = document.getElementById('bfmGuideFee');
+    if(gfEl) gfEl.addEventListener('input', e=>{ draft.guideFee = parseDecimalInput(e.target.value); draw(); });
+    const grEl = document.getElementById('bfmGuideFeeReason');
+    if(grEl) grEl.addEventListener('input', e=>{ draft.guideFeeReason = e.target.value; });
+    document.getElementById('bfmSaveBtn').addEventListener('click', ()=>{
+      updateExcursion(excId, {
+        busOwner: draft.busOwner, busRate: draft.busRate, km: draft.km,
+        guideFee: draft.guideFee, guideFeeReason: draft.guideFeeReason
+      });
+      modal.remove();
+    });
+  }
+
+  document.body.appendChild(modal);
+  draw();
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+}
 function updateRow(excId, rowId, patch, opts={}){
   const tripId = currentTripId;
   const tripData = getTripData(tripId);
@@ -2277,6 +2327,7 @@ function openRowDetailModal(excId, rowId){
   const editable = canEditRow(rawRow);
   // Local draft — nothing is written back until "Зберегти" is pressed.
   const draft = { ...rawRow };
+  let personPickerOpen = !draft.person; // new/unassigned rows go straight to picking
 
   const existing = document.getElementById('rowDetailModal');
   if(existing) existing.remove();
@@ -2304,7 +2355,10 @@ function openRowDetailModal(excId, rowId){
     modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
       <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">Учасник екскурсії</h2>
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <select class="person-select" id="rdmPerson" style="flex:1; min-width:0; box-sizing:border-box; background:${hasPerson?personColor(r):'#c9cdbe'};" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, takenGuides)}</select>
+        ${personPickerOpen
+          ? `<select class="person-select" id="rdmPerson" style="flex:1; min-width:0; box-sizing:border-box; background:${hasPerson?personColor(r):'#c9cdbe'};" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, takenGuides)}</select>`
+          : `<span class="person-chip" style="background:${personColor(r)};">${r.label}${editable ? ` <span class="exc-edit-name-icon no-print" id="rdmChangePerson" title="Змінити гіда/партнера">✏️</span>` : ''}</span>`
+        }
         ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" id="rdmFillTourists" style="flex-shrink:0; font-size:12px; white-space:nowrap;" title="Заповнити чол/суму з даних гіда в списку туристів">📋 зі списку туристів</button>` : ''}
       </div>
       ${r.isTest ? `<div style="font-size:11px; color:#b45309; font-weight:700; margin-bottom:8px;">🧪 ТЕСТ — не враховується в реальних розрахунках</div>` : ''}
@@ -2341,6 +2395,12 @@ function openRowDetailModal(excId, rowId){
       if(!e.target.value) return;
       const [ptype, pname] = e.target.value.split('::');
       Object.assign(draft, {personType:ptype, person:pname});
+      personPickerOpen = false;
+      draw();
+    });
+    const changePersonBtn = document.getElementById('rdmChangePerson');
+    if(changePersonBtn) changePersonBtn.addEventListener('click', ()=>{
+      personPickerOpen = true;
       draw();
     });
     const custEl = document.getElementById('rdmCustomName');
