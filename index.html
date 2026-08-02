@@ -270,13 +270,13 @@
   .num-input-wide{width:92px;}
 
   .rows-cards{ display:flex; flex-direction:column; gap:10px; margin-top:10px; }
-  .row-card{ border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--whitewash); animation: fadeInUp 0.2s ease both; }
+  .row-card{ border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:var(--whitewash); animation: fadeInUp 0.2s ease both; }
   .row-card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px; }
   .row-card-top .person-select{ width:100%; }
-  .row-card-summary{ display:flex; align-items:center; gap:10px; row-gap:6px; flex-wrap:wrap; cursor:pointer; }
-  .row-summary-mid{ flex:1; font-size:12.5px; }
-  .row-summary-result{ font-size:13.5px; font-weight:700; flex-shrink:0; }
-  .person-chip{ border-radius:6px; padding:5px 9px; font-weight:600; font-size:12.5px; color:#fff; flex-shrink:0; }
+  .row-card-summary{ display:flex; align-items:center; gap:8px; row-gap:6px; flex-wrap:wrap; cursor:pointer; }
+  .row-summary-mid{ flex:1; font-size:12px; white-space:nowrap; }
+  .row-summary-result{ font-size:12.5px; font-weight:700; flex-shrink:0; white-space:nowrap; }
+  .person-chip{ border-radius:6px; padding:4px 8px; font-weight:600; font-size:12px; color:#fff; flex-shrink:0; white-space:nowrap; }
   .row-card-fields{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
   .row-card-fields label{ display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:var(--ink-soft); flex:1; min-width:78px; }
   .row-card-fields input{ width:100%; box-sizing:border-box; }
@@ -1860,7 +1860,7 @@ function renderExcursions(){
       tr.innerHTML = `
         <div class="row-card-summary" data-role="rowOpen" data-row-id="${r.id}">
           <span class="person-chip" style="background:${hasPerson?personColor(r):'#c9cdbe'}">${hasPerson ? r.label : 'оберіть гіда/партнера'}</span>
-          <span class="row-summary-mid muted">${hasPerson ? fmt(r.chol)+' чол' : ''}${hasPerson && r.isGuide ? ' · '+fmt(r.zibrano)+' €' : ''}</span>
+          <span class="row-summary-mid muted">${hasPerson ? Math.round(Number(r.chol)||0)+' чол' : ''}${hasPerson && r.isGuide ? ' · '+fmt(r.zibrano)+' €' : ''}</span>
           <span class="row-summary-result">${resultHtml}</span>
           ${receivedHtml}
         </div>
