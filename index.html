@@ -2317,7 +2317,7 @@ function openBusFeeModal(excId, onClose){
       <div class="field-group" style="margin-bottom:10px;">
         <span>Км екскурсії:</span>
         <input type="text" inputmode="decimal" pattern="[0-9]*[,\\.]?[0-9]*" class="km-input" id="bfmKm" value="${String(draft.km).replace('.',',')}">
-        <span class="muted">→ ${fmt(calc.busPayment)} €</span>
+        <span class="muted" id="bfmKmPreview">→ ${fmt(calc.busPayment)} €</span>
       </div>
       ${noGuideFee ? '' : `
       <div class="field-group" style="flex-direction:column; align-items:flex-start; gap:6px; margin-bottom:10px;">
@@ -2336,9 +2336,16 @@ function openBusFeeModal(excId, onClose){
     });
     const rateEl = document.getElementById('bfmBusRate');
     if(rateEl) rateEl.addEventListener('change', e=>{ draft.busRate = Number(e.target.value); draw(); });
-    document.getElementById('bfmKm').addEventListener('input', e=>{ draft.km = e.target.value.replace(',','.'); draw(); });
+    document.getElementById('bfmKm').addEventListener('input', e=>{
+      draft.km = e.target.value.replace(',','.');
+      const p = modal.querySelector('#bfmKmPreview');
+      if(p) p.textContent = `→ ${fmt(preview().busPayment)} €`;
+    });
     const gfEl = document.getElementById('bfmGuideFee');
-    if(gfEl) gfEl.addEventListener('input', e=>{ draft.guideFee = parseDecimalInput(e.target.value); draw(); });
+    if(gfEl){
+      gfEl.addEventListener('input', e=>{ draft.guideFee = parseDecimalInput(e.target.value); });
+      gfEl.addEventListener('blur', draw); // only rebuild (to show/hide the reason field) once they're done typing
+    }
     const grEl = document.getElementById('bfmGuideFeeReason');
     if(grEl) grEl.addEventListener('input', e=>{ draft.guideFeeReason = e.target.value; });
     document.getElementById('bfmSaveBtn').addEventListener('click', ()=>{
