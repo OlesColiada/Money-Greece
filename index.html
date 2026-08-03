@@ -1534,8 +1534,9 @@ function renderTripGrid(){
   const grid = document.getElementById('tripGrid');
   grid.innerHTML = "";
   const inTourGroup = ['profit','tourists','finance'].includes(currentSection);
-  const tripsToShow = inTourGroup ? TRIPS_DEF.filter(d=> tripStatus(d).text === 'Триває') : TRIPS_DEF;
-  if(inTourGroup && !tripsToShow.length){
+  const restrictToOngoing = inTourGroup && !(currentProfile && currentProfile.role==='manager');
+  const tripsToShow = restrictToOngoing ? TRIPS_DEF.filter(d=> tripStatus(d).text === 'Триває') : TRIPS_DEF;
+  if(restrictToOngoing && !tripsToShow.length){
     grid.innerHTML = `<p class="report-note">Немає турів, що зараз тривають.</p>`;
   }
   tripsToShow.forEach(def=>{
@@ -1889,8 +1890,9 @@ function openExcursionModal(excId){
         })()}
       </div>
 
-      <div style="margin-top:16px; padding-top:12px; border-top:1px dashed var(--line);">
-        <button class="btn btn-danger-ghost btn-small no-print" id="emDelete" style="width:100%;">🗑️ Видалити екскурсію</button>
+      <div style="display:flex; gap:8px; margin-top:16px; padding-top:12px; border-top:1px dashed var(--line);">
+        ${currentProfile && currentProfile.role==='manager' ? `<button class="btn btn-ghost btn-small no-print" id="emEditName" style="flex:1;">✏️ Назва</button>` : ''}
+        <button class="btn btn-danger-ghost btn-small no-print" id="emDelete" style="flex:1;">🗑️ Видалити екскурсію</button>
       </div>
     </div>`;
 
@@ -1902,6 +1904,7 @@ function openExcursionModal(excId){
   // previously proven unreliable for taps on Android/Chrome.
   modal.addEventListener('click', e=>{
     if(e.target===modal){ closeModal(); return; }
+    if(e.target.closest('#emEditName')){ e.preventDefault(); e.stopPropagation(); openExcNameModal(excId, draw); return; }
     if(e.target.closest('#emBusFee')){ e.preventDefault(); e.stopPropagation(); openBusFeeModal(excId, draw); return; }
     if(e.target.closest('#emDelete')){
       e.preventDefault(); e.stopPropagation();
@@ -2527,6 +2530,7 @@ document.getElementById('addExcursionBtn').addEventListener('click', async ()=>{
   renderAll();
   await upsertExcursion(currentTripId, exc);
   for(const r of exc.rows) await upsertRow(currentTripId, exc.id, r);
+  openExcNameModal(exc.id, ()=> openExcursionModal(exc.id));
 });
 document.getElementById('printBtn').addEventListener('click', ()=> window.print());
 
