@@ -196,21 +196,21 @@
   main{max-width:1040px; margin:0 auto; padding:20px 16px 100px;}
 
   select, input[type=text], input[type=number], input[type=password]{
-    font-family:'Inter',sans-serif; font-size:14px; border:1px solid var(--line);
+    font-family:'Inter',sans-serif; font-size:15px; border:1px solid var(--line);
     background:#fff; border-radius:8px; padding:8px 10px; color:var(--ink);
   }
   select:focus, input:focus{outline:2px solid var(--aegean); outline-offset:1px;}
-  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; border:none; border-radius:8px; padding:9px 14px; cursor:pointer; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;}
+  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:14.5px; border:none; border-radius:8px; padding:9px 14px; cursor:pointer; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;}
   .btn:active{transform:translateY(1px) scale(0.97);}
   .btn:hover{box-shadow:0 3px 10px rgba(0,0,0,.08);}
   .btn-primary{background:var(--aegean); color:#fff;} .btn-primary:hover{background:var(--aegean-deep);}
   .btn-ghost{background:transparent; color:var(--aegean); border:1px solid var(--aegean);} .btn-ghost:hover{background:rgba(28,90,122,.06);}
   .btn-danger-ghost{background:transparent; color:var(--bad); border:1px solid #e3b8b8; font-size:12px; padding:6px 10px;}
-  .btn-small{padding:6px 11px; font-size:12.5px;}
+  .btn-small{padding:6px 11px; font-size:13.5px;}
 
   .step-block{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; box-shadow:var(--shadow); animation: fadeInUp 0.28s ease both;}
   .step-label{font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ochre); display:block; margin-bottom:8px;}
-  .step-title{font-weight:600; font-size:15px; margin:0 0 10px;}
+  .step-title{font-weight:600; font-size:16.5px; margin:0 0 10px;}
 
   /* Trip picker */
   .trip-grid{display:flex; gap:8px; flex-wrap:wrap;}
@@ -254,7 +254,7 @@
   .fin-print-only{ display:none; }
   @media print{ .fin-print-only{ display:block; } }
   .exc-del-btn{padding:5px 9px; font-size:14px; line-height:1; flex-shrink:0;}
-  .field-group{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft);}
+  .field-group{display:flex; align-items:center; gap:6px; font-size:13.5px; color:var(--ink-soft);}
   .km-input, .rate-input, .guidefee-input{width:76px; text-align:right;}
   .exc-body{padding:14px 16px 16px;}
 
@@ -279,8 +279,8 @@
   .row-card-top .person-select{ width:100%; }
   .row-card-summary{ display:flex; align-items:center; gap:6px; row-gap:6px; flex-wrap:nowrap; cursor:pointer; }
   .row-summary-mid{ flex:1; min-width:0; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .row-summary-result{ font-size:12px; font-weight:700; flex-shrink:0; white-space:nowrap; }
-  .person-chip{ border-radius:6px; padding:4px 7px; font-weight:600; font-size:12px; color:#fff; flex-shrink:0; white-space:nowrap; }
+  .row-summary-result{ font-size:13.5px; font-weight:700; flex-shrink:0; white-space:nowrap; }
+  .person-chip{ border-radius:6px; padding:4px 7px; font-weight:600; font-size:13px; color:#fff; flex-shrink:0; white-space:nowrap; }
   .row-card-summary .btn-small{ padding:3px 7px; font-size:11px; min-height:0; }
   .row-card-fields{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
   .row-card-fields label{ display:flex; flex-direction:column; gap:4px; font-size:11px; font-weight:700; color:var(--ink-soft); flex:1; min-width:78px; }
@@ -1874,7 +1874,7 @@ function openExcursionModal(excId){
 
     modal.innerHTML = `<div class="hb-modal-card" style="max-width:460px; max-height:88vh; overflow-y:auto;">
       <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-        <h2 style="flex:1; min-width:0; font-size:18px; font-weight:700; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${displayName}</h2>
+        <h2 style="flex:1; min-width:0; font-size:19px; font-weight:700; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${displayName}</h2>
         <button class="btn btn-ghost btn-small no-print" id="emCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
       </div>
       <div class="muted" style="font-size:12.5px; margin-bottom:14px;">${calc.totalPeople} чол · <span class="${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span></div>
@@ -2257,7 +2257,7 @@ function openExcNameModal(excId, onClose){
   modal.style.zIndex = String(nextModalZ());
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:360px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">Назва екскурсії</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">Назва екскурсії</h2>
       <button class="btn btn-ghost btn-small no-print" id="excNameModalCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <select id="excNameModalSelect" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; font-weight:600;">${nameOptions}</select>
@@ -2311,7 +2311,7 @@ function openBusFeeModal(excId, onClose){
     const feeDiffers = Number(draft.guideFee) !== Number(exc.guideFeeDefault);
     modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
       <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-        <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">Автобус і гід</h2>
+        <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">Автобус і гід</h2>
         <button class="btn btn-ghost btn-small no-print" id="bfmCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
       </div>
       <div class="field-group" style="flex-wrap:nowrap; margin-bottom:10px;">
@@ -2418,7 +2418,7 @@ function openRowDetailModal(excId, rowId, onClose){
                 : `<span class="muted">розрахунок з партнером</span>`);
     modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
       <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-        <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">Учасник екскурсії</h2>
+        <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">Учасник екскурсії</h2>
         <button class="btn btn-ghost btn-small no-print" id="rdmCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
       </div>
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
@@ -3886,7 +3886,7 @@ function openFinPartnerModal(report, section){
   modal.style.zIndex = String(nextModalZ());
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">🤝 ${section==='received' ? 'Отримано від партнера' : 'Сплачено партнеру'}</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">🤝 ${section==='received' ? 'Отримано від партнера' : 'Сплачено партнеру'}</h2>
       <button class="btn btn-ghost btn-small no-print" id="finPartnerCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <label style="display:block; font-size:12px; font-weight:600; margin:10px 0 4px;">Партнер</label>
@@ -3951,7 +3951,7 @@ async function openFinGuideFeeModalFixed(report, excName){
   if(lockedBy){
     modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
       <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-        <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">🧑‍✈️ Екскурсовод — ${excName}</h2>
+        <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">🧑‍✈️ Екскурсовод — ${excName}</h2>
         <button class="btn btn-ghost btn-small no-print" id="finGuideFeeCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
       </div>
       <p style="font-size:13.5px; margin-bottom:6px;">Цей гонорар уже записаний у звіті гіда <b>${lockedBy.guide}</b> (${fmt(lockedBy.amount)} €).</p>
@@ -3964,7 +3964,7 @@ async function openFinGuideFeeModalFixed(report, excName){
   }
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">🧑‍✈️ Екскурсовод — ${excName}</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">🧑‍✈️ Екскурсовод — ${excName}</h2>
       <button class="btn btn-ghost btn-small no-print" id="finGuideFeeCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Сума (€)</label>
@@ -4003,7 +4003,7 @@ function openFinSimpleAmountModal(report, itemKey, title, section){
   modal.style.zIndex = String(nextModalZ());
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:360px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">${title}</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">${title}</h2>
       <button class="btn btn-ghost btn-small no-print" id="finSimpleCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Сума (€)</label>
@@ -4032,7 +4032,7 @@ function openFinHotelModal(report){
   modal.style.zIndex = String(nextModalZ());
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">🏨 Готель</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">🏨 Готель</h2>
       <button class="btn btn-ghost btn-small no-print" id="finHotelCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Готель</label>
@@ -4068,7 +4068,7 @@ function openFinBusModal(report){
   modal.style.zIndex = String(nextModalZ());
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">🚌 Автобус (оплата кілометражу)</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">🚌 Автобус (оплата кілометражу)</h2>
       <button class="btn btn-ghost btn-small no-print" id="finBusCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Передплата (€)</label>
@@ -4100,7 +4100,7 @@ function openFinPerdiemModal(report){
   modal.style.zIndex = String(nextModalZ());
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">🍽 Добові</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">🍽 Добові</h2>
       <button class="btn btn-ghost btn-small no-print" id="finPerdiemCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Сума (€)</label>
@@ -4133,7 +4133,7 @@ function openFinGiftModal(report){
   modal.style.zIndex = String(nextModalZ());
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">🎁 Подарунок туристам</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">🎁 Подарунок туристам</h2>
       <button class="btn btn-ghost btn-small no-print" id="finGiftCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Що і кому (опис)</label>
@@ -4185,7 +4185,7 @@ function openFinListModal(report, config){
   }).join('');
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:420px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">${config.title}</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">${config.title}</h2>
       <button class="btn btn-ghost btn-small no-print" id="finListCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <div style="margin-bottom:12px;">${itemsHtml}</div>
@@ -4293,20 +4293,22 @@ function openFinCollectedModal(report){
   ` : '';
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:420px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">🎟 Зібрано з екскурсій</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">🎟 Зібрано з екскурсій</h2>
       <button class="btn btn-ghost btn-small no-print" id="finCollectedCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <div style="margin-bottom:8px;">${itemsHtml}</div>
     ${suggestionsHtml}
     <div style="border-top:1px dashed var(--line); padding-top:10px; margin-top:10px;">
       <p style="font-size:12.5px; font-weight:700; margin:0 0 4px;">Додати вручну (якщо зібрано інакше)</p>
+      ${excNames.filter(n=>!addedExcNames.has(n)).length ? `
       <label style="display:block; font-size:12px; font-weight:600; margin:8px 0 4px;">Екскурсія</label>
       <select id="finCollectedExc" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
-        ${excNames.map(n=>`<option value="${n}">${n}</option>`).join('') || '<option value="">— немає екскурсій —</option>'}
+        ${excNames.filter(n=>!addedExcNames.has(n)).map(n=>`<option value="${n}">${n}</option>`).join('')}
       </select>
       <label style="display:block; font-size:12px; font-weight:600; margin:8px 0 4px;">Сума (€)</label>
       <input type="text" inputmode="decimal" id="finCollectedAmount" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
       <button class="btn btn-primary" id="finCollectedAddBtn" style="width:100%; margin-top:10px;">💾 Зберегти</button>
+      ` : `<p class="report-note" style="margin:0;">Усі екскурсії цього туру вже додано.</p>`}
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -4327,7 +4329,8 @@ function openFinCollectedModal(report){
     modal.remove();
     openFinCollectedModal(report);
   }));
-  document.getElementById('finCollectedAddBtn').addEventListener('click', ()=>{
+  const finCollectedAddBtn = document.getElementById('finCollectedAddBtn');
+  if(finCollectedAddBtn) finCollectedAddBtn.addEventListener('click', ()=>{
     const excName = document.getElementById('finCollectedExc').value;
     if(!excName){ alert('Оберіть екскурсію.'); return; }
     const amount = parseDecimalInput(document.getElementById('finCollectedAmount').value);
@@ -4389,7 +4392,7 @@ function openFinPartnerListModal(report, section){
   `).join('') : `<p class="report-note">Ще нічого не додано.</p>`;
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:420px;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">🤝 ${section==='received'?'Отримано від партнерів':'Сплачено партнерам'}</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">🤝 ${section==='received'?'Отримано від партнерів':'Сплачено партнерам'}</h2>
       <button class="btn btn-ghost btn-small no-print" id="finPartnerListCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <div style="margin-bottom:12px;">${itemsHtml}</div>
@@ -4668,7 +4671,7 @@ function openFinSectionModal(sectionKey){
 
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:420px; max-height:85vh; overflow-y:auto;">
     <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">${titles[sectionKey]||''}</h2>
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">${titles[sectionKey]||''}</h2>
       <button class="btn btn-ghost btn-small no-print" id="finSectionCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     ${bodyHtml}
@@ -5417,7 +5420,7 @@ function openPointGuideModal(tripId, rows, idx){
   modal.className = 'hb-modal-overlay';
   modal.style.zIndex = '900';
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
-    <h2 style="font-size:17px; font-weight:700; margin-bottom:4px;">🔗 Де насправді запис?</h2>
+    <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">🔗 Де насправді запис?</h2>
     <p class="report-note" style="margin-bottom:10px;">${r.guide} — ${r.excName}. Якщо бачиш, що цей платіж (${fmt(r.auto.sum)} €) насправді записаний у звіті іншого гіда — обери його нижче.</p>
     <select id="pointGuideSelect" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; margin-bottom:12px;">
       ${(td?td.guides||[]:[]).map(g=>`<option value="${g.name}" ${g.name===r.guide?'disabled':''}>${g.name}</option>`).join('')}
@@ -5464,7 +5467,7 @@ function openProfitCorrectionModal(tripId, r, field){
   modal.className = 'hb-modal-overlay';
   modal.style.zIndex = '900';
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:440px;">
-    <h2 style="font-size:17px; font-weight:700; margin-bottom:4px;">✏️ Виправити: ${fieldMeta.label}</h2>
+    <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">✏️ Виправити: ${fieldMeta.label}</h2>
     <p class="report-note" style="margin-bottom:10px;">${r.guide} — ${r.excName}</p>
     <p style="font-size:13px; margin-bottom:10px;">Зараз у Прибутковості: <b>${fmt(fieldMeta.current)} €</b></p>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Нове значення (€)</label>
@@ -5805,7 +5808,7 @@ function openProfitExcursionDetailModal(tripId, excId){
   }).join('');
 
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:460px;">
-    <h2 style="font-size:17px; font-weight:700; margin-bottom:4px;">${g.excLabel}</h2>
+    <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">${g.excLabel}</h2>
     <p class="report-note" style="margin-top:0;">${g.isOwnBus?'Наш автобус':'Партнерський автобус'} · ${g.totalPeople} чол</p>
 
     <div class="fin-panel" style="margin-top:8px;">
@@ -5949,7 +5952,7 @@ function showTripProfitabilityView(tripId){
     detail.className = 'hb-modal-overlay';
     detail.style.zIndex = '850';
     detail.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
-      <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">📊 Заробіток наших гідів на екскурсіях</h2>
+      <h2 style="font-size:18px; font-weight:700; margin-bottom:10px;">📊 Заробіток наших гідів на екскурсіях</h2>
       ${earningsHtml}
       <button class="btn btn-ghost" id="profitEarningsCloseBtn" style="width:100%; margin-top:14px;">Закрити</button>
     </div>`;
@@ -5963,7 +5966,7 @@ function showTripProfitabilityView(tripId){
     detail.className = 'hb-modal-overlay';
     detail.style.zIndex = '850';
     detail.innerHTML = `<div class="hb-modal-card" style="max-width:600px;">
-      <h2 style="font-size:17px; font-weight:700; margin-bottom:6px;">➕ Альтернативний розрахунок</h2>
+      <h2 style="font-size:18px; font-weight:700; margin-bottom:6px;">➕ Альтернативний розрахунок</h2>
       <p class="report-note" style="margin-top:0;">Для екскурсій на нашому автобусі — той самий розрахунок, але до суми «Офіс» додається вартість кілометражу (бо ці кошти зрештою повертає гід через загальний звіт керівника). Для екскурсій на автобусі партнера — без змін.</p>
       <div id="tripProfitAltWrap" style="margin-top:8px;"></div>
       <button class="btn btn-ghost" id="profitAltCloseBtn" style="width:100%; margin-top:14px;">Закрити</button>
