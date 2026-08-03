@@ -1258,13 +1258,16 @@ function setupProfitRealtimeSubscription(tripId){
       if(currentTripId !== tripId || currentSection !== 'profit') return;
       const active = document.activeElement;
       const wrap = document.getElementById('excursionsWrap');
-      const isTyping = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.tagName==='SELECT') && wrap && wrap.contains(active);
+      const inAnyModal = !!(active && active.closest && active.closest('.hb-modal-overlay'));
+      const isTyping = active && (active.tagName==='INPUT' || active.tagName==='TEXTAREA' || active.tagName==='SELECT') && ((wrap && wrap.contains(active)) || inAnyModal);
       if(isTyping){
         // Don't rebuild the screen out from under someone actively typing a number —
         // just check again shortly, once they've moved on or paused.
         profitRealtimeDebounceTimer = setTimeout(tryRefresh, 800);
         return;
       }
+      // Any excursion/bus-fee/participant modal open? Refreshing the background data underneath
+      // it is harmless — but don't reach for the whole renderAll(), and never touch the modal itself.
       loadTripData(tripId).then(()=> renderAll());
     };
     profitRealtimeDebounceTimer = setTimeout(tryRefresh, 400); // small debounce so several near-simultaneous row saves don't each trigger a separate reload
@@ -3516,6 +3519,21 @@ function renderTouristStats(){
 }
 
 async function loadTripGuideExcursionStats(){
+  // Prefer the RPC (works across all guides — see SQL migration note). Falls back to
+  // the old direct-table query, which under RLS typically only sees the caller's own
+  // tourists, so a guide could only ever pull their own numbers this way.
+  try {
+    const { data, error } = await sb.rpc('get_guide_excursion_stats', { p_trip_id: currentTripId });
+    if(!error && Array.isArray(data)){
+      const byGuideExc = {};
+      data.forEach(row=>{
+        if(!byGuideExc[row.guide_name]) byGuideExc[row.guide_name] = {};
+        byGuideExc[row.guide_name][row.excursion_name] = { count: Number(row.cnt)||0, sum: Number(row.total)||0 };
+      });
+      return byGuideExc;
+    }
+  } catch(e){ /* fall through to the direct-query fallback below */ }
+
   const { data: tourists, error: tErr } = await sb.from('tourists').select('*').eq('trip_id', currentTripId);
   if(tErr || !tourists || !tourists.length) return {};
   const ids = tourists.map(t=>t.id);
