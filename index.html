@@ -2472,16 +2472,48 @@ function openRowDetailModal(excId, rowId, onClose){
       const byGuideExc = await loadTripGuideExcursionStats();
       const stats = (byGuideExc[draft.person]||{})[exc.name];
       if(!stats || stats.count<=0){
-        alert('У списку туристів поки немає даних для цієї екскурсії у гіда '+draft.person+'.');
-        fillBtn.disabled = false; fillBtn.textContent = '📋 Підтягнути з списку туристів';
+        const infoModal = document.createElement('div');
+        infoModal.className = 'hb-modal-overlay';
+        infoModal.style.zIndex = String(nextModalZ());
+        infoModal.innerHTML = `<div class="hb-modal-card" style="max-width:340px;">
+          <h2 style="font-size:16px; font-weight:700; margin-bottom:10px;">Немає даних</h2>
+          <p style="margin:0 0 16px; font-size:14px;">У списку туристів поки немає даних для цієї екскурсії у гіда <b>${draft.person}</b>.</p>
+          <button class="btn btn-primary" id="fillInfoOkBtn" style="width:100%;">Зрозуміло</button>
+        </div>`;
+        document.body.appendChild(infoModal);
+        function closeInfo(){ infoModal.remove(); fillBtn.disabled = false; fillBtn.textContent = '📋 Підтягнути з списку туристів'; }
+        infoModal.addEventListener('click', e=>{ if(e.target===infoModal) closeInfo(); });
+        document.getElementById('fillInfoOkBtn').addEventListener('click', closeInfo);
         return;
       }
-      if(confirm(`Підставити з списку туристів: ${stats.count} чол, ${fmt(stats.sum)} €?\n\n(Поточні значення: ${draft.chol} чол, ${fmt(draft.zibrano)} €)`)){
-        draft.chol = stats.count; draft.zibrano = stats.sum;
-        draw();
-      } else {
+      const oldChol = draft.chol, oldZibrano = draft.zibrano;
+      const confirmModal = document.createElement('div');
+      confirmModal.className = 'hb-modal-overlay';
+      confirmModal.style.zIndex = String(nextModalZ());
+      confirmModal.innerHTML = `<div class="hb-modal-card" style="max-width:340px;">
+        <h2 style="font-size:16px; font-weight:700; margin-bottom:12px;">Підтягнути з туристів?</h2>
+        <div style="background:var(--whitewash); border-radius:10px; padding:12px; text-align:center; margin-bottom:10px;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin-bottom:4px;">Нові значення</div>
+          <div style="font-size:22px; font-weight:700;">${stats.count} чол · ${fmt(stats.sum)} €</div>
+        </div>
+        <div class="muted" style="font-size:12.5px; text-align:center; margin-bottom:14px;">Поточні: ${oldChol} чол · ${fmt(oldZibrano)} €</div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-primary" id="fillConfirmOkBtn" style="flex:1;">Підставити</button>
+          <button class="btn btn-ghost" id="fillConfirmCancelBtn" style="flex:1;">Скасувати</button>
+        </div>
+      </div>`;
+      document.body.appendChild(confirmModal);
+      function closeConfirm(){
+        confirmModal.remove();
         fillBtn.disabled = false; fillBtn.textContent = '📋 Підтягнути з списку туристів';
       }
+      confirmModal.addEventListener('click', e=>{ if(e.target===confirmModal) closeConfirm(); });
+      document.getElementById('fillConfirmCancelBtn').addEventListener('click', closeConfirm);
+      document.getElementById('fillConfirmOkBtn').addEventListener('click', ()=>{
+        draft.chol = stats.count; draft.zibrano = stats.sum;
+        confirmModal.remove();
+        draw();
+      });
     });
     const saveBtn = document.getElementById('rdmSaveBtn');
     if(saveBtn) saveBtn.addEventListener('click', ()=>{
