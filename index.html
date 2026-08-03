@@ -1866,8 +1866,7 @@ function openExcursionModal(excId){
     modal.innerHTML = `<div class="hb-modal-card" style="max-width:460px; max-height:88vh; overflow-y:auto;">
       <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
         <h2 style="flex:1; min-width:0; font-size:18px; font-weight:700; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${displayName}</h2>
-        <span class="exc-edit-name-icon no-print" id="emEditName" title="Змінити назву екскурсії">✏️</span>
-        <button class="btn btn-danger-ghost btn-small no-print" id="emDelete" title="Видалити екскурсію">🗑️</button>
+        <button class="btn btn-ghost btn-small no-print" id="emCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
       </div>
       <div class="muted" style="font-size:12.5px; margin-bottom:14px;">${calc.totalPeople} чол · <span class="${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span></div>
 
@@ -1890,7 +1889,9 @@ function openExcursionModal(excId){
         })()}
       </div>
 
-      <button class="btn btn-ghost" id="emCloseBtn" style="width:100%; margin-top:16px;">Закрити</button>
+      <div style="margin-top:16px; padding-top:12px; border-top:1px dashed var(--line);">
+        <button class="btn btn-danger-ghost btn-small no-print" id="emDelete" style="width:100%;">🗑️ Видалити екскурсію</button>
+      </div>
     </div>`;
 
     renderExcursionRowsInto(modal.querySelector('#emRowsBody'), exc, calc, draw);
@@ -1901,7 +1902,6 @@ function openExcursionModal(excId){
   // previously proven unreliable for taps on Android/Chrome.
   modal.addEventListener('click', e=>{
     if(e.target===modal){ closeModal(); return; }
-    if(e.target.closest('#emEditName')){ e.preventDefault(); e.stopPropagation(); openExcNameModal(excId, draw); return; }
     if(e.target.closest('#emBusFee')){ e.preventDefault(); e.stopPropagation(); openBusFeeModal(excId, draw); return; }
     if(e.target.closest('#emDelete')){
       e.preventDefault(); e.stopPropagation();
@@ -2245,16 +2245,17 @@ function openExcNameModal(excId, onClose){
   modal.className = 'hb-modal-overlay';
   modal.style.zIndex = String(nextModalZ());
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:360px;">
-    <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">Назва екскурсії</h2>
+    <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+      <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">Назва екскурсії</h2>
+      <button class="btn btn-ghost btn-small no-print" id="excNameModalCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+    </div>
     <select id="excNameModalSelect" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; font-weight:600;">${nameOptions}</select>
     <input type="text" id="excNameModalCustom" placeholder="Назва екскурсії" value="${exc.customName||''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; margin-top:10px; ${exc.name==='Інше...'?'':'display:none;'}">
-    <div style="display:flex; gap:10px; margin-top:14px;">
-      <button class="btn btn-primary" id="excNameModalSaveBtn" style="flex:1;">💾 Зберегти</button>
-      <button class="btn btn-ghost" id="excNameModalCancelBtn" style="flex:1;">Скасувати</button>
-    </div>
+    <button class="btn btn-primary" id="excNameModalSaveBtn" style="width:100%; margin-top:14px;">💾 Зберегти</button>
   </div>`;
   document.body.appendChild(modal);
-  function closeModal(){ modal.remove(); if(typeof onClose==='function') onClose(); }
+  function closeModal(){ modal.remove(); }
+  function closeAndNotify(){ modal.remove(); if(typeof onClose==='function') onClose(); }
   modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
   document.getElementById('excNameModalCancelBtn').addEventListener('click', closeModal);
   const selectEl = document.getElementById('excNameModalSelect');
@@ -2271,7 +2272,7 @@ function openExcNameModal(excId, onClose){
       guideFee: DEFAULT_GUIDE_FEE[name]||0,
       guideFeeReason: ""
     });
-    closeModal();
+    closeAndNotify();
   });
 }
 function openBusFeeModal(excId, onClose){
@@ -2291,13 +2292,17 @@ function openBusFeeModal(excId, onClose){
   function preview(){
     return calcExcursion({ ...exc, busOwner:draft.busOwner, busRate:draft.busRate, km:draft.km, guideFee:draft.guideFee });
   }
-  function closeModal(){ modal.remove(); if(typeof onClose==='function') onClose(); }
+  function closeModal(){ modal.remove(); }
+  function closeAndNotify(){ modal.remove(); if(typeof onClose==='function') onClose(); }
 
   function draw(){
     const calc = preview();
     const feeDiffers = Number(draft.guideFee) !== Number(exc.guideFeeDefault);
     modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
-      <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">Автобус і гід</h2>
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+        <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">Автобус і гід</h2>
+        <button class="btn btn-ghost btn-small no-print" id="bfmCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+      </div>
       <div class="field-group" style="flex-wrap:nowrap; margin-bottom:10px;">
         <span style="flex-shrink:0;">Автобус:</span>
         <select id="bfmBusOwner" style="flex:1; min-width:0;">
@@ -2317,10 +2322,7 @@ function openBusFeeModal(excId, onClose){
         <input type="text" inputmode="decimal" class="guidefee-input" id="bfmGuideFee" value="${draft.guideFee}">
         ${feeDiffers ? `<input type="text" class="reason-input" placeholder="Причина зміни стандартної ціни" id="bfmGuideFeeReason" value="${draft.guideFeeReason||''}">` : ''}
       </div>`}
-      <div style="display:flex; gap:8px; margin-top:14px;">
-        <button class="btn btn-primary" id="bfmSaveBtn" style="flex:1;">💾 Зберегти</button>
-        <button class="btn btn-ghost" id="bfmCloseBtn" style="flex:1;">Закрити</button>
-      </div>
+      <button class="btn btn-primary" id="bfmSaveBtn" style="width:100%; margin-top:14px;">💾 Зберегти</button>
     </div>`;
 
     document.getElementById('bfmCloseBtn').addEventListener('click', closeModal);
@@ -2341,7 +2343,7 @@ function openBusFeeModal(excId, onClose){
         busOwner: draft.busOwner, busRate: draft.busRate, km: draft.km,
         guideFee: draft.guideFee, guideFeeReason: draft.guideFeeReason
       });
-      closeModal();
+      closeAndNotify();
     });
   }
 
@@ -2382,7 +2384,8 @@ function openRowDetailModal(excId, rowId, onClose){
     const tempExc = { ...exc, rows: exc.rows.map(x=> x.id===rowId ? draft : x) };
     return calcExcursion(tempExc).rowResults.find(x=>x.id===rowId);
   }
-  function closeModal(){ modal.remove(); if(typeof onClose==='function') onClose(); }
+  function closeModal(){ modal.remove(); }
+  function closeAndNotify(){ modal.remove(); if(typeof onClose==='function') onClose(); }
 
   function draw(){
     const r = preview();
@@ -2396,14 +2399,17 @@ function openRowDetailModal(excId, rowId, onClose){
                 ? `<span class="muted">винен нам ${fmt(r.settlement)} €</span>`
                 : `<span class="muted">розрахунок з партнером</span>`);
     modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
-      <h2 style="font-size:17px; font-weight:700; margin-bottom:10px;">Учасник екскурсії</h2>
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+        <h2 style="flex:1; font-size:17px; font-weight:700; margin:0;">Учасник екскурсії</h2>
+        <button class="btn btn-ghost btn-small no-print" id="rdmCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+      </div>
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
         ${!hasPerson
           ? `<select class="person-select" id="rdmPerson" style="flex:1; min-width:0; box-sizing:border-box; background:#c9cdbe;" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, takenGuides)}</select>`
           : `<span class="person-chip" style="background:${personColor(r)};">${r.label}</span>`
         }
-        ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="edit-toggle-btn no-print" id="rdmFillTourists" style="flex-shrink:0; font-size:12px; white-space:nowrap;" title="Заповнити чол/суму з даних гіда в списку туристів">📋 зі списку туристів</button>` : ''}
       </div>
+      ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="btn btn-primary btn-small no-print" id="rdmFillTourists" style="width:100%; margin-bottom:10px;" title="Заповнити чол/суму з даних гіда в списку туристів">📋 Підтягнути з списку туристів</button>` : ''}
       ${r.isTest ? `<div style="font-size:11px; color:#b45309; font-weight:700; margin-bottom:8px;">🧪 ТЕСТ — не враховується в реальних розрахунках</div>` : ''}
       ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" id="rdmCustomName" value="${r.customPartnerName||''}" style="width:100%; box-sizing:border-box; margin-bottom:8px;" ${editable?'':'disabled'}>` : ''}
       <div class="row-card-fields">
@@ -2427,7 +2433,6 @@ function openRowDetailModal(excId, rowId, onClose){
       })()}
       <div style="display:flex; gap:8px; margin-top:14px;">
         ${editable ? `<button class="btn btn-primary" id="rdmSaveBtn" style="flex:1;">💾 Зберегти</button>` : ''}
-        <button class="btn btn-ghost" id="rdmCloseBtn" style="flex:1;">Закрити</button>
         ${editable ? `<button class="btn btn-danger-ghost" id="rdmDeleteBtn" title="Видалити рядок">🗑️</button>` : ''}
       </div>
     </div>`;
@@ -2455,14 +2460,14 @@ function openRowDetailModal(excId, rowId, onClose){
       const stats = (byGuideExc[draft.person]||{})[exc.name];
       if(!stats || stats.count<=0){
         alert('У списку туристів поки немає даних для цієї екскурсії у гіда '+draft.person+'.');
-        fillBtn.disabled = false; fillBtn.textContent = '📋 зі списку туристів';
+        fillBtn.disabled = false; fillBtn.textContent = '📋 Підтягнути з списку туристів';
         return;
       }
       if(confirm(`Підставити з списку туристів: ${stats.count} чол, ${fmt(stats.sum)} €?\n\n(Поточні значення: ${draft.chol} чол, ${fmt(draft.zibrano)} €)`)){
         draft.chol = stats.count; draft.zibrano = stats.sum;
         draw();
       } else {
-        fillBtn.disabled = false; fillBtn.textContent = '📋 зі списку туристів';
+        fillBtn.disabled = false; fillBtn.textContent = '📋 Підтягнути з списку туристів';
       }
     });
     const saveBtn = document.getElementById('rdmSaveBtn');
@@ -2471,11 +2476,11 @@ function openRowDetailModal(excId, rowId, onClose){
         personType: draft.personType, person: draft.person, customPartnerName: draft.customPartnerName,
         chol: draft.chol, zibrano: draft.zibrano, quitky: draft.quitky
       });
-      closeModal();
+      closeAndNotify();
     });
     const delBtn = document.getElementById('rdmDeleteBtn');
     if(delBtn) delBtn.addEventListener('click', ()=>{
-      closeModal();
+      closeAndNotify();
       deleteRow(excId, rowId);
     });
   }
