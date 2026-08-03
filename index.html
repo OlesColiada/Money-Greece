@@ -1756,8 +1756,8 @@ document.getElementById('excursionsSaveBtn').addEventListener('click', async ()=
     const rows = buildProfitabilityRows();
     const path = `${currentTripId}/profitability/report_${tripFileTag(currentTripId)}.xlsx`;
     const error = await saveXlsxSnapshot(path, rows, 'Прибутковість');
-    if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
-    else alert('Прибутковість екскурсій збережено в сховище.');
+    if(error) showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+    else showAppAlert('Прибутковість екскурсій збережено в сховище.');
   } finally {
     btn.disabled = false; btn.textContent = '💾 Зберегти';
   }
@@ -2128,7 +2128,7 @@ async function upsertExcursion(tripId, exc){
   });
   if(queued) setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет");
   else setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
-  if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
+  if(error){ console.error(error); showAppAlert(friendlyErrorMessage(error)); }
 }
 async function upsertRow(tripId, excId, row){
   const { error, queued } = await rtGuideWrite('upsert', 'excursion_rows', {
@@ -2140,7 +2140,7 @@ async function upsertRow(tripId, excId, row){
   });
   if(queued) setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет");
   else setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
-  if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
+  if(error){ console.error(error); showAppAlert(friendlyErrorMessage(error)); }
 }
 async function upsertGuide(tripId, guide){
   const { error } = await rtGuideWrite('upsert', 'trip_guides', { id: guide.id, trip_id: tripId, guide_name: guide.name, own_bus: !!guide.ownBus, substitute_note: guide.substituteNote||'' });
@@ -2155,7 +2155,7 @@ async function markSettlementPaid(excId, which){
   setStatus("Підтвердження…");
   await flushPendingPersists();
   const { error, queued } = await rtGuideRpc('mark_settlement_paid', { p_excursion_id: excId, p_which: which });
-  if(error){ alert(friendlyErrorMessage(error)); setStatus("Помилка"); return; }
+  if(error){ showAppAlert(friendlyErrorMessage(error)); setStatus("Помилка"); return; }
   if(queued){ setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет"); return; }
   await loadTripData(currentTripId);
   renderAll();
@@ -2164,7 +2164,7 @@ async function unmarkSettlementPaid(excId, which){
   if(!confirm('Скасувати позначку "оплачено" для цього розрахунку?')) return;
   setStatus("Скасування…");
   const { error } = await sb.rpc('unmark_settlement_paid', { p_excursion_id: excId, p_which: which });
-  if(error){ alert(friendlyErrorMessage(error)); setStatus("Помилка"); return; }
+  if(error){ showAppAlert(friendlyErrorMessage(error)); setStatus("Помилка"); return; }
   await loadTripData(currentTripId);
   renderAll();
 }
@@ -2244,6 +2244,23 @@ function updateExcursion(excId, patch, opts={}){
 }
 let modalZTop = 900;
 function nextModalZ(){ modalZTop += 10; return modalZTop; }
+function showAppAlert(message){
+  const existing = document.getElementById('finAlertModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'finAlertModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:340px;">
+    <p id="finAlertMsg" style="margin:0 0 16px; font-size:14px; white-space:pre-wrap;"></p>
+    <button class="btn btn-primary" id="finAlertOkBtn" style="width:100%;">Зрозуміло</button>
+  </div>`;
+  modal.querySelector('#finAlertMsg').textContent = message;
+  document.body.appendChild(modal);
+  const close = ()=> modal.remove();
+  modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
+  document.getElementById('finAlertOkBtn').addEventListener('click', close);
+}
 function openExcNameModal(excId, onClose){
   const tripData = getTripData(currentTripId);
   const exc = tripData.excursions.find(e=>e.id===excId);
@@ -2680,7 +2697,7 @@ function showFinanceNotifyList(reports){
       const trip = btn.dataset.trip, guide = btn.dataset.guide;
       if(!confirm(`Прийняти фінансовий звіт гіда ${guide}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`)) return;
       const { error } = await sb.from('financial_reports').update({ accepted:true, accepted_at:new Date().toISOString() }).eq('trip_id', trip).eq('guide_name', guide);
-      if(error){ alert(friendlyErrorMessage(error)); return; }
+      if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
       const idx = reports.findIndex(r=>r.trip_id===trip && r.guide_name===guide);
       if(idx>-1) reports.splice(idx,1);
       rerenderPanel();
@@ -2879,7 +2896,7 @@ document.getElementById('savePasswordBtn').addEventListener('click', async ()=>{
   const { error } = await sb.auth.updateUser({ password: p1 });
   if(error){ errEl.textContent = friendlyErrorMessage(error); return; }
   document.getElementById('changePasswordOverlay').classList.add('app-hidden');
-  alert('Пароль змінено.');
+  showAppAlert('Пароль змінено.');
 });
 
 /* ============================================================
@@ -3189,7 +3206,7 @@ function renderTouristList(){
       e.stopPropagation();
       if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
       const { error } = await sb.from('tourists').delete().eq('id', t.id);
-      if(error){ alert(friendlyErrorMessage(error)); return; }
+      if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
       if(openTouristId===t.id) openTouristId=null;
       await loadTourists();
       renderTouristSection();
@@ -3238,7 +3255,7 @@ function renderTouristEditForm(block, t){
   if(delBtn) delBtn.addEventListener('click', async ()=>{
     if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
     const { error } = await sb.from('tourists').delete().eq('id', t.id);
-    if(error){ alert(friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     openTouristId = null;
     await loadTourists();
     renderTouristSection();
@@ -3251,7 +3268,7 @@ function renderTouristEditForm(block, t){
     const guide = document.getElementById('editGuide').value;
     const birthChanged = birth !== (t.birth_date || null);
     const { error } = await sb.from('tourists').update({ first_name:first, last_name:last, birth_date:birth, passport_data:passport, guide_name:guide }).eq('id', t.id);
-    if(error){ alert(friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     // If the birth date changed, re-price any selections still on standard pricing (don't touch manual overrides).
     if(birthChanged){
       const newDef = TRIPS_DEF.find(d=>d.id===currentTripId);
@@ -3268,7 +3285,7 @@ function renderTouristEditForm(block, t){
     }
     await loadTourists();
     renderTouristSection();
-    alert("Збережено.");
+    showAppAlert("Збережено.");
   });
 }
 
@@ -3370,7 +3387,7 @@ function renderTouristDetail(){
   if(delBtn) delBtn.addEventListener('click', async ()=>{
     if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
     const { error } = await sb.from('tourists').delete().eq('id', t.id);
-    if(error){ alert(friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     openTouristId = null;
     await loadTourists();
     renderTouristSection();
@@ -3440,7 +3457,7 @@ function renderTouristDetail(){
       touristPaymentCurrencyDraft[t.id] = { currency, nbuRate: Math.round(nbuRate*10000)/10000, rate: safeRate, origAmount: suggestedAmount };
     } catch(err){
       touristPaymentCurrencyDraft[t.id] = { currency };
-      alert('Не вдалося отримати курс НБУ: ' + (err && err.message ? err.message : err) + ' — впиши суму вручну.');
+      showAppAlert('Не вдалося отримати курс НБУ: ' + (err && err.message ? err.message : err) + ' — впиши суму вручну.');
     }
     renderTouristDetail();
   });
@@ -3477,7 +3494,7 @@ function updateSelectionLocal(touristId, selId, patch, debounce){
     going:s.going, price_mode:s.price_mode, price:Number(s.price)||0,
     cancelled: !!s.cancelled, cancelled_reason: s.cancelled_reason||'',
     paid: !!s.paid, refunded: !!s.refunded
-  }).then(({error, queued})=>{ if(error){ console.error(error); alert(friendlyErrorMessage(error)); } else if(queued){ hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет'); } });
+  }).then(({error, queued})=>{ if(error){ console.error(error); showAppAlert(friendlyErrorMessage(error)); } else if(queued){ hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет'); } });
   if(debounce) debouncedPersist('sel:'+selId, doPersist); else persistNow('sel:'+selId, doPersist);
   renderTouristStats();
 }
@@ -3487,7 +3504,7 @@ async function payTourist(touristId){
   const draft = touristPaymentCurrencyDraft[touristId] || { currency: 'EUR' };
   const isForeign = draft.currency && draft.currency !== 'EUR';
   const { error, queued } = await rtGuideRpc('mark_tourist_paid', { p_tourist_id: touristId });
-  if(error){ alert(friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
   const currencyUpdate = isForeign
     ? { payment_currency: draft.currency, payment_orig_amount: parseDecimalInput(draft.origAmount), payment_rate: parseDecimalInput(draft.rate) }
     : { payment_currency: null, payment_orig_amount: null, payment_rate: null };
@@ -3516,7 +3533,7 @@ async function payTourist(touristId){
 async function cancelSelection(selId, reason){
   await flushPendingPersists();
   const { error, queued } = await rtGuideRpc('cancel_tourist_selection', { p_selection_id: selId, p_reason: reason });
-  if(error){ alert(friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
   if(queued){
     Object.values(touristData.selectionsByTourist).forEach(sels=>{
       const s = sels.find(x=>x.id===selId);
@@ -3530,7 +3547,7 @@ async function cancelSelection(selId, reason){
 }
 async function refundSelection(selId){
   const { error, queued } = await rtGuideRpc('refund_tourist_selection', { p_selection_id: selId });
-  if(error){ alert(friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
   if(queued){
     Object.values(touristData.selectionsByTourist).forEach(sels=>{
       const s = sels.find(x=>x.id===selId);
@@ -3618,7 +3635,7 @@ function renderTouristSection(){
 }
 document.getElementById('touristStatsSaveBtn').addEventListener('click', async ()=>{
   const guideName = activeTouristGuideName();
-  if(!guideName){ alert('Оберіть гіда вище.'); return; }
+  if(!guideName){ showAppAlert('Оберіть гіда вище.'); return; }
   const btn = document.getElementById('touristStatsSaveBtn');
   btn.disabled = true; btn.textContent = 'Зберігаю…';
   try{
@@ -3632,20 +3649,20 @@ document.getElementById('touristStatsSaveBtn').addEventListener('click', async (
     TOURIST_PRICE_LIST.forEach(p=> rows.push([p.name, stats[p.name].count, fmt(stats[p.name].sum)]));
     const path = `${currentTripId}/tourist-stats/${safePathSlug(guideName)}/report_${tripFileTag(currentTripId)}.xlsx`;
     const error = await saveXlsxSnapshot(path, rows, 'Статистика');
-    if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
-    else alert('Статистику збережено в сховище.');
+    if(error) showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+    else showAppAlert('Статистику збережено в сховище.');
   } finally {
     btn.disabled = false; btn.textContent = '💾 Зберегти';
   }
 });
 document.getElementById('touristStatsDownloadBtn').addEventListener('click', ()=>{
   const guideName = activeTouristGuideName();
-  if(!guideName){ alert('Оберіть гіда вище.'); return; }
+  if(!guideName){ showAppAlert('Оберіть гіда вище.'); return; }
   downloadXlsxSnapshot(`${currentTripId}/tourist-stats/${safePathSlug(guideName)}/report_${tripFileTag(currentTripId)}.xlsx`);
 });
 document.getElementById('touristListSaveBtn').addEventListener('click', async ()=>{
   const guideName = activeTouristGuideName();
-  if(!guideName){ alert('Оберіть гіда вище.'); return; }
+  if(!guideName){ showAppAlert('Оберіть гіда вище.'); return; }
   const btn = document.getElementById('touristListSaveBtn');
   btn.disabled = true; btn.textContent = 'Зберігаю…';
   try{
@@ -3660,15 +3677,15 @@ document.getElementById('touristListSaveBtn').addEventListener('click', async ()
     });
     const path = `${currentTripId}/tourist-list/${safePathSlug(guideName)}/report_${tripFileTag(currentTripId)}.xlsx`;
     const error = await saveXlsxSnapshot(path, rows, 'Туристи');
-    if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
-    else alert('Список туристів збережено в сховище.');
+    if(error) showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+    else showAppAlert('Список туристів збережено в сховище.');
   } finally {
     btn.disabled = false; btn.textContent = '💾 Зберегти';
   }
 });
 document.getElementById('touristListDownloadBtn').addEventListener('click', ()=>{
   const guideName = activeTouristGuideName();
-  if(!guideName){ alert('Оберіть гіда вище.'); return; }
+  if(!guideName){ showAppAlert('Оберіть гіда вище.'); return; }
   downloadXlsxSnapshot(`${currentTripId}/tourist-list/${safePathSlug(guideName)}/report_${tripFileTag(currentTripId)}.xlsx`);
 });
 document.getElementById('clearTouristListBtn').addEventListener('click', async ()=>{
@@ -3677,7 +3694,7 @@ document.getElementById('clearTouristListBtn').addEventListener('click', async (
   if(!confirm(`Видалити ВЕСЬ список туристів групи "${guideName}" для цього заїзду (${touristData.tourists.length} осіб)? Це не можна скасувати.`)) return;
   const ids = touristData.tourists.map(t=>t.id);
   const { error } = await sb.from('tourists').delete().in('id', ids);
-  if(error){ alert(friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
   openTouristId = null;
   await loadTourists();
   renderTouristSection();
@@ -3690,7 +3707,7 @@ document.getElementById('addTouristBtn').addEventListener('click', async ()=>{
   const guideName = activeTouristGuideName();
   if(!first || !last || !guideName) return;
   const { error } = await sb.from('tourists').insert({ trip_id: currentTripId, guide_name: guideName, first_name:first, last_name:last, birth_date: birth||null, passport_data: passport });
-  if(error){ alert(friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
   document.getElementById('newTouristFirst').value='';
   document.getElementById('newTouristLast').value='';
   document.getElementById('newTouristBirth').value='';
@@ -3707,7 +3724,7 @@ document.getElementById('addExtraTouristBtn').addEventListener('click', async ()
   if(!first || !last || !guideName) return;
   const payload = { trip_id: currentTripId, guide_name: guideName, first_name:first, last_name:last, birth_date: birth||null, passport_data: passport, added_by_guide:true };
   const { error, queued } = await rtGuideWrite('insert', 'tourists', payload);
-  if(error){ alert(friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
   document.getElementById('newExtraTouristFirst').value='';
   document.getElementById('newExtraTouristLast').value='';
   document.getElementById('newExtraTouristBirth').value='';
@@ -3781,7 +3798,7 @@ document.getElementById('bulkAddTouristBtn').addEventListener('click', async ()=
   }).filter(r=> r.first_name || r.last_name);
   if(!inserts.length) return;
   const { error } = await sb.from('tourists').insert(inserts);
-  if(error){ alert(friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
   document.getElementById('bulkTouristInput').value='';
   await loadTourists();
   renderTouristSection();
@@ -3913,11 +3930,11 @@ function openFinPartnerModal(report, section){
   });
   document.getElementById('finPartnerAddBtn').addEventListener('click', ()=>{
     const partnerName = partnerSelect.value===CUSTOM_PARTNER_VALUE ? customInput.value.trim() : partnerSelect.value;
-    if(!partnerName){ alert('Вкажи назву партнера.'); return; }
+    if(!partnerName){ showAppAlert('Вкажи назву партнера.'); return; }
     const excName = document.getElementById('finPartnerExc').value;
-    if(!excName){ alert('Оберіть екскурсію.'); return; }
+    if(!excName){ showAppAlert('Оберіть екскурсію.'); return; }
     const amount = parseDecimalInput(document.getElementById('finPartnerAmount').value);
-    if(!amount){ alert('Впиши суму.'); return; }
+    if(!amount){ showAppAlert('Впиши суму.'); return; }
     report.entries.push({
       section, label: `Партнер ${partnerName}: ${excName}`, amount,
       isPartnerEntry: true, partnerName, excursionName: excName
@@ -3981,7 +3998,7 @@ async function openFinGuideFeeModalFixed(report, excName){
       const already = (otherReports||[]).find(r=> (r.entries||[]).some(e=> e.itemKey===itemKey && Number(e.amount)>0));
       if(already){
         const theirAmt = (already.entries.find(e=>e.itemKey===itemKey)||{}).amount||0;
-        alert(`Поки ти заповнював(ла) — гід ${already.guide_name} уже встиг записати цей гонорар (${fmt(theirAmt)} €). Твій запис не збережено.`);
+        showAppAlert(`Поки ти заповнював(ла) — гід ${already.guide_name} уже встиг записати цей гонорар (${fmt(theirAmt)} €). Твій запис не збережено.`);
         modal.remove();
         return;
       }
@@ -4148,7 +4165,7 @@ function openFinGiftModal(report){
   document.getElementById('finGiftSaveBtn').addEventListener('click', ()=>{
     const desc = document.getElementById('finGiftDesc').value.trim();
     const amount = parseDecimalInput(document.getElementById('finGiftAmount').value);
-    if(!desc){ alert('Опиши, що за подарунок.'); return; }
+    if(!desc){ showAppAlert('Опиши, що за подарунок.'); return; }
     if(current){ current.amount = amount; current.giftDescription = desc; current.label = `Подарунок туристам: ${desc}`; }
     else { report.entries.push({ section:'paid', label:`Подарунок туристам: ${desc}`, amount, itemKey:'gift', giftDescription:desc }); }
     finSaveAndRerender(report);
@@ -4208,9 +4225,9 @@ function openFinListModal(report, config){
     const vals = {};
     config.fields.forEach(f=> vals[f.key] = document.getElementById('finListField_'+f.key).value.trim());
     const err = config.validate ? config.validate(vals) : null;
-    if(err){ alert(err); return; }
+    if(err){ showAppAlert(err); return; }
     const amount = parseDecimalInput(vals.amount);
-    if(!amount){ alert('Впиши суму.'); return; }
+    if(!amount){ showAppAlert('Впиши суму.'); return; }
     const entry = Object.assign({ section: config.section, label: config.buildLabel(vals), amount, itemKey: config.itemKey }, config.extraProps ? config.extraProps(vals) : {});
     report.entries.push(entry);
     finSaveAndRerender(report);
@@ -4332,9 +4349,9 @@ function openFinCollectedModal(report){
   const finCollectedAddBtn = document.getElementById('finCollectedAddBtn');
   if(finCollectedAddBtn) finCollectedAddBtn.addEventListener('click', ()=>{
     const excName = document.getElementById('finCollectedExc').value;
-    if(!excName){ alert('Оберіть екскурсію.'); return; }
+    if(!excName){ showAppAlert('Оберіть екскурсію.'); return; }
     const amount = parseDecimalInput(document.getElementById('finCollectedAmount').value);
-    if(!amount){ alert('Впиши суму.'); return; }
+    if(!amount){ showAppAlert('Впиши суму.'); return; }
     report.entries.push({ section:'received', label:`Зібрано: ${excName}`, amount, itemKey:'collected', excursionName: excName });
     finSaveAndRerender(report);
     modal.remove();
@@ -4495,7 +4512,7 @@ async function saveFinanceReport(report){
     trip_id: report.trip_id, guide_name: report.guide_name,
     handed_over: Number(report.handed_over)||0, entries: report.entries
   }, { onConflict: 'trip_id,guide_name' });
-  if(error){ console.error(error); alert(friendlyErrorMessage(error)); }
+  if(error){ console.error(error); showAppAlert(friendlyErrorMessage(error)); }
   else if(queued){ hbShowToast('💾 Звіт збережено локально — синхронізується, коли з\'явиться інтернет'); }
 }
 
@@ -4579,12 +4596,12 @@ async function saveFinanceReportToStorage(report, received, paid, totalReceived,
     const blob = new Blob([wbBinary], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const path = `${report.trip_id}/finance-report/${safePathSlug(report.guide_name)}/report_${tripFileTag(report.trip_id)}.xlsx`;
     const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, blob, { upsert:true });
-    if(error){ if(!silent) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return false; }
-    if(!silent) alert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити збережений" — з будь-якого пристрою, включно з менеджером.');
+    if(error){ if(!silent) showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return false; }
+    if(!silent) showAppAlert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити збережений" — з будь-якого пристрою, включно з менеджером.');
     return true;
   } catch(err){
     console.error(err);
-    if(!silent) alert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
+    if(!silent) showAppAlert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
     return false;
   } finally {
     if(btn && !silent){ btn.disabled = false; btn.textContent = '💾 Зберегти звіт'; }
@@ -4701,7 +4718,7 @@ function openFinSectionModal(sectionKey){
         { submitted: true, submitted_at: new Date().toISOString(), manager_seen: false },
         { trip_id: report.trip_id, guide_name: report.guide_name }
       );
-      if(error){ alert(friendlyErrorMessage(error)); submitBtn.disabled=false; submitBtn.textContent='📤 Відправити менеджеру'; return; }
+      if(error){ showAppAlert(friendlyErrorMessage(error)); submitBtn.disabled=false; submitBtn.textContent='📤 Відправити менеджеру'; return; }
       report.submitted = true;
       report.submitted_at = new Date().toISOString();
       if(queued) hbShowToast('💾 Відправлення збережено локально — надійде менеджеру, коли з\'явиться інтернет');
@@ -4716,7 +4733,7 @@ function openFinSectionModal(sectionKey){
         { submitted: false },
         { trip_id: report.trip_id, guide_name: report.guide_name }
       );
-      if(error){ alert(friendlyErrorMessage(error)); return; }
+      if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
       report.submitted = false;
       report._snapshotChecked = false;
       if(queued) hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет');
@@ -4870,7 +4887,7 @@ function renderFinanceReport(report){
   document.getElementById('finDownloadSavedBtn').addEventListener('click', async ()=>{
     const path = `${report.trip_id}/finance-report/${safePathSlug(report.guide_name)}/report_${tripFileTag(report.trip_id)}.xlsx`;
     const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-    if(error){ alert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти звіт").'); return; }
+    if(error){ showAppAlert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти звіт").'); return; }
     window.open(data.signedUrl, '_blank');
   });
 
@@ -4957,7 +4974,7 @@ async function saveXlsxSnapshot(storagePath, rows, sheetName){
 }
 async function downloadXlsxSnapshot(storagePath, notFoundMsg){
   const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(storagePath, 3600);
-  if(error){ alert(notFoundMsg || 'Ще немає збереженої версії — спочатку натисни "💾 Зберегти".'); return; }
+  if(error){ showAppAlert(notFoundMsg || 'Ще немає збереженої версії — спочатку натисни "💾 Зберегти".'); return; }
   window.open(data.signedUrl, '_blank');
 }
 function saveDownloadButtonsHtml(idPrefix){
@@ -4972,10 +4989,10 @@ function wireSaveDownloadButtons(idPrefix, storagePath, buildRowsFn, sheetName){
     try{
       const rows = buildRowsFn();
       const error = await saveXlsxSnapshot(storagePath, rows, sheetName);
-      if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
-      else alert('Збережено в сховище. Тепер можна завантажити кнопкою "⬇ Завантажити збережений" з будь-якого пристрою.');
+      if(error) showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+      else showAppAlert('Збережено в сховище. Тепер можна завантажити кнопкою "⬇ Завантажити збережений" з будь-якого пристрою.');
     } catch(err){
-      console.error(err); alert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
+      console.error(err); showAppAlert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
     } finally {
       saveBtn.disabled = false; saveBtn.textContent = '💾 Зберегти';
     }
@@ -4988,7 +5005,7 @@ async function uploadReportFile(file, pathPrefix){
   const ext = extMatch ? extMatch[0].toLowerCase() : '';
   const path = `${pathPrefix}/${uid()}${ext}`;
   const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, file, { upsert:true });
-  if(error){ alert('Не вдалося завантажити файл: ' + friendlyErrorMessage(error)); return null; }
+  if(error){ showAppAlert('Не вдалося завантажити файл: ' + friendlyErrorMessage(error)); return null; }
   return path;
 }
 async function removeReportFile(path){
@@ -4998,7 +5015,7 @@ async function removeReportFile(path){
 async function openReportFile(path){
   if(!path) return;
   const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-  if(error){ alert('Не вдалося відкрити файл: ' + friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert('Не вдалося відкрити файл: ' + friendlyErrorMessage(error)); return; }
   window.open(data.signedUrl, '_blank');
 }
 
@@ -5159,7 +5176,7 @@ async function saveManagerReport(report){
     trip_id: report.trip_id, hotels: report.hotels,
     expenses: report.expenses, submitted: !!report.submitted, own_bus_guide: report.ownBusGuide||''
   }, { onConflict: 'trip_id' });
-  if(error){ console.error(error); alert('Не вдалося зберегти звіт: ' + friendlyErrorMessage(error)); }
+  if(error){ console.error(error); showAppAlert('Не вдалося зберегти звіт: ' + friendlyErrorMessage(error)); }
 }
 
 let managerReportRerenderTimer;
@@ -5445,7 +5462,7 @@ function openPointGuideModal(tripId, rows, idx){
     ]);
     modal.remove();
     if(!found.found || found.sum===0){
-      alert(`У звіті ${chosenGuide} не знайшов запису "Зібрано: ${r.excName}".`);
+      showAppAlert(`У звіті ${chosenGuide} не знайшов запису "Зібрано: ${r.excName}".`);
       return;
     }
     rows[idx].pointedGuideResult = { guide: chosenGuide, amount: found.sum };
@@ -5485,14 +5502,14 @@ function openProfitCorrectionModal(tripId, r, field){
   document.getElementById('profitCorrectionSaveBtn').addEventListener('click', async ()=>{
     const newVal = parseDecimalInput(document.getElementById('profitCorrectionValue').value);
     const comment = document.getElementById('profitCorrectionComment').value.trim();
-    if(!comment){ alert("Коментар обов'язковий — коротко поясни, чому виправляєш."); return; }
+    if(!comment){ showAppAlert("Коментар обов'язковий — коротко поясни, чому виправляєш."); return; }
     const saveBtn = document.getElementById('profitCorrectionSaveBtn');
     saveBtn.disabled = true; saveBtn.textContent = 'Зберігаю…';
     const result = await applyProfitCorrection(tripId, r.guide, r.excName, field, newVal, comment);
-    if(result.error){ alert('Не вдалося зберегти: ' + result.error); saveBtn.disabled=false; saveBtn.textContent='💾 Зберегти корекцію'; return; }
+    if(result.error){ showAppAlert('Не вдалося зберегти: ' + result.error); saveBtn.disabled=false; saveBtn.textContent='💾 Зберегти корекцію'; return; }
     modal.remove();
     const profitDiff = result.newProfit - result.oldProfit;
-    alert(`✅ Виправлено.\n\nПрибуток гіда з цієї екскурсії: було ${fmt(result.oldProfit)} € → стало ${fmt(result.newProfit)} € (${profitDiff>=0?'+':''}${fmt(profitDiff)} €).\n% гіда: було ${fmt(result.oldPct)} € → стало ${fmt(result.newPct)} €.`);
+    showAppAlert(`✅ Виправлено.\n\nПрибуток гіда з цієї екскурсії: було ${fmt(result.oldProfit)} € → стало ${fmt(result.newProfit)} € (${profitDiff>=0?'+':''}${fmt(profitDiff)} €).\n% гіда: було ${fmt(result.oldPct)} € → стало ${fmt(result.newPct)} €.`);
     renderReconciliationCheck(tripId);
   });
 }
@@ -5582,7 +5599,7 @@ function renderReconciliationCheckFromRows(tripId, rows, tripWide){
   container.querySelectorAll('[data-role="reconcileShowNames"]').forEach(btn=> btn.addEventListener('click', ()=>{
     const r = rows[Number(btn.dataset.idx)];
     const names = (r.auto.names||[]).slice().sort((a,b)=>a.localeCompare(b,'uk'));
-    alert(`У "Список" для ${r.guide} — ${r.excName} враховано ${names.length} чол:\n\n${names.join('\n') || '(нікого)'}`);
+    showAppAlert(`У "Список" для ${r.guide} — ${r.excName} враховано ${names.length} чол:\n\n${names.join('\n') || '(нікого)'}`);
   }));
   container.querySelectorAll('[data-role="reconcilePointGuide"]').forEach(btn=> btn.addEventListener('click', ()=>{
     openPointGuideModal(tripId, rows, Number(btn.dataset.idx));
@@ -5667,7 +5684,7 @@ async function renderReportsSection(){
     if(!tripId) return;
     const def = TRIPS_DEF.find(d=>d.id===tripId);
     if(def && new Date() <= def.end){
-      alert('Цей заїзд ще триває (або не почався) — дані ще не повні (не всі екскурсії позначені, фінзвіти не здані). Перевірку нестиковок можна робити тільки після завершення заїзду.');
+      showAppAlert('Цей заїзд ще триває (або не почався) — дані ще не повні (не всі екскурсії позначені, фінзвіти не здані). Перевірку нестиковок можна робити тільки після завершення заїзду.');
       return;
     }
     reconcileBtn.disabled = true; reconcileBtn.textContent = 'Перевіряю…';
@@ -6399,7 +6416,7 @@ async function showGuideSingleView(tripId, guideName, target){
   if(unacceptBtn) unacceptBtn.addEventListener('click', async ()=>{
     if(!confirm(`Звіт гіда ${guideName} уже прийнятий. Зняти прийняття і відкрити для корекції? Це варто робити тільки якщо після прийняття знайшлась нестиковка, яку треба виправити.`)) return;
     const { error } = await sb.from('financial_reports').update({ accepted:false, accepted_at:null }).eq('trip_id', tripId).eq('guide_name', guideName);
-    if(error){ alert(friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     managerFinanceCorrectionKey = tripId+'|'+guideName;
     modal.remove();
     currentTripId = tripId;
@@ -6411,7 +6428,7 @@ async function showGuideSingleView(tripId, guideName, target){
   if(acceptBtn) acceptBtn.addEventListener('click', async ()=>{
     if(!confirm(`Прийняти фінансовий звіт гіда ${guideName}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`)) return;
     const { error } = await sb.from('financial_reports').update({ accepted:true, accepted_at:new Date().toISOString() }).eq('trip_id', tripId).eq('guide_name', guideName);
-    if(error){ alert(friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     showGuideSingleView(tripId, guideName, target);
   });
   document.getElementById('guideSinglePrintBtn').addEventListener('click', ()=>{
@@ -6564,7 +6581,7 @@ async function renderReportsGuideDrilldown(tripId){
     const guide = btn.dataset.guide;
     if(!confirm(`Прийняти фінансовий звіт гіда ${guide}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`)) return;
     const { error } = await sb.from('financial_reports').update({ accepted:true, accepted_at:new Date().toISOString() }).eq('trip_id', tripId).eq('guide_name', guide);
-    if(error){ alert(friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     await renderReportsGuideDrilldown(tripId);
   }));
 }
@@ -6572,7 +6589,7 @@ async function renderReportsGuideDrilldown(tripId){
 function exportExcursionProfitabilityToExcel(tripId){
   const td = state.trips[tripId];
   const def = TRIPS_DEF.find(d=>d.id===tripId);
-  if(!td){ alert('Немає даних по цьому заїзду.'); return; }
+  if(!td){ showAppAlert('Немає даних по цьому заїзду.'); return; }
 
   const detailRows = [['Екскурсія','Автобус','Гід','Група','Чол','Зібрано','к-ть км','Вартість км','Оплата км','Гід (€)','Квитки','Витрати (гід+км)','Затрат на учасника','Затрат на гіда','Прибуток','%','Офіс']];
   const summaryRows = [['Екскурсія','Зібрано','Нам платить партнер','Затрати','Ми платимо партнеру','Залишок','Керівники','Офіс']];
@@ -6945,7 +6962,7 @@ function renderManagerReport(report, officeTotal, missing){
       const file = e.target.files[0]; if(!file) return;
       const h = findHotel(e.target.dataset.hotel);
       const c = h.corporates.find(x=>x.id===e.target.dataset.id);
-      if(!c){ alert('Внутрішня помилка: не знайдено запис корпорату. Онови сторінку і спробуй ще раз.'); return; }
+      if(!c){ showAppAlert('Внутрішня помилка: не знайдено запис корпорату. Онови сторінку і спробуй ще раз.'); return; }
       const path = await uploadReportFile(file, `${report.trip_id}/corporates`);
       if(path){
         if(c.file_path) await removeReportFile(c.file_path);
@@ -6955,7 +6972,7 @@ function renderManagerReport(report, officeTotal, missing){
       }
     } catch(err){
       console.error(err);
-      alert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
+      showAppAlert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
     }
   }));
   block.querySelectorAll('[data-role="mrCorpDelete"]').forEach(el=> el.addEventListener('click', async e=>{
@@ -7025,7 +7042,7 @@ function renderManagerReport(report, officeTotal, missing){
     try{
       const file = e.target.files[0]; if(!file) return;
       const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
-      if(!ex){ alert('Внутрішня помилка: не знайдено пункт витрат. Онови сторінку і спробуй ще раз.'); return; }
+      if(!ex){ showAppAlert('Внутрішня помилка: не знайдено пункт витрат. Онови сторінку і спробуй ще раз.'); return; }
       const path = await uploadReportFile(file, `${report.trip_id}/expenses`);
       if(path){
         if(ex.file_path) await removeReportFile(ex.file_path);
@@ -7035,7 +7052,7 @@ function renderManagerReport(report, officeTotal, missing){
       }
     } catch(err){
       console.error(err);
-      alert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
+      showAppAlert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
     }
   }));
   block.querySelectorAll('[data-role="mrExpenseDelete"]').forEach(el=> el.addEventListener('click', async e=>{
@@ -7108,11 +7125,11 @@ function renderManagerReport(report, officeTotal, missing){
       const blob = new Blob([wbBinary], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const path = `${report.trip_id}/manager-report/report_${tripFileTag(report.trip_id)}.xlsx`;
       const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, blob, { upsert:true });
-      if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); }
-      else { alert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити збережений" — з будь-якого пристрою.'); }
+      if(error){ showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); }
+      else { showAppAlert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити збережений" — з будь-якого пристрою.'); }
     } catch(err){
       console.error(err);
-      alert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
+      showAppAlert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
     } finally {
       btn.disabled = false; btn.textContent = '💾 Зберегти в сховище';
     }
@@ -7120,7 +7137,7 @@ function renderManagerReport(report, officeTotal, missing){
   document.getElementById('mrDownloadSavedBtn').addEventListener('click', async ()=>{
     const path = `${report.trip_id}/manager-report/report_${tripFileTag(report.trip_id)}.xlsx`;
     const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-    if(error){ alert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти в сховище").'); return; }
+    if(error){ showAppAlert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти в сховище").'); return; }
     window.open(data.signedUrl, '_blank');
   });
   function buildManagerReportRows(){
@@ -7281,7 +7298,7 @@ const GUIDE_FULL_NAME_MAP = {
 
 async function addGuideSelfToManifest(tripId, guideName){
   const existing = (await sb.from('skiatos_manifest_extras').select('id').eq('trip_id', tripId).eq('guide_name', guideName).eq('entry_type','guide_self').maybeSingle()).data;
-  if(existing){ alert('Ти вже в списку.'); return; }
+  if(existing){ showAppAlert('Ти вже в списку.'); return; }
   const info = GUIDE_FULL_NAME_MAP[guideName];
   let first = '', last = '';
   if(info){
@@ -7294,7 +7311,7 @@ async function addGuideSelfToManifest(tripId, guideName){
     first_name:first, last_name:last, passport_data: info ? info.passport : '',
     birth_date: info ? info.birthDate : null
   });
-  if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося додати: ' + friendlyErrorMessage(error));
   else if(queued) hbShowToast('💾 Збережено локально — з\'явиться в списку, коли повернеться інтернет');
 }
 async function addExtraPersonToManifest(tripId, guideName, firstName, lastName, birthDate, passport, partnerOperator){
@@ -7306,7 +7323,7 @@ async function addExtraPersonToManifest(tripId, guideName, firstName, lastName, 
     first_name:firstName, last_name:lastName, birth_date: birthDate||null, price, price_mode:'standard',
     passport_data: passport||'', partner_operator: partnerOperator||null
   });
-  if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося додати: ' + friendlyErrorMessage(error));
   else if(queued) hbShowToast('💾 Збережено локально — з\'явиться в списку, коли повернеться інтернет');
 }
 async function addDriverToManifest(tripId, guideName, firstName, lastName, birthDate, passport){
@@ -7314,7 +7331,7 @@ async function addDriverToManifest(tripId, guideName, firstName, lastName, birth
     trip_id: tripId, guide_name: guideName, entry_type:'driver', first_name:firstName, last_name:lastName, price:0,
     birth_date: birthDate||null, passport_data: passport||''
   });
-  if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося додати: ' + friendlyErrorMessage(error));
   else if(queued) hbShowToast('💾 Збережено локально — з\'явиться в списку, коли повернеться інтернет');
 }
 async function addForeignGuideToManifest(tripId, guideName, firstName, lastName, birthDate, passport){
@@ -7322,17 +7339,17 @@ async function addForeignGuideToManifest(tripId, guideName, firstName, lastName,
     trip_id: tripId, guide_name: guideName, entry_type:'guide_foreign', first_name:firstName, last_name:lastName, price:0,
     birth_date: birthDate||null, passport_data: passport||''
   });
-  if(error) alert('Не вдалося додати: ' + friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося додати: ' + friendlyErrorMessage(error));
   else if(queued) hbShowToast('💾 Збережено локально — з\'явиться в списку, коли повернеться інтернет');
 }
 async function updateManifestExtraPrice(extraId, price){
   const { error, queued } = await rtGuideWrite('update', 'skiatos_manifest_extras', { price, price_mode:'manual' }, { id: extraId });
-  if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
   else if(queued) hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет');
 }
 async function deleteManifestExtra(extraId){
   const { error, queued } = await rtGuideWrite('delete', 'skiatos_manifest_extras', null, { id: extraId });
-  if(error) alert('Не вдалося видалити: ' + friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося видалити: ' + friendlyErrorMessage(error));
   else if(queued) hbShowToast('💾 Видалення збережено локально — синхронізується, коли з\'явиться інтернет');
 }
 
@@ -7661,9 +7678,9 @@ async function renderSkiatosManifest(){
     if(type==='partner'){
       const partnerSel = document.getElementById('extraNewPartner').value;
       partnerName = partnerSel===CUSTOM_PARTNER_VALUE ? document.getElementById('extraNewPartnerCustom').value.trim() : partnerSel;
-      if(!partnerName){ alert('Вкажіть партнера/оператора зі списку (або "+ Новий партнер...").'); return; }
+      if(!partnerName){ showAppAlert('Вкажіть партнера/оператора зі списку (або "+ Новий партнер...").'); return; }
     }
-    if(!attributedGuide){ alert('Не вдалося визначити гіда для запису.'); return; }
+    if(!attributedGuide){ showAppAlert('Не вдалося визначити гіда для запису.'); return; }
     const rows = Array.from(document.querySelectorAll('#extraNewRows .extra-person-row'));
     const people = rows.map(row=>({
       first: row.querySelector('.extraRowFirst').value.trim(),
@@ -7671,7 +7688,7 @@ async function renderSkiatosManifest(){
       birth: parseUkrDateInput(row.querySelector('.extraRowBirth').value),
       passport: row.querySelector('.extraRowPassport').value.trim()
     })).filter(p=>p.first || p.last);
-    if(!people.length){ alert('Введіть ім\'я або прізвище хоча б для однієї людини.'); return; }
+    if(!people.length){ showAppAlert('Введіть ім\'я або прізвище хоча б для однієї людини.'); return; }
     for(const p of people){
       if(type==='guide') await addForeignGuideToManifest(currentTripId, attributedGuide, p.first, p.last, p.birth||null, p.passport);
       else if(type==='driver') await addDriverToManifest(currentTripId, attributedGuide, p.first, p.last, p.birth||null, p.passport);
@@ -7714,7 +7731,7 @@ async function renderSkiatosManifest(){
   block.querySelectorAll('[data-role="removeFromSkiatos"]').forEach(el=> el.addEventListener('click', async e=>{
     if(!confirm('Прибрати цю людину зі списку на Скіатос? Самого туриста це не видалить.')) return;
     const { error, queued } = await rtGuideRpc('cancel_tourist_selection', { p_selection_id: e.target.dataset.sel, p_reason: 'Прибрано зі Скіатосу' });
-    if(error){ alert('Не вдалося прибрати: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося прибрати: ' + friendlyErrorMessage(error)); return; }
     if(queued) hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет');
     renderSkiatosManifest();
   }));
@@ -7729,7 +7746,7 @@ async function renderSkiatosManifest(){
       const rows = buildSkiatosManifestRows(groups, drivers, foreignGuides, partnerGroups);
       const path = `${currentTripId}/skiatos-list/report_${tripFileTag(currentTripId)}.xlsx`;
       const error = await saveXlsxSnapshot(path, rows, 'Скіатос');
-      if(error) alert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
+      if(error) showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
       else hbShowToast('✅ Список на Скіатос збережено');
     } finally {
       btn.disabled = false; btn.textContent = '💾 Зберегти';
@@ -7792,7 +7809,7 @@ async function importTripPrepFile(file, tripId, targetHotel){
   const wb = XLSX.read(buf, {type:'array'});
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet, {defval:'', raw:true});
-  if(!rows.length){ alert('Файл порожній.'); return false; }
+  if(!rows.length){ showAppAlert('Файл порожній.'); return false; }
   const headers = Object.keys(rows[0]);
   const sheetMerges = sheet['!merges'] || []; // merged cell ranges — used to auto-detect "same company" groupings
 
@@ -7817,7 +7834,7 @@ async function importTripPrepFile(file, tripId, targetHotel){
   const keySv = findHeaderKey(headers, ['SV']);
   const keyPriceChangeReason = findHeaderKey(headers, ['Причина зміни ціни']);
 
-  if(!keyName){ alert('Не знайшов колонку з ПІБ (очікую заголовок типу "Прізвище та ім\'я"). Перевір файл.'); return false; }
+  if(!keyName){ showAppAlert('Не знайшов колонку з ПІБ (очікую заголовок типу "Прізвище та ім\'я"). Перевір файл.'); return false; }
 
   let lastBooking = '';
   let lastConnected = '';
@@ -7911,12 +7928,12 @@ async function importTripPrepFile(file, tripId, targetHotel){
   let delQuery = sb.from('trip_prep_tourists').delete().eq('trip_id', tripId);
   delQuery = targetHotel ? delQuery.eq('target_hotel', targetHotel) : delQuery.eq('target_hotel', '');
   const { error: delErr } = await delQuery;
-  if(delErr){ alert('Помилка при очищенні старих даних: '+friendlyErrorMessage(delErr)); return false; }
+  if(delErr){ showAppAlert('Помилка при очищенні старих даних: '+friendlyErrorMessage(delErr)); return false; }
   const chunkSize = 200;
   for(let i=0;i<parsed.length;i+=chunkSize){
     const chunk = parsed.slice(i,i+chunkSize).map(r=>{ const { _birth_invalid, ...rest } = r; return { trip_id: tripId, ...rest }; });
     const { error } = await sb.from('trip_prep_tourists').insert(chunk);
-    if(error){ alert('Помилка імпорту: '+friendlyErrorMessage(error)); return false; }
+    if(error){ showAppAlert('Помилка імпорту: '+friendlyErrorMessage(error)); return false; }
   }
   const groupCount = new Set(parsed.map(r=>r.link_group)).size;
   const missingCity = keyCity ? parsed.filter(r=>r.full_name && !r.pickup_city) : [];
@@ -7933,19 +7950,19 @@ async function importTripPrepFile(file, tripId, targetHotel){
     : '';
   await sb.from('trips').update({ overview_confirmed: false }).eq('id', tripId);
   TRIPS_DEF = await fetchTrips();
-  alert(`Імпортовано ${parsed.length} туристів, ${groupCount} непорушних груп.${cityWarning}${invalidBirthWarning}${birthWarning}`);
+  showAppAlert(`Імпортовано ${parsed.length} туристів, ${groupCount} непорушних груп.${cityWarning}${invalidBirthWarning}${birthWarning}`);
   return true;
 }
 
 async function assignGroupToRoom(groupKey, roomId, hotelName){
   const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey).map(t=>t.id);
   const { error } = await sb.from('trip_prep_tourists').update({ assigned_room_id: roomId, assigned_hotel: hotelName }).in('id', ids);
-  if(error) alert('Не вдалося призначити: '+friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося призначити: '+friendlyErrorMessage(error));
 }
 async function unassignGroupFromRoom(groupKey){
   const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey).map(t=>t.id);
   const { error } = await sb.from('trip_prep_tourists').update({ assigned_room_id: null, assigned_hotel: '' }).in('id', ids);
-  if(error) alert('Не вдалося скасувати: '+friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося скасувати: '+friendlyErrorMessage(error));
 }
 function isSelfArrivingCity(pickupCity){
   return ['самостійно','self','own','власний доїзд','власний під\'їзд','свій доїзд','самостійний доїзд','без автобуса','без доїзду'].includes(String(pickupCity||'').trim().toLowerCase());
@@ -7955,25 +7972,25 @@ async function assignGroupToBus(groupKey, busName){
   const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey && !isSelfArrivingCity(t.pickup_city)).map(t=>t.id);
   if(!ids.length) return;
   const { error } = await sb.from('trip_prep_tourists').update({ assigned_bus: busName }).in('id', ids);
-  if(error) alert('Не вдалося призначити: '+friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося призначити: '+friendlyErrorMessage(error));
 }
 async function unassignGroupFromBus(groupKey){
   const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey && !isSelfArrivingCity(t.pickup_city)).map(t=>t.id);
   if(!ids.length) return;
   const { error } = await sb.from('trip_prep_tourists').update({ assigned_bus: '' }).in('id', ids);
-  if(error) alert('Не вдалося скасувати: '+friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося скасувати: '+friendlyErrorMessage(error));
 }
 async function assignSelfArrivingGuide(groupKey, guideName){
   const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey && isSelfArrivingCity(t.pickup_city)).map(t=>t.id);
   if(!ids.length) return;
   const { error } = await sb.from('trip_prep_tourists').update({ assigned_bus: guideName }).in('id', ids);
-  if(error) alert('Не вдалося призначити: '+friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося призначити: '+friendlyErrorMessage(error));
 }
 async function unassignSelfArrivingGuide(groupKey){
   const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===groupKey && isSelfArrivingCity(t.pickup_city)).map(t=>t.id);
   if(!ids.length) return;
   const { error } = await sb.from('trip_prep_tourists').update({ assigned_bus: '' }).in('id', ids);
-  if(error) alert('Не вдалося скасувати: '+friendlyErrorMessage(error));
+  if(error) showAppAlert('Не вдалося скасувати: '+friendlyErrorMessage(error));
 }
 
 async function resetBusAssignment(busName){
@@ -7986,7 +8003,7 @@ async function resetBusAssignment(busName){
   });
   if(!idsToReset.length) return;
   const { error } = await sb.from('trip_prep_tourists').update({ assigned_bus: '' }).in('id', idsToReset);
-  if(error){ alert('Не вдалося обнулити: ' + friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert('Не вдалося обнулити: ' + friendlyErrorMessage(error)); return; }
   await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName);
 }
 
@@ -8002,7 +8019,7 @@ async function resetAllBusAssignments(){
   });
   if(!idsToReset.length) return;
   const { error } = await sb.from('trip_prep_tourists').update({ assigned_bus: '' }).in('id', idsToReset);
-  if(error){ alert('Не вдалося обнулити: ' + friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert('Не вдалося обнулити: ' + friendlyErrorMessage(error)); return; }
   for(const b of busNamesTouched){
     await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', b);
   }
@@ -8095,7 +8112,7 @@ function renderTripPrepView(){
         });
         if(!toInsert.length) continue;
         const { error: insErr } = await sb.from('tourists').insert(toInsert);
-        if(insErr){ alert(`Не вдалося передати список гіду ${guideName}: ` + friendlyErrorMessage(insErr)); continue; }
+        if(insErr){ showAppAlert(`Не вдалося передати список гіду ${guideName}: ` + friendlyErrorMessage(insErr)); continue; }
         totalAdded += toInsert.length;
       }
       hbShowToast(totalAdded ? `✅ Передано ${totalAdded} чол. по всіх гідах` : 'Усі вже передані — новеньких немає.');
@@ -8291,21 +8308,21 @@ function renderTripPrepOverview(){
   document.getElementById('tpClearTouristsBtn').addEventListener('click', async ()=>{
     if(!confirm('Точно видалити весь список учасників цього заїзду (обидва готелі)? Це не можна скасувати.')) return;
     const { error } = await sb.from('trip_prep_tourists').delete().eq('trip_id', currentTripId);
-    if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
   });
   document.getElementById('tpClearKonstantinBtn').addEventListener('click', async ()=>{
     if(!confirm('Точно видалити список учасників для Konstantin? Great Aleksander не постраждає.')) return;
     const { error } = await sb.from('trip_prep_tourists').delete().eq('trip_id', currentTripId).eq('target_hotel', 'konstantin');
-    if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
   });
   document.getElementById('tpClearGreatBtn').addEventListener('click', async ()=>{
     if(!confirm('Точно видалити список учасників для Great Aleksander? Konstantin не постраждає.')) return;
     const { error } = await sb.from('trip_prep_tourists').delete().eq('trip_id', currentTripId).eq('target_hotel', 'greataleksander');
-    if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
   });
@@ -8317,7 +8334,7 @@ function renderTripPrepOverview(){
     const raw = e.target.dataset.raw;
     const sel = content.querySelector(`[data-role="tpCityFixInline"][data-raw="${raw}"]`);
     const { error } = await sb.from('trip_prep_tourists').update({ pickup_city: sel.value }).eq('trip_id', currentTripId).eq('pickup_city', raw);
-    if(error){ alert('Не вдалося виправити: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося виправити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepOverview();
   }));
@@ -8330,18 +8347,18 @@ function renderTripPrepOverview(){
   content.querySelectorAll('[data-role="tpApplyMissingCity"]').forEach(el=> el.addEventListener('click', async e=>{
     const gk = e.target.dataset.group;
     const sel = content.querySelector(`[data-role="tpMissingCitySelect"][data-group="${gk}"]`);
-    if(!sel.value){ alert('Спочатку обери місто зі списку.'); return; }
+    if(!sel.value){ showAppAlert('Спочатку обери місто зі списку.'); return; }
     const ids = tripPrepData.tourists.filter(t=>(t.link_group||t.id)===gk && !String(t.pickup_city||'').trim()).map(t=>t.id);
     if(!ids.length) return;
     const { error } = await sb.from('trip_prep_tourists').update({ pickup_city: sel.value }).in('id', ids);
-    if(error){ alert('Не вдалося застосувати: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося застосувати: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepOverview();
     hbShowToast(`✅ Місто "${sel.value}" встановлено`);
   }));
   document.getElementById('tpAddManualTouristBtn').addEventListener('click', async ()=>{
     const fullName = document.getElementById('tpManualFullName').value.trim();
-    if(!fullName){ alert("Впиши ім'я та прізвище."); return; }
+    if(!fullName){ showAppAlert("Впиши ім'я та прізвище."); return; }
     const birth = document.getElementById('tpManualBirth').value;
     const passport = document.getElementById('tpManualPassport').value.trim();
     let booking = document.getElementById('tpManualBooking').value.trim();
@@ -8369,7 +8386,7 @@ function renderTripPrepOverview(){
       full_name: fullName, birth_date: birth||null, passport, target_hotel: hotel,
       pickup_city: city, phone, agency, insurance, paid_seats: paidSeats
     });
-    if(error){ alert('Не вдалося додати: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося додати: ' + friendlyErrorMessage(error)); return; }
     document.getElementById('tpManualFullName').value = '';
     document.getElementById('tpManualBirth').value = '';
     document.getElementById('tpManualPassport').value = '';
@@ -8386,14 +8403,14 @@ function renderTripPrepOverview(){
   });
   document.getElementById('tpMergeGroupsBtn').addEventListener('click', async ()=>{
     const checked = Array.from(content.querySelectorAll('.tp-group-cb:checked')).map(cb=>cb.dataset.group);
-    if(checked.length < 2){ alert('Постав галочки щонайменше на двох групах, які треба об\'єднати.'); return; }
+    if(checked.length < 2){ showAppAlert('Постав галочки щонайменше на двох групах, які треба об\'єднати.'); return; }
     const newKey = checked[0];
     const idsToUpdate = [];
     checked.forEach(gk=>{
       (groups[gk]||[]).forEach(m=> idsToUpdate.push(m.id));
     });
     const { error } = await sb.from('trip_prep_tourists').update({ link_group: newKey }).in('id', idsToUpdate);
-    if(error){ alert('Не вдалося об\'єднати: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося об\'єднати: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
   });
@@ -8401,15 +8418,15 @@ function renderTripPrepOverview(){
     const raw = document.getElementById('tpQuickMergeInput').value.trim();
     if(!raw) return;
     const numbers = raw.split(/[,\s]+/).map(s=>s.replace(/^#/,'').trim()).filter(Boolean);
-    if(numbers.length < 2){ alert('Впиши щонайменше два номери заявок, розділені комою чи пробілом.'); return; }
+    if(numbers.length < 2){ showAppAlert('Впиши щонайменше два номери заявок, розділені комою чи пробілом.'); return; }
     const matched = tripPrepData.tourists.filter(t=> numbers.includes((t.booking_number||'').replace(/^#/,'')));
-    if(!matched.length){ alert('Не знайшов жодної заявки з такими номерами в цьому заїзді.'); return; }
+    if(!matched.length){ showAppAlert('Не знайшов жодної заявки з такими номерами в цьому заїзді.'); return; }
     const foundNumbers = [...new Set(matched.map(t=>(t.booking_number||'').replace(/^#/,'')))];
     const missing = numbers.filter(n=>!foundNumbers.includes(n));
     const newKey = matched[0].link_group || numbers[0];
     const ids = matched.map(t=>t.id);
     const { error } = await sb.from('trip_prep_tourists').update({ link_group: newKey }).in('id', ids);
-    if(error){ alert('Не вдалося об\'єднати: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося об\'єднати: ' + friendlyErrorMessage(error)); return; }
     document.getElementById('tpQuickMergeInput').value = '';
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
@@ -8417,7 +8434,7 @@ function renderTripPrepOverview(){
   });
   document.getElementById('tpMoveHotelBtn').addEventListener('click', async ()=>{
     const checked = Array.from(content.querySelectorAll('.tp-group-cb:checked')).map(cb=>cb.dataset.group);
-    if(!checked.length){ alert('Постав галочку хоча б на одній групі, яку треба перенести.'); return; }
+    if(!checked.length){ showAppAlert('Постав галочку хоча б на одній групі, яку треба перенести.'); return; }
     const otherHotel = { konstantin:'greataleksander', greataleksander:'konstantin' };
     const byNewHotel = {};
     checked.forEach(gk=>{
@@ -8427,12 +8444,12 @@ function renderTripPrepOverview(){
       if(!byNewHotel[next]) byNewHotel[next] = [];
       groups[gk].forEach(m=> byNewHotel[next].push(m.id));
     });
-    if(!Object.keys(byNewHotel).length){ alert('У вибраних груп не визначено готель — перенесення неможливе.'); return; }
+    if(!Object.keys(byNewHotel).length){ showAppAlert('У вибраних груп не визначено готель — перенесення неможливе.'); return; }
     const summary = Object.keys(byNewHotel).map(h=>`${HB_HOTEL_STRUCTURE[h].name}: ${byNewHotel[h].length} осіб`).join(', ');
     if(!confirm(`Перенести вибрані групи? ${summary}.\n\n⚠️ Якщо для когось із них уже є бронювання кімнати у старому готелі — його треба буде скасувати вручну у вкладці "Готель" (тут воно НЕ видаляється автоматично).`)) return;
     for(const hotel of Object.keys(byNewHotel)){
       const { error } = await sb.from('trip_prep_tourists').update({ target_hotel: hotel }).in('id', byNewHotel[hotel]);
-      if(error){ alert('Не вдалося перенести: ' + friendlyErrorMessage(error)); return; }
+      if(error){ showAppAlert('Не вдалося перенести: ' + friendlyErrorMessage(error)); return; }
     }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
@@ -8443,7 +8460,7 @@ function renderTripPrepOverview(){
     if(!confirm(`Роз'єднати заявку №${booking} з цієї групи?`)) return;
     const ids = tripPrepData.tourists.filter(t=>t.booking_number===booking).map(t=>t.id);
     const { error } = await sb.from('trip_prep_tourists').update({ link_group: booking }).in('id', ids);
-    if(error){ alert('Не вдалося роз\'єднати: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося роз\'єднати: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
   }));
@@ -8503,7 +8520,7 @@ function renderTripPrepOverview(){
     await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('full_name', tourist.full_name);
 
     const { error } = await sb.from('trip_prep_tourists').delete().eq('id', touristId);
-    if(error){ alert('Не вдалося видалити: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося видалити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
     hbShowToast(`🗑️ ${tourist.full_name} видалено (зі списку, кімнати і місця в автобусі)`);
@@ -8825,7 +8842,7 @@ async function renderTripPrepBuses(){
       trip_id: currentTripId, bus_name: b, gr_slot: grSlot, layout_name: physical, border_point: border, time_slot: timeSlot, seat_count: seatCount,
       guide_phone: guidePhone, meeting_point: meetingPoint, gather_time: gatherTime, departure_time: departTime, pickup_points_text: pickupText
     });
-    if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
     hbShowToast(`✅ Конфігурацію для ${b} збережено`);
     await loadBusSeatData(currentTripId, true);
     renderTripPrepBuses();
@@ -8834,13 +8851,13 @@ async function renderTripPrepBuses(){
   if(customUploadEl) customUploadEl.addEventListener('change', async e=>{
     const file = e.target.files[0]; if(!file) return;
     const name = document.getElementById('tpCustomBusName').value.trim();
-    if(!name){ alert('Спочатку впиши назву автобуса-заміни.'); return; }
+    if(!name){ showAppAlert('Спочатку впиши назву автобуса-заміни.'); return; }
     const rows = await parseCustomBusLayoutFile(file);
-    if(!rows.length){ alert('Не вдалося прочитати схему з файлу — перевір формат.'); return; }
+    if(!rows.length){ showAppAlert('Не вдалося прочитати схему з файлу — перевір формат.'); return; }
     const seatNums = rows.flatMap(r=>r.filter(c=>'seat' in c).map(c=>c.seat));
     const seatCount = seatNums.length ? Math.max(...seatNums) : 50;
     const { error } = await sb.from('custom_bus_layouts').insert({ trip_id: currentTripId, name, layout_json: rows, seat_count: seatCount });
-    if(error){ alert('Не вдалося зберегти схему: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося зберегти схему: ' + friendlyErrorMessage(error)); return; }
     hbShowToast(`✅ Схему "${name}" додано — тепер доступна у списку "Фізичний автобус"`);
     await loadBusSeatData(currentTripId, true);
     renderTripPrepBuses();
@@ -8897,10 +8914,10 @@ async function renderTripPrepBuses(){
     const rawCity = e.target.dataset.raw;
     const sel = content.querySelector(`[data-role="tpCityFix"][data-raw="${rawCity}"]`);
     const corrected = sel.value;
-    if(!corrected){ alert('Обери, на яке місто виправити.'); return; }
+    if(!corrected){ showAppAlert('Обери, на яке місто виправити.'); return; }
     const idsToFix = tripPrepData.tourists.filter(t=>t.pickup_city===rawCity).map(t=>t.id);
     const { error } = await sb.from('trip_prep_tourists').update({ pickup_city: corrected }).in('id', idsToFix);
-    if(error){ alert('Не вдалося виправити: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося виправити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepBuses();
     hbShowToast(`✅ "${rawCity}" → "${corrected}" (${idsToFix.length} чол)`);
@@ -9321,7 +9338,7 @@ function openAutoSeatPlanModal(busName){
       full_name: p.full_name, booking_number: p.booking_number, link_group: p.link_group, paid_seat: p.paid_seat
     }));
     const { error } = await sb.from('bus_seat_assignments').upsert(rows, { onConflict: 'trip_id,bus_name,seat_number' });
-    if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); btn.disabled=false; btn.textContent='✅ Застосувати'; return; }
+    if(error){ showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); btn.disabled=false; btn.textContent='✅ Застосувати'; return; }
     await loadBusSeatData(currentTripId, true);
     renderBusSeatChart(busName);
     closeAutoSeatPlanModal();
@@ -9489,7 +9506,7 @@ function renderCityWizardStep(){
   document.getElementById('tpCityFixConfirmBtn').addEventListener('click', async ()=>{
     const target = document.getElementById('tpCityKnownSelect').value;
     const { error } = await sb.from('trip_prep_tourists').update({ pickup_city: target }).eq('trip_id', currentTripId).eq('pickup_city', item.raw);
-    if(error){ alert('Не вдалося виправити: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося виправити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     cityWizardIndex++;
     renderCityWizardStep();
@@ -9502,7 +9519,7 @@ function renderCityWizardStep(){
 
 async function confirmOverviewTables(){
   const { error } = await sb.from('trips').update({ overview_confirmed: true }).eq('id', currentTripId);
-  if(error){ alert('Не вдалося підтвердити: ' + friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert('Не вдалося підтвердити: ' + friendlyErrorMessage(error)); return; }
   TRIPS_DEF = await fetchTrips();
   renderTripPrepView();
   hbShowToast('✅ Таблиці підтверджено — інші вкладки відкриті.');
@@ -9568,7 +9585,7 @@ async function hbAssignSelectedPersonToSeat(busName, seatNum){
     full_name: t.full_name, booking_number: (t.booking_number||'').replace(/^#/,''),
     link_group: t.link_group||'', paid_seat: Number(t.paid_seats) > 0
   }, { onConflict: 'trip_id,bus_name,seat_number' });
-  if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); renderBusSeatChart(busName); return; }
+  if(error){ showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); renderBusSeatChart(busName); return; }
   await loadBusSeatData(currentTripId, true);
   updatePulseGroupAfterAssign(t.link_group || t.id, busName);
   renderBusSeatChart(busName);
@@ -9610,7 +9627,7 @@ async function tpSaveEditTouristModal(){
     insurance: parseDecimalInput(document.getElementById('tpEditInsurance').value)
   };
   const { error } = await sb.from('trip_prep_tourists').update(updates).eq('id', tpEditTouristId);
-  if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
   document.getElementById('tpEditTouristModal').classList.add('app-hidden');
   tpEditTouristId = null;
   tripPrepData = await loadTripPrepData(currentTripId);
@@ -9625,7 +9642,7 @@ async function hbEditSeatPersonFields(touristId){
   const newPaidRaw = prompt(`Платні місця (€) для ${t.full_name} (0, якщо нема):`, t.paid_seats||0);
   if(newPaidRaw===null) return;
   const { error } = await sb.from('trip_prep_tourists').update({ pickup_city: newCity.trim(), paid_seats: parseDecimalInput(newPaidRaw) }).eq('id', touristId);
-  if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+  if(error){ showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
   tripPrepData = await loadTripPrepData(currentTripId);
   renderBusSeatChart(tripPrepBusSeatView);
   hbShowToast(`✅ Оновлено: ${t.full_name}`);
@@ -9813,7 +9830,7 @@ function renderBusSeatChart(busName){
   document.getElementById('tpClearSeatChartBtn').addEventListener('click', async ()=>{
     if(!confirm(`Точно очистити всю розсадку для "${busName}"? Розподіл груп по автобусах не зміниться, тільки конкретні місця.`)) return;
     const { error } = await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName);
-    if(error){ alert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
+    if(error){ showAppAlert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
     await loadBusSeatData(currentTripId, true);
     renderBusSeatChart(busName);
   });
@@ -9872,17 +9889,17 @@ function openSeatActionModal(busName, seatNum, existing){
     });
     const confirmMove = async ()=>{
       const newSeatNum = parseInt(document.getElementById('tpSeatNewNumInput').value);
-      if(!newSeatNum){ alert('Впиши номер місця.'); return; }
+      if(!newSeatNum){ showAppAlert('Впиши номер місця.'); return; }
       if(newSeatNum === seatNum){ closeSeatActionModal(); return; }
       const targetOccupied = tripPrepBusSeatData.assignments.find(a=>a.bus_name===busName && a.seat_number===newSeatNum);
-      if(targetOccupied){ alert(`Місце ${newSeatNum} вже зайняте: ${targetOccupied.full_name}. Спочатку звільни його.`); return; }
+      if(targetOccupied){ showAppAlert(`Місце ${newSeatNum} вже зайняте: ${targetOccupied.full_name}. Спочатку звільни його.`); return; }
       await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName).eq('seat_number', seatNum);
       const { error } = await sb.from('bus_seat_assignments').upsert({
         trip_id: currentTripId, bus_name: busName, seat_number: newSeatNum,
         full_name: existing.full_name, booking_number: existing.booking_number,
         link_group: existing.link_group, paid_seat: existing.paid_seat
       }, { onConflict: 'trip_id,bus_name,seat_number' });
-      if(error){ alert('Не вдалося перенести: ' + friendlyErrorMessage(error)); return; }
+      if(error){ showAppAlert('Не вдалося перенести: ' + friendlyErrorMessage(error)); return; }
       await loadBusSeatData(currentTripId, true);
       renderBusSeatChart(busName);
       closeSeatActionModal();
@@ -9907,7 +9924,7 @@ function openSeatActionModal(busName, seatNum, existing){
     document.getElementById('tpSeatCancelBtn').addEventListener('click', closeSeatActionModal);
     const confirmAssign = async ()=>{
       const name = document.getElementById('tpSeatNameInput').value.trim();
-      if(!name){ alert("Впиши ім'я."); return; }
+      if(!name){ showAppAlert("Впиши ім'я."); return; }
       const groups = tripPrepGroups();
       const matchGk = Object.keys(groups).find(gk=>groups[gk].some(m=>m.full_name.trim().toLowerCase()===name.toLowerCase()));
       const matchMember = matchGk ? groups[matchGk].find(m=>m.full_name.trim().toLowerCase()===name.toLowerCase()) : null;
@@ -9916,7 +9933,7 @@ function openSeatActionModal(busName, seatNum, existing){
         full_name: name, booking_number: matchMember ? matchMember.booking_number : '',
         link_group: matchGk || '', paid_seat: matchMember ? Number(matchMember.paid_seats) > 0 : false
       }, { onConflict: 'trip_id,bus_name,seat_number' });
-      if(error){ alert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
+      if(error){ showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return; }
       await loadBusSeatData(currentTripId, true);
       if(matchGk) updatePulseGroupAfterAssign(matchGk, busName);
       renderBusSeatChart(busName);
@@ -9986,7 +10003,7 @@ function docExportWord(title, bodyHtml, filename){
 
 function docOpenPrintWindow(title, bodyHtml){
   const win = window.open('', '_blank');
-  if(!win){ alert('Браузер заблокував нове вікно — дозволь спливаючі вікна для друку/PDF.'); return; }
+  if(!win){ showAppAlert('Браузер заблокував нове вікно — дозволь спливаючі вікна для друку/PDF.'); return; }
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
     <style>
       body{ font-family: Arial, sans-serif; padding: 24px; color:#111; }
@@ -10227,7 +10244,7 @@ async function renderTripPrepDocs(){
       const note = e.target.value;
       debtNotesMap[gk] = note;
       const { error } = await sb.from('trip_debt_notes').upsert({ trip_id: currentTripId, link_group: gk, note });
-      if(error) alert('Не вдалося зберегти нотатку: ' + friendlyErrorMessage(error));
+      if(error) showAppAlert('Не вдалося зберегти нотатку: ' + friendlyErrorMessage(error));
     }));
   }
   renderDebtorsTable();
@@ -10442,7 +10459,7 @@ async function renderTripPrepDocs(){
   }
   function openWindshieldSign(guideName){
     const win = window.open('', '_blank');
-    if(!win){ alert('Браузер заблокував нове вікно — дозволь спливаючі вікна для друку.'); return; }
+    if(!win){ showAppAlert('Браузер заблокував нове вікно — дозволь спливаючі вікна для друку.'); return; }
     win.document.write(buildWindshieldSignHtml(guideName));
     win.document.close();
   }
@@ -10533,7 +10550,7 @@ const SEAT_CELL_MAP = {
       a.click();
       URL.revokeObjectURL(url);
     } catch(err){
-      alert(err.message || 'Не вдалося згенерувати файл розсадки.');
+      showAppAlert(err.message || 'Не вдалося згенерувати файл розсадки.');
     }
   }
 
@@ -10593,7 +10610,7 @@ const SEAT_CELL_MAP = {
       a.click();
       URL.revokeObjectURL(url);
     } catch(err){
-      alert(err.message || 'Не вдалося згенерувати інфолист.');
+      showAppAlert(err.message || 'Не вдалося згенерувати інфолист.');
     }
   }
 
@@ -10704,7 +10721,7 @@ const SEAT_CELL_MAP = {
       const blob = await buildGuidePackageZipBlob(guideName);
       const storagePath = `${currentTripId}/guide-package/${safePathSlug(guideName)}/package_${tripFileTag(currentTripId)}.zip`;
       const { error } = await sb.storage.from(STORAGE_BUCKET).upload(storagePath, blob, { upsert:true });
-      if(error){ alert('Документи згенеровано, але не вдалось зберегти в сховище: ' + friendlyErrorMessage(error)); return; }
+      if(error){ showAppAlert('Документи згенеровано, але не вдалось зберегти в сховище: ' + friendlyErrorMessage(error)); return; }
       hbShowToast(`✅ Документи для "${guideName}" підготовлено${issues.length ? ' (із застереженнями)' : ''}`);
     } finally {
       btn.disabled = false; btn.textContent = oldText;
@@ -11048,13 +11065,13 @@ function hbFindDuplicateRoomedNames(hotel, period, roomNum, names){
 async function hbSaveShare(hotel, period, roomNum, share){
   if(!share.requestNum){
     console.error('hbSaveShare: rejected save without a request number', {hotel, period, roomNum, share});
-    alert('⚠️ Внутрішня помилка: спроба зберегти бронювання без номера заявки. Збереження скасовано.');
+    showAppAlert('⚠️ Внутрішня помилка: спроба зберегти бронювання без номера заявки. Збереження скасовано.');
     return false;
   }
   const conflicts = hbFindDuplicateRoomedNames(hotel, period, roomNum, share.memberNames);
   if(conflicts.length){
     const lines = conflicts.map(c=> `${c.name} — вже в номері ${c.roomNumber}`).join('\n');
-    alert(`⚠️ Не поселено — ці люди вже поселені в іншому номері цього заїзду:\n\n${lines}\n\nСпочатку прибери їх звідти (або скористайся "Перенести"), якщо треба змінити кімнату.`);
+    showAppAlert(`⚠️ Не поселено — ці люди вже поселені в іншому номері цього заїзду:\n\n${lines}\n\nСпочатку прибери їх звідти (або скористайся "Перенести"), якщо треба змінити кімнату.`);
     return false;
   }
   await hbDeleteShare(hotel, period, roomNum, share.requestNum, true);
@@ -11064,7 +11081,7 @@ async function hbSaveShare(hotel, period, roomNum, share){
     total: share.total||0, extra_bed: !!share.extraBed, seeking_roommate: !!share.seeking, notes: share.notes||'',
     member_names: share.memberNames||[]
   });
-  if(error){ alert('⚠️ Не вдалося зберегти в хмару. Перевірте інтернет.'); return false; }
+  if(error){ showAppAlert('⚠️ Не вдалося зберегти в хмару. Перевірте інтернет.'); return false; }
   return true;
 }
 
@@ -11072,7 +11089,7 @@ async function hbDeleteShare(hotel, period, roomNum, requestNum, silent){
   let q = sb.from('room_bookings').delete().eq('hotel',hotel).eq('period',period).eq('room_number',roomNum);
   q = (requestNum===null||requestNum===undefined||requestNum==='') ? q.is('request_id', null) : q.eq('request_id', requestNum);
   const { error } = await q;
-  if(error && !silent){ alert('⚠️ Не вдалося зберегти скасування в хмару. Перевірте інтернет.'); }
+  if(error && !silent){ showAppAlert('⚠️ Не вдалося зберегти скасування в хмару. Перевірте інтернет.'); }
 }
 
 function hbGetRoomEntry(hotel, period, roomNum){
@@ -11105,19 +11122,19 @@ async function hbLoadExtraRooms(){
 }
 async function hbSaveExtraRoom(hotel, roomNum, typeLabel, maxGuests, label){
   const { error } = await sb.from('extra_rooms').upsert({ hotel, room_number:roomNum, type_label:typeLabel, max_guests:maxGuests, label }, { onConflict:'hotel,room_number' });
-  if(error){ alert('⚠️ Не вдалося зберегти нове місце в хмару.'); return false; }
+  if(error){ showAppAlert('⚠️ Не вдалося зберегти нове місце в хмару.'); return false; }
   return true;
 }
 async function hbDeleteExtraRoom(hotel, roomNum){
   const { error } = await sb.from('extra_rooms').delete().eq('hotel', hotel).eq('room_number', roomNum);
-  if(error){ alert('⚠️ Не вдалося видалити з хмари. Перевірте інтернет.'); return false; }
+  if(error){ showAppAlert('⚠️ Не вдалося видалити з хмари. Перевірте інтернет.'); return false; }
   if(hbExtraRooms[hotel]) hbExtraRooms[hotel] = hbExtraRooms[hotel].filter(r=>r.number!==roomNum);
   return true;
 }
 async function hbHandleDeleteExtraRoom(roomNum){
   const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
   if(entry && entry.shares.length){
-    alert('⚠️ Це місце зараз зайняте — спочатку виселіть/перенесіть людей звідти, тоді можна буде видалити.');
+    showAppAlert('⚠️ Це місце зараз зайняте — спочатку виселіть/перенесіть людей звідти, тоді можна буде видалити.');
     return;
   }
   if(!confirm('Видалити це додаткове місце (овербукінг)?')) return;
@@ -11144,7 +11161,7 @@ async function hbLinkRequestsFn(hotel, period, requestNums){
   if(!groupId) groupId = 'grp-' + Date.now();
   const rows = requestNums.map(req=>({ hotel, period, request_id:req, link_group:groupId }));
   const { error } = await sb.from('linked_requests').upsert(rows, { onConflict:'hotel,period,request_id' });
-  if(error) alert("⚠️ Не вдалося зберегти зв'язок заявок у хмару.");
+  if(error) showAppAlert("⚠️ Не вдалося зберегти зв'язок заявок у хмару.");
   if(!hbLinkGroups[hotel]) hbLinkGroups[hotel] = {};
   if(!hbLinkGroups[hotel][period]) hbLinkGroups[hotel][period] = {};
   requestNums.forEach(req=> hbLinkGroups[hotel][period][req] = groupId);
@@ -11268,7 +11285,7 @@ async function hbClearHotelBookings(){
   if(!confirm(`Точно обнулити всі бронювання в "${hotelName}" для заїзду ${hbCurrentPeriod}? Це стосується тільки цього готелю й цього заїзду, інші не постраждають. Дію не можна скасувати.`)) return;
   const { error: e1 } = await sb.from('room_bookings').delete().eq('hotel', hbCurrentHotel).eq('period', hbCurrentPeriod);
   const { error: e2 } = await sb.from('linked_requests').delete().eq('hotel', hbCurrentHotel).eq('period', hbCurrentPeriod);
-  if(e1 || e2){ alert('Не вдалося обнулити: ' + friendlyErrorMessage(e1||e2)); return; }
+  if(e1 || e2){ showAppAlert('Не вдалося обнулити: ' + friendlyErrorMessage(e1||e2)); return; }
   await hbManualRefresh();
   hbShowToast(`🗑️ ${hotelName} обнулено для цього заїзду`);
 }
@@ -11460,7 +11477,7 @@ function hbAttachLinkHoverHighlight(){
 function hbHandleRoomClick(roomNum){
   const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
   if(!entry || entry.shares.length===0){
-    if(hbIsPeriodLocked(hbCurrentPeriod)) return alert("Бронювання заблоковано — заїзд уже почався або завершився");
+    if(hbIsPeriodLocked(hbCurrentPeriod)) return showAppAlert("Бронювання заблоковано — заїзд уже почався або завершився");
     hbOpenBookingModal(roomNum, 'new');
     return;
   }
@@ -11674,7 +11691,7 @@ function hbOpenMoveModalByIndex(idx){
 function hbOpenLinkModalByIndex(idx){
   const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, hbActiveRoomNum);
   if(!entry || !entry.shares[idx]) return;
-  if(!entry.shares[idx].requestNum){ alert('У цього запису немає номера заявки, тож його не можна зв\'язати з іншими. Спочатку скасуйте цей запис.'); return; }
+  if(!entry.shares[idx].requestNum){ showAppAlert('У цього запису немає номера заявки, тож його не можна зв\'язати з іншими. Спочатку скасуйте цей запис.'); return; }
   hbOpenLinkModal(entry.shares[idx].requestNum);
 }
 
@@ -11776,11 +11793,11 @@ async function hbConfirmBooking(){
   const total = adults + kids612 + kidsUnder6;
   const roomNum = hbModalRoomNum;
 
-  if(!requestNum || requestNum.length<4) return alert("Введіть номер заявки (4-5 цифр)");
+  if(!requestNum || requestNum.length<4) return showAppAlert("Введіть номер заявки (4-5 цифр)");
 
   const requestTourists = (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===requestNum);
   if(requestTourists.length && requestTourists[0].target_hotel && requestTourists[0].target_hotel !== hbCurrentHotel){
-    return alert(`⛔ Заявка №${requestNum} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — зроби це через "🔄 Перенести вибрані в інший готель" у вкладці "Огляд і імпорт".`);
+    return showAppAlert(`⛔ Заявка №${requestNum} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — зроби це через "🔄 Перенести вибрані в інший готель" у вкладці "Огляд і імпорт".`);
   }
 
   const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
@@ -11790,7 +11807,7 @@ async function hbConfirmBooking(){
   const effectiveCapacity = baseCapacity + ((alreadyHasExtraBed||extraBed) ? 1 : 0);
   const remaining = effectiveCapacity - occupancy;
 
-  if(total > remaining) return alert(`Недостатньо місць! У ${hbRoomDisplay(hbCurrentHotel,roomNum)} вільно лише ${remaining} з ${effectiveCapacity}${(alreadyHasExtraBed||extraBed)?' (з екстраліжком)':''}.`);
+  if(total > remaining) return showAppAlert(`Недостатньо місць! У ${hbRoomDisplay(hbCurrentHotel,roomNum)} вільно лише ${remaining} з ${effectiveCapacity}${(alreadyHasExtraBed||extraBed)?' (з екстраліжком)':''}.`);
 
   let shareMemberNames = [];
   if(document.getElementById('hbModalNamedChecklistWrap').style.display !== 'none' && requestNum in hbWizardSubRemaining){
@@ -11841,7 +11858,7 @@ async function hbConfirmBooking(){
 
   if(unplacedSiblingInfo){
     hbCloseModal();
-    setTimeout(()=> alert(`⚠️ Заявка №${requestNum} пов'язана з №${unplacedSiblingInfo.sib} (${unplacedSiblingInfo.count} чол: ${unplacedSiblingInfo.names}) — її ще не поселено. Не забудь поселити і цю частину компанії!`), 100);
+    setTimeout(()=> showAppAlert(`⚠️ Заявка №${requestNum} пов'язана з №${unplacedSiblingInfo.sib} (${unplacedSiblingInfo.count} чол: ${unplacedSiblingInfo.names}) — її ще не поселено. Не забудь поселити і цю частину компанії!`), 100);
     return;
   }
   setTimeout(()=> hbCloseModal(), 800);
@@ -11858,9 +11875,9 @@ async function hbCancelShare(roomNum, requestNum){
 
 async function hbMoveShare(fromRoom, fromReq, toRoom){
   const fromEntry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, fromRoom);
-  if(!fromEntry) return alert("Помилка: кімнату не знайдено в базі.");
+  if(!fromEntry) return showAppAlert("Помилка: кімнату не знайдено в базі.");
   const share = fromEntry.shares.find(s=>s.requestNum===fromReq);
-  if(!share) return alert("Помилка: заявку не знайдено в цій кімнаті.");
+  if(!share) return showAppAlert("Помилка: заявку не знайдено в цій кімнаті.");
   if(!toRoom) return;
 
   const toEntry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, toRoom);
@@ -11872,7 +11889,7 @@ async function hbMoveShare(fromRoom, fromReq, toRoom){
 
   let needsExtraBed = false;
   if(share.total > remaining){
-    if(share.total > remaining+1){ alert(`Недостатньо місць! У ${hbRoomDisplay(hbCurrentHotel,toRoom)} вільно лише ${remaining} (навіть з екстраліжком не вистачить на ${share.total} осіб).`); return; }
+    if(share.total > remaining+1){ showAppAlert(`Недостатньо місць! У ${hbRoomDisplay(hbCurrentHotel,toRoom)} вільно лише ${remaining} (навіть з екстраліжком не вистачить на ${share.total} осіб).`); return; }
     const wantsExtraBed = await hbAskYesNo(`У ${hbRoomDisplay(hbCurrentHotel,toRoom)} вільно лише ${remaining} місць — не вистачає для ${share.total} осіб. Додати екстраліжко (+1 місце)?`);
     if(!wantsExtraBed) return;
     needsExtraBed = true;
@@ -11890,7 +11907,7 @@ async function hbMoveShare(fromRoom, fromReq, toRoom){
     fromEntry.shares.push(share);
     await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, fromRoom, share);
     hbLoadRoomsGrid();
-    alert('Перенесення скасовано — заявку повернуто в попередню кімнату.');
+    showAppAlert('Перенесення скасовано — заявку повернуто в попередню кімнату.');
     return;
   }
   destEntry.shares.push(movedShare);
@@ -11968,7 +11985,7 @@ document.addEventListener('input', e=>{
 /* ---------- Планувальник розселення ---------- */
 async function hbLoadDemandsFromBaseList(){
   const { data: tourists, error } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', currentTripId).order('row_order');
-  if(error || !tourists || !tourists.length){ alert('Немає завантаженого базового списку для цього заїзду (спочатку завантаж його у вкладці "Огляд і імпорт").'); return; }
+  if(error || !tourists || !tourists.length){ showAppAlert('Немає завантаженого базового списку для цього заїзду (спочатку завантаж його у вкладці "Огляд і імпорт").'); return; }
   const groups = {};
   tourists.forEach(t=>{
     const key = t.link_group || t.id;
@@ -11994,7 +12011,7 @@ async function hbLoadDemandsFromBaseList(){
     hbAddDemandRow(primaryReq, remaining, combinedComment);
     added++;
   });
-  if(!added) alert('Усі групи з базового списку вже заброньовані (або список порожній).');
+  if(!added) showAppAlert('Усі групи з базового списку вже заброньовані (або список порожній).');
   else hbShowToast(`Завантажено ${added} груп із базового списку.`);
 }
 
@@ -12120,8 +12137,8 @@ function hbComputeAllocation(demands){
 }
 function hbComputePlanSuggestions(){
   const { demands, errors } = hbCollectDemandsFromInputs();
-  if(errors.length){ alert(errors.join('\n')); return; }
-  if(!demands.length){ alert('Додайте хоча б одну заявку з номером і кількістю людей.'); return; }
+  if(errors.length){ showAppAlert(errors.join('\n')); return; }
+  if(!demands.length){ showAppAlert('Додайте хоча б одну заявку з номером і кількістю людей.'); return; }
   const { assignments, unplaced } = hbComputeAllocation(demands);
   hbPlannerSuggestions = assignments;
   hbRenderSuggestions(assignments, unplaced);
@@ -12213,7 +12230,7 @@ function hbWizardComputeBreakdown(group){
 
 async function hbOpenWizard(){
   const { data: tourists, error } = await sb.from('trip_prep_tourists').select('*').eq('trip_id', currentTripId).order('row_order');
-  if(error || !tourists || !tourists.length){ alert('Немає завантаженого базового списку для цього заїзду (спочатку завантаж його у вкладці "Огляд і імпорт").'); return; }
+  if(error || !tourists || !tourists.length){ showAppAlert('Немає завантаженого базового списку для цього заїзду (спочатку завантаж його у вкладці "Огляд і імпорт").'); return; }
   const groupsByKey = {};
   tourists.forEach(t=>{ const key=t.link_group||t.id; if(!groupsByKey[key]) groupsByKey[key]=[]; groupsByKey[key].push(t); });
 
@@ -12244,7 +12261,7 @@ async function hbOpenWizard(){
     })
     .sort((a,b)=>a.minRowOrder-b.minRowOrder);
 
-  if(!hbWizardGroups.length){ alert('Усі групи з базового списку вже розселені!'); return; }
+  if(!hbWizardGroups.length){ showAppAlert('Усі групи з базового списку вже розселені!'); return; }
 
   hbWizardIndex = 0;
   hbWizardSelectedRoom = null;
@@ -12410,7 +12427,7 @@ async function hbModalApplyManualLinkedRooms(){
     const reqB = inp.dataset.req;
     const validRoomNumbers = new Set([...hbGetAllRoomsForHotel(hbCurrentHotel).map(r=>r.number), ...(hbExtraRooms[hbCurrentHotel]||[]).map(r=>r.number)]);
     if(!validRoomNumbers.has(roomNum)){
-      alert(`⚠️ Кімнати №${roomNum} не існує в ${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}. Заявку №${reqB} пропущено — перевір номер.`);
+      showAppAlert(`⚠️ Кімнати №${roomNum} не існує в ${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}. Заявку №${reqB} пропущено — перевір номер.`);
       continue;
     }
     if(!(reqB in hbWizardSubRemaining)){
@@ -12430,7 +12447,7 @@ async function hbModalApplyManualLinkedRooms(){
     const cap = baseCap + (hasExtra?1:0);
     const free = cap - occ;
     if(members.length > free){
-      alert(`У кімнату ${roomNum} для заявки №${reqB} не влазить ${members.length} чол (вільно лише ${free}). Цю заявку пропущено — вкажи іншу кімнату або онови сторінку і спробуй розбити її частково.`);
+      showAppAlert(`У кімнату ${roomNum} для заявки №${reqB} не влазить ${members.length} чол (вільно лише ${free}). Цю заявку пропущено — вкажи іншу кімнату або онови сторінку і спробуй розбити її частково.`);
       continue;
     }
     const { adults, kids612, kidsUnder6 } = hbWizardComputeSubBreakdown(members);
@@ -12439,7 +12456,7 @@ async function hbModalApplyManualLinkedRooms(){
     hbWizardSubRemaining[reqB] = [];
     anyApplied = true;
   }
-  if(!anyApplied){ alert('Впиши хоча б один номер кімнати.'); return; }
+  if(!anyApplied){ showAppAlert('Впиши хоча б один номер кімнати.'); return; }
 
   const reqNum = document.getElementById('hbRequestNum').value.trim().replace(/^#/,'');
   const tourists = tripPrepData.tourists || [];
@@ -12802,11 +12819,11 @@ function hbWizardComputeSubBreakdown(members){
 
 async function hbWizardConfirmSubBooking(){
   const roomNum = hbWizardSelectedRoom;
-  if(!roomNum){ alert('Спочатку обери кімнату.'); return; }
+  if(!roomNum){ showAppAlert('Спочатку обери кімнату.'); return; }
   const remainingMembers = hbWizardSubRemaining[hbWizardActiveBooking] || [];
   const checkboxes = Array.from(document.querySelectorAll('.hb-wizard-member-cb'));
   const checkedIdx = checkboxes.filter(cb=>cb.checked).map(cb=>parseInt(cb.dataset.idx));
-  if(!checkedIdx.length){ alert('Познач хоча б одну людину, яку поселяємо сюди.'); return; }
+  if(!checkedIdx.length){ showAppAlert('Познач хоча б одну людину, яку поселяємо сюди.'); return; }
   const selectedMembers = checkedIdx.map(i=>remainingMembers[i]);
   const { adults, kids612, kidsUnder6, total } = hbWizardComputeSubBreakdown(selectedMembers);
 
@@ -12818,7 +12835,7 @@ async function hbWizardConfirmSubBooking(){
   const wantsExtraBed = extraBedCb ? extraBedCb.checked : false;
   const effectiveCapacity = baseCapacity + ((alreadyHasExtraBed||wantsExtraBed) ? 1 : 0);
   const remaining = effectiveCapacity - occupancy;
-  if(total > remaining){ alert(`Недостатньо місць! Вільно лише ${remaining} з ${effectiveCapacity}.`); return; }
+  if(total > remaining){ showAppAlert(`Недостатньо місць! Вільно лише ${remaining} з ${effectiveCapacity}.`); return; }
   const seekingCb = document.getElementById('hbWizardSeekingCb');
   const wantsSeeking = seekingCb ? seekingCb.checked : false;
 
