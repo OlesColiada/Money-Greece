@@ -4818,7 +4818,11 @@ function renderFinanceReport(report){
   const partnerReceivedSum = report.entries.filter(e=>e.isPartnerEntry && e.section==='received').reduce((s,e)=>s+(Number(e.amount)||0),0);
   const partnerPaidSum = report.entries.filter(e=>e.isPartnerEntry && e.section==='paid').reduce((s,e)=>s+(Number(e.amount)||0),0);
   const busTotal = finSumByKey(report.entries,'bus_prepay') + finSumByKey(report.entries,'bus_doplata');
-  const guideFeeExcursions = ['Олімп','Едеса','Метеори'];
+  const guideFeeExcursions = [...new Set(
+    (state.trips[report.trip_id]?.excursions||[])
+      .map(exc=> exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name)
+      .filter(label=> label && !NO_GUIDE_FEE_EXCURSIONS.includes(label))
+  )];
 
   const receivedAccordionHtml = `
     ${finLeaf('Офіс', finSumByKey(report.entries,'office'), 'data-modal="office"')}
