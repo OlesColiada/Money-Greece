@@ -3630,8 +3630,8 @@ async function loadTripGuideExcursionStats(){
     const g = touristGuide[s.tourist_id];
     if(!g) return;
     if(!byGuideExc[g][s.excursion_name]) byGuideExc[g][s.excursion_name] = {count:0, sum:0};
-    byGuideExc[g][s.excursion_name].count++;
-    byGuideExc[g][s.excursion_name].sum += Number(s.price)||0;
+    if(s.price_mode !== 'ticket') byGuideExc[g][s.excursion_name].count++; // ticket-only riders don't pay for the bus, so they don't count toward cost-per-participant
+    byGuideExc[g][s.excursion_name].sum += Number(s.price)||0; // but their payment still went to the guide, so it still counts toward Зібрано
   });
   return byGuideExc;
 }
@@ -5782,18 +5782,20 @@ async function renderReportsSection(){
           const td = state.trips[def.id];
           const names = td ? td.guides.map(g=>g.name) : [];
           const guideCell = (n)=>{
-            if(!n) return '—';
+            if(!n) return { html:'—', bg:'' };
             const status = finStatusByTripGuide[def.id+'|'+n];
-            const icon = status && status.accepted ? '🔒 ' : status && status.submitted ? '⏳ ' : '⚠️ ';
-            const title = status && status.accepted ? 'Фінзвіт прийнято' : status && status.submitted ? 'Відправлено, ще не прийнято' : 'Фінзвіт ще не відправлено';
-            return `<span class="reports-guide-link" data-trip="${def.id}" data-guide="${n}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);" title="${title}">${icon}${guideDisplayLabel(def.id, n)}</span>`;
+            const accepted = status && status.accepted;
+            const bg = accepted ? '#dcfce7' : '#fce7f3';
+            const title = accepted ? 'Фінзвіт прийнято' : status && status.submitted ? 'Відправлено, ще не прийнято' : 'Фінзвіт ще не відправлено';
+            return { html:`<span class="reports-guide-link" data-trip="${def.id}" data-guide="${n}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);" title="${title}">${guideDisplayLabel(def.id, n)}</span>`, bg };
           };
           const hasExcursions = td && (td.excursions||[]).length;
+          const g0 = guideCell(names[0]), g1 = guideCell(names[1]), g2 = guideCell(names[2]);
           return `<tr style="${def.reconciled ? 'background:#ffedd5;' : ''}">
             <td class="reports-overview-row" data-trip="${def.id}" style="cursor:pointer;" title="${def.reconciled ? '✓ Прораховано — нестиковок не знайдено' : ''}">${def.reconciled ? '✓ ' : ''}${def.label}</td>
-            <td>${guideCell(names[0])}</td>
-            <td>${guideCell(names[1])}</td>
-            <td>${guideCell(names[2])}</td>
+            <td style="${g0.bg?`background:${g0.bg};`:''}">${g0.html}</td>
+            <td style="${g1.bg?`background:${g1.bg};`:''}">${g1.html}</td>
+            <td style="${g2.bg?`background:${g2.bg};`:''}">${g2.html}</td>
             <td>${hasExcursions ? `<span class="reports-profit-link" data-trip="${def.id}" style="cursor:pointer; text-decoration:underline; color:var(--aegean);">переглянути</span>` : '—'}</td>
           </tr>`;
         }).join('')}</tbody>
@@ -6472,7 +6474,7 @@ async function showGuideSingleView(tripId, guideName, target){
     const byTouristId = {};
     selections.forEach(s=>{
       if(!byTouristId[s.tourist_id]) byTouristId[s.tourist_id] = {};
-      byTouristId[s.tourist_id][s.excursion_name] = { price: Number(s.price)||0, isPaid: !!s.paid };
+      byTouristId[s.tourist_id][s.excursion_name] = { price: Number(s.price)||0, isPaid: !!s.paid, priceMode: s.price_mode || 'standard' };
     });
     const matrixTouristIds = Object.keys(byTouristId)
       .sort((a,b)=>{
@@ -6481,6 +6483,8 @@ async function showGuideSingleView(tripId, guideName, target){
         return na.localeCompare(nb, 'uk');
       });
     const colTotals = {}; matrixExcNames.forEach(n=> colTotals[n]=0);
+    const colCounts = {}; matrixExcNames.forEach(n=> colCounts[n]=0);
+    const colCategoryCounts = {}; matrixExcNames.forEach(n=> colCategoryCounts[n]={});
     let grandTotal = 0;
     const matrixBodyRows = matrixTouristIds.map(tid=>{
       const t = touristById[tid];
@@ -6491,19 +6495,37 @@ async function showGuideSingleView(tripId, guideName, target){
         if(!cell) return '<td></td>';
         rowTotal += cell.price;
         colTotals[excName] += cell.price;
+        colCounts[excName]++;
+        if(cell.priceMode !== 'standard'){
+          colCategoryCounts[excName][cell.priceMode] = (colCategoryCounts[excName][cell.priceMode]||0) + 1;
+        }
+        const modeTag = cell.priceMode !== 'standard' ? ` [${PRICE_MODE_LABELS[cell.priceMode]||cell.priceMode}]` : '';
         const style = cell.isPaid ? 'color:#166534; font-weight:600;' : 'color:#b91c1c; font-weight:600;';
-        return `<td style="text-align:center; ${style}">${fmt(cell.price)}${cell.isPaid ? '' : ' ⚠'}</td>`;
+        return `<td style="text-align:center; ${style}" title="${PRICE_MODE_LABELS[cell.priceMode]||''}">${fmt(cell.price)}${cell.isPaid ? '' : ' ⚠'}${modeTag}</td>`;
       }).join('');
       grandTotal += rowTotal;
       return `<tr><td style="text-align:left;">${name}</td>${cells}<td style="text-align:center; font-weight:700;">${fmt(rowTotal)} €</td></tr>`;
     }).join('');
+    // Усі категорії знижок (крім "Стандарт"), що трапились хоч в одній екскурсії — по одному рядку на кожну.
+    const usedCategories = [...new Set(matrixExcNames.flatMap(n=> Object.keys(colCategoryCounts[n])))];
+    const categoryRowsHtml = usedCategories.map(cat=> `
+      <tr style="font-size:11.5px; color:var(--ink-soft);">
+        <td style="text-align:left;">&nbsp;&nbsp;у т.ч. ${PRICE_MODE_LABELS[cat]||cat}</td>
+        ${matrixExcNames.map(n=> `<td style="text-align:center;">${colCategoryCounts[n][cat]||''}</td>`).join('')}
+        <td></td>
+      </tr>
+    `).join('');
     const matrixTableHtml = matrixTouristIds.length ? `
       <table class="report-table" style="font-size:12px; width:100%;">
         <thead><tr><th style="text-align:left;">Турист</th>${matrixExcNames.map(n=>`<th>${n}</th>`).join('')}<th>Всього здав</th></tr></thead>
         <tbody>${matrixBodyRows}</tbody>
-        <tfoot><tr style="font-weight:700; border-top:2px solid #333;"><td style="text-align:left;">Всього на екскурсію</td>${matrixExcNames.map(n=>`<td style="text-align:center;">${fmt(colTotals[n])} €</td>`).join('')}<td style="text-align:center;">${fmt(grandTotal)} €</td></tr></tfoot>
+        <tfoot>
+          <tr style="font-weight:700; border-top:2px solid #333;"><td style="text-align:left;">Всього на екскурсію</td>${matrixExcNames.map(n=>`<td style="text-align:center;">${fmt(colTotals[n])} €</td>`).join('')}<td style="text-align:center;">${fmt(grandTotal)} €</td></tr>
+          <tr style="font-weight:700;"><td style="text-align:left;">Кількість людей</td>${matrixExcNames.map(n=>`<td style="text-align:center;">${colCounts[n]}</td>`).join('')}<td></td></tr>
+          ${categoryRowsHtml}
+        </tfoot>
       </table>
-      <p class="report-note">✓ зелене — сплачено · ⚠ червоне — ще не сплачено (за списком туриста).</p>
+      <p class="report-note">✓ зелене — сплачено · ⚠ червоне — ще не сплачено (за списком туриста). Позначка [Знижка]/[Безкоштовно]/[Вартість квитка] — особлива ціна.</p>
     ` : `<p class="report-note">Немає позначених екскурсій.</p>`;
 
     container.innerHTML = `
