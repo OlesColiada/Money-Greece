@@ -1662,8 +1662,8 @@ function renderGuidesBlockInstance(inst){
     });
   }
 }
-function requestGuidesEditMode(){
-  if(!confirm('Змінити склад гідів на цьому заїзді?')) return;
+async function requestGuidesEditMode(){
+  if(!(await showAppConfirm('Змінити склад гідів на цьому заїзді?'))) return;
   guidesEditMode = true;
   renderAll();
 }
@@ -1910,13 +1910,13 @@ function openExcursionModal(excId){
   // Single delegated handler attached once to the modal element itself (which persists
   // across draw() redraws) — per-element listeners recreated on every redraw have
   // previously proven unreliable for taps on Android/Chrome.
-  modal.addEventListener('click', e=>{
+  modal.addEventListener('click', async e=>{
     if(e.target===modal){ closeModal(); return; }
     if(e.target.closest('#emEditName')){ e.preventDefault(); e.stopPropagation(); openExcNameModal(excId, draw); return; }
     if(e.target.closest('#emBusFee')){ e.preventDefault(); e.stopPropagation(); openBusFeeModal(excId, draw); return; }
     if(e.target.closest('#emDelete')){
       e.preventDefault(); e.stopPropagation();
-      deleteExcursion(excId); // has its own confirm() dialog
+      await deleteExcursion(excId); // has its own confirm() dialog
       const stillExists = getTripData(currentTripId).excursions.some(x=>x.id===excId);
       if(!stillExists) closeModal();
       return;
@@ -2161,7 +2161,7 @@ async function markSettlementPaid(excId, which){
   renderAll();
 }
 async function unmarkSettlementPaid(excId, which){
-  if(!confirm('Скасувати позначку "оплачено" для цього розрахунку?')) return;
+  if(!(await showAppConfirm('Скасувати позначку "оплачено" для цього розрахунку?'))) return;
   setStatus("Скасування…");
   const { error } = await sb.rpc('unmark_settlement_paid', { p_excursion_id: excId, p_which: which });
   if(error){ showAppAlert(friendlyErrorMessage(error)); setStatus("Помилка"); return; }
@@ -2260,6 +2260,29 @@ function showAppAlert(message){
   const close = ()=> modal.remove();
   modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
   document.getElementById('finAlertOkBtn').addEventListener('click', close);
+}
+function showAppConfirm(message){
+  return new Promise(resolve=>{
+    const existing = document.getElementById('finConfirmModal');
+    if(existing) existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'finConfirmModal';
+    modal.className = 'hb-modal-overlay';
+    modal.style.zIndex = String(nextModalZ());
+    modal.innerHTML = `<div class="hb-modal-card" style="max-width:360px;">
+      <p id="finConfirmMsg" style="margin:0 0 18px; font-size:14px; white-space:pre-wrap;"></p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-primary" id="finConfirmOkBtn" style="flex:1;">Так</button>
+        <button class="btn btn-ghost" id="finConfirmCancelBtn" style="flex:1;">Скасувати</button>
+      </div>
+    </div>`;
+    modal.querySelector('#finConfirmMsg').textContent = message;
+    document.body.appendChild(modal);
+    const finish = (result)=>{ modal.remove(); resolve(result); };
+    modal.addEventListener('click', e=>{ if(e.target===modal) finish(false); });
+    document.getElementById('finConfirmOkBtn').addEventListener('click', ()=> finish(true));
+    document.getElementById('finConfirmCancelBtn').addEventListener('click', ()=> finish(false));
+  });
 }
 function openExcNameModal(excId, onClose){
   const tripData = getTripData(currentTripId);
@@ -2546,9 +2569,9 @@ function openRowDetailModal(excId, rowId, onClose){
       closeAndNotify();
     });
     const delBtn = document.getElementById('rdmDeleteBtn');
-    if(delBtn) delBtn.addEventListener('click', ()=>{
-      closeAndNotify();
-      deleteRow(excId, rowId);
+    if(delBtn) delBtn.addEventListener('click', async ()=>{
+      const deleted = await deleteRow(excId, rowId);
+      if(deleted) closeAndNotify();
     });
   }
 
@@ -2556,8 +2579,8 @@ function openRowDetailModal(excId, rowId, onClose){
   draw();
   modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
 }
-function deleteRow(excId, rowId){
-  if(!confirm('Видалити цей рядок?')) return;
+async function deleteRow(excId, rowId){
+  if(!(await showAppConfirm('Видалити цей рядок?'))) return false;
   const tripData = getTripData(currentTripId);
   const exc = tripData.excursions.find(e=>e.id===excId);
   exc.rows = exc.rows.filter(r=>r.id!==rowId);
@@ -2568,6 +2591,7 @@ function deleteRow(excId, rowId){
     upsertRow(currentTripId, exc.id, newR);
   }
   renderAll();
+  return true;
 }
 function addRow(excId){
   const tripData = getTripData(currentTripId);
@@ -2577,8 +2601,8 @@ function addRow(excId){
   renderAll();
   upsertRow(currentTripId, exc.id, row);
 }
-function deleteExcursion(excId){
-  if(!confirm('Видалити цю екскурсію? Усі дані по ній (км, гонорар, розрахунки) буде втрачено.')) return;
+async function deleteExcursion(excId){
+  if(!(await showAppConfirm('Видалити цю екскурсію? Усі дані по ній (км, гонорар, розрахунки) буде втрачено.'))) return;
   const tripData = getTripData(currentTripId);
   tripData.excursions = tripData.excursions.filter(e=>e.id!==excId);
   renderAll();
@@ -2683,9 +2707,9 @@ function showFinanceNotifyList(reports){
   };
 
   const wireItemButtons = ()=>{
-    panel.querySelectorAll('[data-role="finNotifyCorrect"]').forEach(btn=> btn.addEventListener('click', ()=>{
+    panel.querySelectorAll('[data-role="finNotifyCorrect"]').forEach(btn=> btn.addEventListener('click', async ()=>{
       const trip = btn.dataset.trip, guide = btn.dataset.guide;
-      if(!confirm(`Відкрити фінансовий звіт гіда ${guide} для корекції? Ви зможете виправити цифри напряму — вносьте зміни обережно.`)) return;
+      if(!(await showAppConfirm(`Відкрити фінансовий звіт гіда ${guide} для корекції? Ви зможете виправити цифри напряму — вносьте зміни обережно.`))) return;
       managerFinanceCorrectionKey = trip+'|'+guide;
       panel.remove();
       currentTripId = trip;
@@ -2695,7 +2719,7 @@ function showFinanceNotifyList(reports){
     }));
     panel.querySelectorAll('[data-role="finNotifyAccept"]').forEach(btn=> btn.addEventListener('click', async ()=>{
       const trip = btn.dataset.trip, guide = btn.dataset.guide;
-      if(!confirm(`Прийняти фінансовий звіт гіда ${guide}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`)) return;
+      if(!(await showAppConfirm(`Прийняти фінансовий звіт гіда ${guide}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`))) return;
       const { error } = await sb.from('financial_reports').update({ accepted:true, accepted_at:new Date().toISOString() }).eq('trip_id', trip).eq('guide_name', guide);
       if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
       const idx = reports.findIndex(r=>r.trip_id===trip && r.guide_name===guide);
@@ -3204,7 +3228,7 @@ function renderTouristList(){
     const delBtn = row.querySelector('[data-role="delTourist"]');
     if(delBtn) delBtn.addEventListener('click', async (e)=>{
       e.stopPropagation();
-      if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
+      if(!(await showAppConfirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`))) return;
       const { error } = await sb.from('tourists').delete().eq('id', t.id);
       if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
       if(openTouristId===t.id) openTouristId=null;
@@ -3253,7 +3277,7 @@ function renderTouristEditForm(block, t){
   document.getElementById('closeTouristDetailBtn').addEventListener('click', ()=>{ openTouristId=null; renderTouristDetail(); });
   const delBtn = document.getElementById('deleteTouristBtn');
   if(delBtn) delBtn.addEventListener('click', async ()=>{
-    if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
+    if(!(await showAppConfirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`))) return;
     const { error } = await sb.from('tourists').delete().eq('id', t.id);
     if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     openTouristId = null;
@@ -3385,7 +3409,7 @@ function renderTouristDetail(){
   document.getElementById('closeTouristDetailBtn').addEventListener('click', ()=>{ openTouristId=null; renderTouristDetail(); });
   const delBtn = document.getElementById('deleteTouristBtn');
   if(delBtn) delBtn.addEventListener('click', async ()=>{
-    if(!confirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`)) return;
+    if(!(await showAppConfirm(`Видалити туриста "${t.last_name} ${t.first_name}" і всі його дані по екскурсіях?`))) return;
     const { error } = await sb.from('tourists').delete().eq('id', t.id);
     if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     openTouristId = null;
@@ -3398,12 +3422,12 @@ function renderTouristDetail(){
     if(openEditPanels.has(sel)) openEditPanels.delete(sel); else openEditPanels.add(sel);
     renderTouristDetail();
   }));
-  block.querySelectorAll('[data-role="toggleUnlockPrice"]').forEach(el=> el.addEventListener('click', e=>{
+  block.querySelectorAll('[data-role="toggleUnlockPrice"]').forEach(el=> el.addEventListener('click', async e=>{
     const sel = e.target.dataset.sel;
     if(priceCorrectionUnlocked.has(sel)){
       priceCorrectionUnlocked.delete(sel);
     } else {
-      if(!confirm('Цю екскурсію вже позначено як оплачену. Розблокувати виправлення ціни? Вносьте зміни обережно.')) return;
+      if(!(await showAppConfirm('Цю екскурсію вже позначено як оплачену. Розблокувати виправлення ціни? Вносьте зміни обережно.'))) return;
       priceCorrectionUnlocked.add(sel);
       openEditPanels.add(sel);
     }
@@ -3440,8 +3464,8 @@ function renderTouristDetail(){
     if(reason===null) return;
     cancelSelection(e.target.dataset.sel, reason);
   }));
-  block.querySelectorAll('[data-role="refund"]').forEach(el=> el.addEventListener('click', e=>{
-    if(!confirm("Підтвердити, що кошти повернуто туристу?")) return;
+  block.querySelectorAll('[data-role="refund"]').forEach(el=> el.addEventListener('click', async e=>{
+    if(!(await showAppConfirm("Підтвердити, що кошти повернуто туристу?"))) return;
     refundSelection(e.target.dataset.sel);
   }));
   const currencySel = document.getElementById('touristPayCurrency');
@@ -3691,7 +3715,7 @@ document.getElementById('touristListDownloadBtn').addEventListener('click', ()=>
 document.getElementById('clearTouristListBtn').addEventListener('click', async ()=>{
   const guideName = activeTouristGuideName();
   if(!guideName || !touristData.tourists.length) return;
-  if(!confirm(`Видалити ВЕСЬ список туристів групи "${guideName}" для цього заїзду (${touristData.tourists.length} осіб)? Це не можна скасувати.`)) return;
+  if(!(await showAppConfirm(`Видалити ВЕСЬ список туристів групи "${guideName}" для цього заїзду (${touristData.tourists.length} осіб)? Це не можна скасувати.`))) return;
   const ids = touristData.tourists.map(t=>t.id);
   const { error } = await sb.from('tourists').delete().in('id', ids);
   if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
@@ -4228,8 +4252,8 @@ function openFinListModal(report, config){
   document.body.appendChild(modal);
   modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
   document.getElementById('finListCloseBtn').addEventListener('click', ()=> modal.remove());
-  modal.querySelectorAll('[data-role="finListDeleteBtn"]').forEach(btn=> btn.addEventListener('click', ()=>{
-    if(!confirm('Видалити цей запис?')) return;
+  modal.querySelectorAll('[data-role="finListDeleteBtn"]').forEach(btn=> btn.addEventListener('click', async ()=>{
+    if(!(await showAppConfirm('Видалити цей запис?'))) return;
     report.entries.splice(Number(btn.dataset.idx), 1);
     finSaveAndRerender(report);
     modal.remove();
@@ -4332,8 +4356,8 @@ function openFinCollectedModal(report){
   document.body.appendChild(modal);
   modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
   document.getElementById('finCollectedCloseBtn').addEventListener('click', ()=> modal.remove());
-  modal.querySelectorAll('[data-role="finCollectedDeleteBtn"]').forEach(btn=> btn.addEventListener('click', ()=>{
-    if(!confirm('Видалити цей запис?')) return;
+  modal.querySelectorAll('[data-role="finCollectedDeleteBtn"]').forEach(btn=> btn.addEventListener('click', async ()=>{
+    if(!(await showAppConfirm('Видалити цей запис?'))) return;
     report.entries.splice(Number(btn.dataset.idx), 1);
     finSaveAndRerender(report);
     modal.remove();
@@ -4409,8 +4433,8 @@ function openFinPartnerListModal(report, section){
   document.body.appendChild(modal);
   modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
   document.getElementById('finPartnerListCloseBtn').addEventListener('click', ()=> modal.remove());
-  modal.querySelectorAll('[data-role="finPartnerListDeleteBtn"]').forEach(btn=> btn.addEventListener('click', ()=>{
-    if(!confirm('Видалити цей запис?')) return;
+  modal.querySelectorAll('[data-role="finPartnerListDeleteBtn"]').forEach(btn=> btn.addEventListener('click', async ()=>{
+    if(!(await showAppConfirm('Видалити цей запис?'))) return;
     report.entries.splice(Number(btn.dataset.idx), 1);
     finSaveAndRerender(report);
     modal.remove();
@@ -4731,7 +4755,7 @@ function openFinSectionModal(sectionKey){
     });
     const submitBtn = document.getElementById('finSubmitBtn');
     if(submitBtn && !report.submitted) submitBtn.addEventListener('click', async ()=>{
-      if(!confirm('Відправити фінансовий звіт менеджеру? Після цього менеджер побачить, що звіт готовий.')) return;
+      if(!(await showAppConfirm('Відправити фінансовий звіт менеджеру? Після цього менеджер побачить, що звіт готовий.'))) return;
       submitBtn.disabled = true;
       submitBtn.textContent = 'Відправляю…';
       const c = lastRenderedFinanceReport;
@@ -4750,7 +4774,7 @@ function openFinSectionModal(sectionKey){
     });
     const reopenBtn = document.getElementById('finReopenBtn');
     if(reopenBtn) reopenBtn.addEventListener('click', async ()=>{
-      if(!confirm('Розпечатати звіт для виправлень? Менеджер побачить, що звіт знову "в роботі", поки ви не відправите його ще раз.')) return;
+      if(!(await showAppConfirm('Розпечатати звіт для виправлень? Менеджер побачить, що звіт знову "в роботі", поки ви не відправите його ще раз.'))) return;
       const { error, queued } = await rtGuideWrite('update', 'financial_reports',
         { submitted: false },
         { trip_id: report.trip_id, guide_name: report.guide_name }
@@ -4906,8 +4930,6 @@ function renderFinanceReport(report){
     </div>
 
     <div class="no-print" style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--line); padding-top:14px;">
-      <button class="btn btn-ghost btn-small" id="finPrintBtn">🖨 Друк</button>
-      <button class="btn btn-ghost btn-small" id="finSaveToStorageBtn">💾 Зберегти звіт</button>
       <button class="btn btn-ghost btn-small" id="finDownloadSavedBtn">⬇ Завантажити збережений</button>
     </div>
   `;
@@ -4920,8 +4942,6 @@ function renderFinanceReport(report){
 
   block.removeEventListener('click', finBlockDelegatedClickHandler);
   block.addEventListener('click', finBlockDelegatedClickHandler);
-  document.getElementById('finPrintBtn').addEventListener('click', ()=> window.print());
-  document.getElementById('finSaveToStorageBtn').addEventListener('click', ()=> saveFinanceReportToStorage(report, received, paid, totalReceived, totalPaid, balance, handedOver, def));
   document.getElementById('finDownloadSavedBtn').addEventListener('click', async ()=>{
     const path = `${report.trip_id}/finance-report/${safePathSlug(report.guide_name)}/report_${tripFileTag(report.trip_id)}.xlsx`;
     const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
@@ -6441,8 +6461,8 @@ async function showGuideSingleView(tripId, guideName, target){
     ${!rep.accepted ? `<button class="btn btn-ghost btn-small no-print" id="guideSingleCorrectBtn" style="margin-top:8px;">🔓 Відкрити для корекції</button>` : ''}
   `;
   const correctBtn = document.getElementById('guideSingleCorrectBtn');
-  if(correctBtn) correctBtn.addEventListener('click', ()=>{
-    if(!confirm(`Відкрити фінансовий звіт гіда ${guideName} для корекції? Ви зможете виправити цифри напряму — вносьте зміни обережно.`)) return;
+  if(correctBtn) correctBtn.addEventListener('click', async ()=>{
+    if(!(await showAppConfirm(`Відкрити фінансовий звіт гіда ${guideName} для корекції? Ви зможете виправити цифри напряму — вносьте зміни обережно.`))) return;
     managerFinanceCorrectionKey = tripId+'|'+guideName;
     modal.remove();
     currentTripId = tripId;
@@ -6452,7 +6472,7 @@ async function showGuideSingleView(tripId, guideName, target){
   });
   const unacceptBtn = document.getElementById('guideSingleUnacceptBtn');
   if(unacceptBtn) unacceptBtn.addEventListener('click', async ()=>{
-    if(!confirm(`Звіт гіда ${guideName} уже прийнятий. Зняти прийняття і відкрити для корекції? Це варто робити тільки якщо після прийняття знайшлась нестиковка, яку треба виправити.`)) return;
+    if(!(await showAppConfirm(`Звіт гіда ${guideName} уже прийнятий. Зняти прийняття і відкрити для корекції? Це варто робити тільки якщо після прийняття знайшлась нестиковка, яку треба виправити.`))) return;
     const { error } = await sb.from('financial_reports').update({ accepted:false, accepted_at:null }).eq('trip_id', tripId).eq('guide_name', guideName);
     if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     managerFinanceCorrectionKey = tripId+'|'+guideName;
@@ -6464,7 +6484,7 @@ async function showGuideSingleView(tripId, guideName, target){
   });
   const acceptBtn = document.getElementById('guideSingleAcceptBtn');
   if(acceptBtn) acceptBtn.addEventListener('click', async ()=>{
-    if(!confirm(`Прийняти фінансовий звіт гіда ${guideName}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`)) return;
+    if(!(await showAppConfirm(`Прийняти фінансовий звіт гіда ${guideName}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`))) return;
     const { error } = await sb.from('financial_reports').update({ accepted:true, accepted_at:new Date().toISOString() }).eq('trip_id', tripId).eq('guide_name', guideName);
     if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     showGuideSingleView(tripId, guideName, target);
@@ -6617,7 +6637,7 @@ async function renderReportsGuideDrilldown(tripId){
   container.innerHTML = profitHtml + complianceHtml + guideBlocksHtml;
   container.querySelectorAll('[data-role="mrAcceptFinReport"]').forEach(btn=> btn.addEventListener('click', async ()=>{
     const guide = btn.dataset.guide;
-    if(!confirm(`Прийняти фінансовий звіт гіда ${guide}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`)) return;
+    if(!(await showAppConfirm(`Прийняти фінансовий звіт гіда ${guide}? Після цього гід більше не зможе нічого виправити чи відправити повторно.`))) return;
     const { error } = await sb.from('financial_reports').update({ accepted:true, accepted_at:new Date().toISOString() }).eq('trip_id', tripId).eq('guide_name', guide);
     if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
     await renderReportsGuideDrilldown(tripId);
@@ -7014,7 +7034,7 @@ function renderManagerReport(report, officeTotal, missing){
     }
   }));
   block.querySelectorAll('[data-role="mrCorpDelete"]').forEach(el=> el.addEventListener('click', async e=>{
-    if(!confirm('Видалити цей корпорат?')) return;
+    if(!(await showAppConfirm('Видалити цей корпорат?'))) return;
     const h = findHotel(e.target.dataset.hotel);
     const c = h.corporates.find(x=>x.id===e.target.dataset.id);
     if(c && c.file_path) await removeReportFile(c.file_path);
@@ -7094,7 +7114,7 @@ function renderManagerReport(report, officeTotal, missing){
     }
   }));
   block.querySelectorAll('[data-role="mrExpenseDelete"]').forEach(el=> el.addEventListener('click', async e=>{
-    if(!confirm('Видалити цю витрату?')) return;
+    if(!(await showAppConfirm('Видалити цю витрату?'))) return;
     const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
     if(ex && ex.file_path) await removeReportFile(ex.file_path);
     report.expenses = report.expenses.filter(x=>x.id!==e.target.dataset.id);
@@ -7109,7 +7129,7 @@ function renderManagerReport(report, officeTotal, missing){
   const ownBusSelect = document.getElementById('mrOwnBusGuideSelect');
   if(ownBusSelect) ownBusSelect.addEventListener('change', async e=>{
     const newOwnBus = e.target.value;
-    if(!confirm(`Позначити ${newOwnBus || 'нікого'} як "наш автобус" (по кілометражу)? Рядки автобусів усіх гідів буде перебудовано.`)){
+    if(!(await showAppConfirm(`Позначити ${newOwnBus || 'нікого'} як "наш автобус" (по кілометражу)? Рядки автобусів усіх гідів буде перебудовано.`))){
       ownBusSelect.value = report.ownBusGuide||'';
       return;
     }
@@ -7674,11 +7694,11 @@ async function renderSkiatosManifest(){
   `;
 
   const correctionToggle = block.querySelector('#managerCorrectionToggle');
-  if(correctionToggle) correctionToggle.addEventListener('click', ()=>{
+  if(correctionToggle) correctionToggle.addEventListener('click', async ()=>{
     if(managerSkiatosCorrectionMode){
       managerSkiatosCorrectionMode = false;
     } else {
-      if(!confirm('Ви дійсно хочете внести правки до списку на Скіатос? Зазвичай ці дані вносить гід — вмикайте це лише для виправлення помилки.')) return;
+      if(!(await showAppConfirm('Ви дійсно хочете внести правки до списку на Скіатос? Зазвичай ці дані вносить гід — вмикайте це лише для виправлення помилки.'))) return;
       managerSkiatosCorrectionMode = true;
     }
     renderSkiatosManifest();
@@ -7762,12 +7782,12 @@ async function renderSkiatosManifest(){
     el._t = setTimeout(()=> updateManifestExtraPrice(id, val), 600);
   }));
   block.querySelectorAll('[data-role="manDeleteExtra"]').forEach(el=> el.addEventListener('click', async e=>{
-    if(!confirm('Видалити цей запис?')) return;
+    if(!(await showAppConfirm('Видалити цей запис?'))) return;
     await deleteManifestExtra(e.target.dataset.id);
     renderSkiatosManifest();
   }));
   block.querySelectorAll('[data-role="removeFromSkiatos"]').forEach(el=> el.addEventListener('click', async e=>{
-    if(!confirm('Прибрати цю людину зі списку на Скіатос? Самого туриста це не видалить.')) return;
+    if(!(await showAppConfirm('Прибрати цю людину зі списку на Скіатос? Самого туриста це не видалить.'))) return;
     const { error, queued } = await rtGuideRpc('cancel_tourist_selection', { p_selection_id: e.target.dataset.sel, p_reason: 'Прибрано зі Скіатосу' });
     if(error){ showAppAlert('Не вдалося прибрати: ' + friendlyErrorMessage(error)); return; }
     if(queued) hbShowToast('💾 Збережено локально — синхронізується, коли з\'явиться інтернет');
@@ -8344,21 +8364,21 @@ function renderTripPrepOverview(){
     else statusEl.textContent = '';
   });
   document.getElementById('tpClearTouristsBtn').addEventListener('click', async ()=>{
-    if(!confirm('Точно видалити весь список учасників цього заїзду (обидва готелі)? Це не можна скасувати.')) return;
+    if(!(await showAppConfirm('Точно видалити весь список учасників цього заїзду (обидва готелі)? Це не можна скасувати.'))) return;
     const { error } = await sb.from('trip_prep_tourists').delete().eq('trip_id', currentTripId);
     if(error){ showAppAlert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
   });
   document.getElementById('tpClearKonstantinBtn').addEventListener('click', async ()=>{
-    if(!confirm('Точно видалити список учасників для Konstantin? Great Aleksander не постраждає.')) return;
+    if(!(await showAppConfirm('Точно видалити список учасників для Konstantin? Great Aleksander не постраждає.'))) return;
     const { error } = await sb.from('trip_prep_tourists').delete().eq('trip_id', currentTripId).eq('target_hotel', 'konstantin');
     if(error){ showAppAlert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
   });
   document.getElementById('tpClearGreatBtn').addEventListener('click', async ()=>{
-    if(!confirm('Точно видалити список учасників для Great Aleksander? Konstantin не постраждає.')) return;
+    if(!(await showAppConfirm('Точно видалити список учасників для Great Aleksander? Konstantin не постраждає.'))) return;
     const { error } = await sb.from('trip_prep_tourists').delete().eq('trip_id', currentTripId).eq('target_hotel', 'greataleksander');
     if(error){ showAppAlert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
@@ -8484,7 +8504,7 @@ function renderTripPrepOverview(){
     });
     if(!Object.keys(byNewHotel).length){ showAppAlert('У вибраних груп не визначено готель — перенесення неможливе.'); return; }
     const summary = Object.keys(byNewHotel).map(h=>`${HB_HOTEL_STRUCTURE[h].name}: ${byNewHotel[h].length} осіб`).join(', ');
-    if(!confirm(`Перенести вибрані групи? ${summary}.\n\n⚠️ Якщо для когось із них уже є бронювання кімнати у старому готелі — його треба буде скасувати вручну у вкладці "Готель" (тут воно НЕ видаляється автоматично).`)) return;
+    if(!(await showAppConfirm(`Перенести вибрані групи? ${summary}.\n\n⚠️ Якщо для когось із них уже є бронювання кімнати у старому готелі — його треба буде скасувати вручну у вкладці "Готель" (тут воно НЕ видаляється автоматично).`))) return;
     for(const hotel of Object.keys(byNewHotel)){
       const { error } = await sb.from('trip_prep_tourists').update({ target_hotel: hotel }).in('id', byNewHotel[hotel]);
       if(error){ showAppAlert('Не вдалося перенести: ' + friendlyErrorMessage(error)); return; }
@@ -8495,7 +8515,7 @@ function renderTripPrepOverview(){
   content.querySelectorAll('[data-role="tpUnmergeBooking"]').forEach(el=> el.addEventListener('click', async e=>{
     e.stopPropagation();
     const booking = e.target.dataset.booking;
-    if(!confirm(`Роз'єднати заявку №${booking} з цієї групи?`)) return;
+    if(!(await showAppConfirm(`Роз'єднати заявку №${booking} з цієї групи?`))) return;
     const ids = tripPrepData.tourists.filter(t=>t.booking_number===booking).map(t=>t.id);
     const { error } = await sb.from('trip_prep_tourists').update({ link_group: booking }).in('id', ids);
     if(error){ showAppAlert('Не вдалося роз\'єднати: ' + friendlyErrorMessage(error)); return; }
@@ -8503,11 +8523,11 @@ function renderTripPrepOverview(){
     renderTripPrepView();
   }));
   const correctionToggle = document.getElementById('tpCorrectionToggle');
-  if(correctionToggle) correctionToggle.addEventListener('click', ()=>{
+  if(correctionToggle) correctionToggle.addEventListener('click', async ()=>{
     if(tpBaseListCorrectionMode){
       tpBaseListCorrectionMode = false;
     } else {
-      if(!confirm('Ви дійсно хочете внести правки до базового списку туристів? Зазвичай ці дані беруться з файлу — вмикайте це лише для виправлення помилки.')) return;
+      if(!(await showAppConfirm('Ви дійсно хочете внести правки до базового списку туристів? Зазвичай ці дані беруться з файлу — вмикайте це лише для виправлення помилки.'))) return;
       tpBaseListCorrectionMode = true;
     }
     renderTripPrepOverview();
@@ -8521,7 +8541,7 @@ function renderTripPrepOverview(){
     const touristId = e.target.dataset.tourist;
     const tourist = tripPrepData.tourists.find(t=>t.id===touristId);
     if(!tourist) return;
-    if(!confirm(`Точно видалити "${tourist.full_name}" зі списку і з кімнати (якщо вже поселено)? Це не можна скасувати.`)) return;
+    if(!(await showAppConfirm(`Точно видалити "${tourist.full_name}" зі списку і з кімнати (якщо вже поселено)? Це не можна скасувати.`))) return;
 
     const targetHotel = tourist.target_hotel;
     const bookingClean = (tourist.booking_number||'').replace(/^#/,'');
@@ -8932,7 +8952,7 @@ async function renderTripPrepBuses(){
   content.querySelectorAll('[data-role="tpResetBus"]').forEach(el=> el.addEventListener('click', async e=>{
     e.preventDefault(); e.stopPropagation();
     const busName = e.target.dataset.bus;
-    if(!confirm(`Точно обнулити розподіл усіх людей з автобуса "${busName}"? Вони повернуться у "Ще не розподілені", а розсадка по місцях у цьому автобусі теж очиститься. Гідів "без автобуса" це не торкнеться.`)) return;
+    if(!(await showAppConfirm(`Точно обнулити розподіл усіх людей з автобуса "${busName}"? Вони повернуться у "Ще не розподілені", а розсадка по місцях у цьому автобусі теж очиститься. Гідів "без автобуса" це не торкнеться.`))) return;
     await resetBusAssignment(busName);
     tripPrepData = await loadTripPrepData(currentTripId);
     await loadBusSeatData(currentTripId, true);
@@ -8941,7 +8961,7 @@ async function renderTripPrepBuses(){
   }));
   const resetAllBtn = document.getElementById('tpResetAllBuses');
   if(resetAllBtn) resetAllBtn.addEventListener('click', async ()=>{
-    if(!confirm('Точно обнулити розподіл УСІХ людей по УСІХ автобусах цього заїзду? Всі повернуться у "Ще не розподілені", розсадка по місцях теж очиститься. Гідів "без автобуса" це не торкнеться.')) return;
+    if(!(await showAppConfirm('Точно обнулити розподіл УСІХ людей по УСІХ автобусах цього заїзду? Всі повернуться у "Ще не розподілені", розсадка по місцях теж очиститься. Гідів "без автобуса" це не торкнеться.'))) return;
     await resetAllBusAssignments();
     tripPrepData = await loadTripPrepData(currentTripId);
     await loadBusSeatData(currentTripId, true);
@@ -8961,7 +8981,7 @@ async function renderTripPrepBuses(){
     hbShowToast(`✅ "${rawCity}" → "${corrected}" (${idsToFix.length} чол)`);
   }));
   content.querySelectorAll('[data-role="tpUnassignBus"]').forEach(el=> el.addEventListener('click', async e=>{
-    if(!confirm('Зняти цю групу з автобуса?')) return;
+    if(!(await showAppConfirm('Зняти цю групу з автобуса?'))) return;
     await unassignGroupFromBus(e.target.dataset.group);
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepBuses();
@@ -9866,7 +9886,7 @@ function renderBusSeatChart(busName){
   document.getElementById('tpAutoSeatBtn').addEventListener('click', ()=> openAutoSeatPlanModal(busName));
   document.getElementById('tpSeatRulesMainBtn').addEventListener('click', ()=> openSeatPlannerRulesModal(busName));
   document.getElementById('tpClearSeatChartBtn').addEventListener('click', async ()=>{
-    if(!confirm(`Точно очистити всю розсадку для "${busName}"? Розподіл груп по автобусах не зміниться, тільки конкретні місця.`)) return;
+    if(!(await showAppConfirm(`Точно очистити всю розсадку для "${busName}"? Розподіл груп по автобусах не зміниться, тільки конкретні місця.`))) return;
     const { error } = await sb.from('bus_seat_assignments').delete().eq('trip_id', currentTripId).eq('bus_name', busName);
     if(error){ showAppAlert('Не вдалося очистити: ' + friendlyErrorMessage(error)); return; }
     await loadBusSeatData(currentTripId, true);
@@ -10750,7 +10770,7 @@ const SEAT_CELL_MAP = {
   async function prepareGuidePackage(guideName, btn){
     const issues = validateGuidePackage(guideName);
     if(issues.length){
-      const proceed = confirm(`Знайдено ${issues.length} застереження(нь) щодо даних гіда "${guideName}":\n\n${issues.map(i=>'• '+i).join('\n')}\n\nВсе одно підготувати документи?`);
+      const proceed = await showAppConfirm(`Знайдено ${issues.length} застереження(нь) щодо даних гіда "${guideName}":\n\n${issues.map(i=>'• '+i).join('\n')}\n\nВсе одно підготувати документи?`);
       if(!proceed) return;
     }
     const oldText = btn.textContent;
