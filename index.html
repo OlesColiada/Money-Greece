@@ -4762,6 +4762,17 @@ function renderFinanceReport(report){
   const block = document.getElementById('financeReportBlock');
   const def = TRIPS_DEF.find(d=>d.id===currentTripId);
 
+  // Clean up any accidental duplicate single-value entries (see finMergeDuplicates) before
+  // computing anything — this used to only happen when a guide opened that specific field's
+  // own edit modal, so a duplicate could keep inflating the total indefinitely if nobody
+  // happened to click into it. Now it's swept on every render.
+  const tripDataForFinCleanup = getTripData(report.trip_id);
+  ['office','borders','phone','integration','integration_hotel_prepay','integration_bus_prepay',
+   'hotel','bus_prepay','bus_doplata','perdiem','gift'].forEach(k=> finMergeDuplicates(report, k));
+  (tripDataForFinCleanup.excursions||[]).forEach(exc=>{
+    finMergeDuplicates(report, 'guidefee_'+exc.name);
+  });
+
   // Авто-синхронізація "% гіда" з Прибутковості — завжди актуальне значення, без ручного оновлення.
   const tripDataForPct = getTripData(report.trip_id);
   const perGuidePct = calcTripByGuide(tripDataForPct)[report.guide_name] || { guideIncome: 0 };
