@@ -4286,7 +4286,6 @@ function openFinCollectedModal(report){
   const existing = document.getElementById('finListModal');
   if(existing) existing.remove();
   const td = state.trips[report.trip_id];
-  const excNames = [...new Set((td?td.excursions||[]:[]).map(exc=> exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name))];
   const items = finEntriesByKey(report.entries, 'collected');
   const addedExcNames = new Set(items.map(e=>e.excursionName));
 
@@ -4318,7 +4317,7 @@ function openFinCollectedModal(report){
     ${suggestions.map(s=>`
       <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:#f0fdf4; border:1px solid #86efac; border-radius:6px; margin-bottom:4px; font-size:13px;">
         <span>${s.excLabel} — ${fmt(s.amount)} €</span>
-        <button class="btn btn-primary btn-small" data-role="finCollectedSuggestBtn" data-exc="${s.excLabel}" data-amount="${s.amount}" style="padding:3px 8px;">+ Додати</button>
+        <button class="btn btn-primary btn-small" data-role="finCollectedSuggestBtn" data-exc="${s.excLabel}" data-amount="${s.amount}" style="padding:3px 8px;">💾 Зберегти</button>
       </div>
     `).join('')}
   ` : '';
@@ -4329,18 +4328,6 @@ function openFinCollectedModal(report){
     </div>
     <div style="margin-bottom:8px;">${itemsHtml}</div>
     ${suggestionsHtml}
-    <div style="border-top:1px dashed var(--line); padding-top:10px; margin-top:10px;">
-      <p style="font-size:12.5px; font-weight:700; margin:0 0 4px;">Додати вручну (якщо зібрано інакше)</p>
-      ${excNames.filter(n=>!addedExcNames.has(n)).length ? `
-      <label style="display:block; font-size:12px; font-weight:600; margin:8px 0 4px;">Екскурсія</label>
-      <select id="finCollectedExc" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
-        ${excNames.filter(n=>!addedExcNames.has(n)).map(n=>`<option value="${n}">${n}</option>`).join('')}
-      </select>
-      <label style="display:block; font-size:12px; font-weight:600; margin:8px 0 4px;">Сума (€)</label>
-      <input type="text" inputmode="decimal" id="finCollectedAmount" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
-      <button class="btn btn-primary" id="finCollectedAddBtn" style="width:100%; margin-top:10px;">💾 Зберегти</button>
-      ` : `<p class="report-note" style="margin:0;">Усі екскурсії цього туру вже додано.</p>`}
-    </div>
   </div>`;
   document.body.appendChild(modal);
   modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
@@ -4360,16 +4347,6 @@ function openFinCollectedModal(report){
     modal.remove();
     openFinCollectedModal(report);
   }));
-  const finCollectedAddBtn = document.getElementById('finCollectedAddBtn');
-  if(finCollectedAddBtn) finCollectedAddBtn.addEventListener('click', ()=>{
-    const excName = document.getElementById('finCollectedExc').value;
-    if(!excName){ showAppAlert('Оберіть екскурсію.'); return; }
-    const amount = parseDecimalInput(document.getElementById('finCollectedAmount').value);
-    if(!amount){ showAppAlert('Впиши суму.'); return; }
-    report.entries.push({ section:'received', label:`Зібрано: ${excName}`, amount, itemKey:'collected', excursionName: excName });
-    finSaveAndRerender(report);
-    modal.remove();
-  });
 }
 
 function openFinHandoffModal(report){
@@ -4648,9 +4625,40 @@ function finBlockDelegatedClickHandler(e){
   else if(modalType==='integration_hotel_prepay') openFinSimpleAmountModal(report, 'integration_hotel_prepay', 'Передоплата за готель', 'paid');
   else if(modalType==='integration_bus_prepay') openFinSimpleAmountModal(report, 'integration_bus_prepay', 'Передоплата за автобус', 'paid');
   else if(modalType==='custom') openFinCustomModal(report);
+  else if(modalType==='legacy_received') openFinLegacyModal(report, 'received');
+  else if(modalType==='legacy_paid') openFinLegacyModal(report, 'paid');
 }
 
 let openFinSectionKeyTracked = null; // which of received/paid/summary is currently open in its own modal, if any
+
+function openFinLegacyModal(report, section){
+  const existing = document.getElementById('finLegacyModal');
+  if(existing) existing.remove();
+  const items = report.entries.filter(e=> e.section===section && !e.itemKey && !e.isPartnerEntry && !e.key);
+  const sum = items.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  const modal = document.createElement('div');
+  modal.id = 'finLegacyModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  const itemsHtml = items.length ? items.map(e=>`
+    <div class="fin-list-row">
+      <span style="flex:1;">${e.label}</span>
+      <span>${fmt(Number(e.amount)||0)} €</span>
+    </div>
+  `).join('') : '<p class="report-note" style="margin:0;">Немає старих записів.</p>';
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:420px;">
+    <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">Старі записи (до оновлення формату)</h2>
+      <button class="btn btn-ghost btn-small no-print" id="finLegacyCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+    </div>
+    <p class="report-note" style="margin:0 0 10px;">Це записи ще з попереднього формату звіту — лише перегляд, тут нічого не можна редагувати чи видаляти, щоб не зачепити реальні цифри. Якщо щось із цього треба виправити чи перенести — скажіть Клоду, що саме.</p>
+    <div style="margin-bottom:8px;">${itemsHtml}</div>
+    <div class="fin-total-row"><span>Разом (старі записи)</span><span>${fmt(sum)} €</span></div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
+  document.getElementById('finLegacyCloseBtn').addEventListener('click', ()=> modal.remove());
+}
 
 function openFinSectionModal(sectionKey){
   const ctx = lastRenderedFinanceReport;
@@ -4762,17 +4770,6 @@ function renderFinanceReport(report){
   const block = document.getElementById('financeReportBlock');
   const def = TRIPS_DEF.find(d=>d.id===currentTripId);
 
-  // Clean up any accidental duplicate single-value entries (see finMergeDuplicates) before
-  // computing anything — this used to only happen when a guide opened that specific field's
-  // own edit modal, so a duplicate could keep inflating the total indefinitely if nobody
-  // happened to click into it. Now it's swept on every render.
-  const tripDataForFinCleanup = getTripData(report.trip_id);
-  ['office','borders','phone','integration','integration_hotel_prepay','integration_bus_prepay',
-   'hotel','bus_prepay','bus_doplata','perdiem','gift'].forEach(k=> finMergeDuplicates(report, k));
-  (tripDataForFinCleanup.excursions||[]).forEach(exc=>{
-    finMergeDuplicates(report, 'guidefee_'+exc.name);
-  });
-
   // Авто-синхронізація "% гіда" з Прибутковості — завжди актуальне значення, без ручного оновлення.
   const tripDataForPct = getTripData(report.trip_id);
   const perGuidePct = calcTripByGuide(tripDataForPct)[report.guide_name] || { guideIncome: 0 };
@@ -4829,6 +4826,12 @@ function renderFinanceReport(report){
     ${finLeaf('Зібрано з екскурсій', finSumByKey(report.entries,'collected'), 'data-modal="collected"')}
     ${finLeaf('Партнери', partnerReceivedSum, 'data-modal="partner_received"')}
     ${finLeaf('Передав гід', finSumByKey(report.entries,'handoff'), 'data-modal="handoff"')}
+    ${(()=>{
+      const legacy = report.entries.filter(e=> e.section==='received' && !e.itemKey && !e.isPartnerEntry && !e.key);
+      if(!legacy.length) return '';
+      const sum = legacy.reduce((s,e)=>s+(Number(e.amount)||0),0);
+      return finLeaf('Старі записи (до оновлення формату)', sum, 'data-modal="legacy_received"');
+    })()}
   `;
   const paidAccordionHtml = `
     ${finLeaf('Готель', finSumByKey(report.entries,'hotel'), 'data-modal="hotel"')}
@@ -4852,6 +4855,12 @@ function renderFinanceReport(report){
     ${finLeaf('Передоплата за готель', finSumByKey(report.entries,'integration_hotel_prepay'), 'data-modal="integration_hotel_prepay"')}
     ${finLeaf('Передоплата за автобус', finSumByKey(report.entries,'integration_bus_prepay'), 'data-modal="integration_bus_prepay"')}
     ${finLeaf('Додатковий пункт', finSumByKey(report.entries,'custom'), 'data-modal="custom"')}
+    ${(()=>{
+      const legacy = report.entries.filter(e=> e.section==='paid' && !e.itemKey && !e.isPartnerEntry && !e.key);
+      if(!legacy.length) return '';
+      const sum = legacy.reduce((s,e)=>s+(Number(e.amount)||0),0);
+      return finLeaf('Старі записи (до оновлення формату)', sum, 'data-modal="legacy_paid"');
+    })()}
   `;
   Object.assign(lastRenderedFinanceReport, { receivedAccordionHtml, paidAccordionHtml });
 
