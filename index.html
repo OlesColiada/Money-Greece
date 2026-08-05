@@ -1505,6 +1505,7 @@ function calcTripByGuide(tripData){
 
 /* ---------- Rendering ---------- */
 function fmt(n){ return (Math.round((n+Number.EPSILON)*100)/100).toLocaleString('uk-UA',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function r2(n){ return Math.round(((Number(n)||0)+Number.EPSILON)*100)/100; }
 function round2(n){ return Math.round(((Number(n)||0)+Number.EPSILON)*100)/100; }
 // Accepts "5120", "5120.50", "5120,50" — comma or period both work as decimal separator.
 function distinctGroupColor(i){
@@ -4023,7 +4024,7 @@ async function openFinGuideFeeModalFixed(report, excName){
       <button class="btn btn-ghost btn-small no-print" id="finGuideFeeCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Сума (€)</label>
-    <input type="text" inputmode="decimal" id="finGuideFeeAmount" value="${current?current.amount:''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
+    <input type="text" inputmode="decimal" id="finGuideFeeAmount" value="${current?r2(current.amount):''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
     <button class="btn btn-primary" id="finGuideFeeSaveBtn" style="width:100%; margin-top:14px;">💾 Зберегти</button>
   </div>`;
   document.body.appendChild(modal);
@@ -4062,7 +4063,7 @@ function openFinSimpleAmountModal(report, itemKey, title, section){
       <button class="btn btn-ghost btn-small no-print" id="finSimpleCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
     </div>
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Сума (€)</label>
-    <input type="text" inputmode="decimal" id="finSimpleAmount" value="${current?current.amount:''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
+    <input type="text" inputmode="decimal" id="finSimpleAmount" value="${current?r2(current.amount):''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
     <button class="btn btn-primary" id="finSimpleSaveBtn" style="width:100%; margin-top:14px;">💾 Зберегти</button>
   </div>`;
   document.body.appendChild(modal);
@@ -4096,7 +4097,7 @@ function openFinHotelModal(report){
       <option value="Great Aleksander 3*" ${current&&current.hotel==='Great Aleksander 3*'?'selected':''}>Great Aleksander 3*</option>
     </select>
     <label style="display:block; font-size:12px; font-weight:600; margin:10px 0 4px;">Сума (€)</label>
-    <input type="text" inputmode="decimal" id="finHotelAmount" value="${current?current.amount:''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
+    <input type="text" inputmode="decimal" id="finHotelAmount" value="${current?r2(current.amount):''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
     <button class="btn btn-primary" id="finHotelSaveBtn" style="width:100%; margin-top:14px;">💾 Зберегти</button>
   </div>`;
   document.body.appendChild(modal);
@@ -4209,7 +4210,7 @@ function openFinGiftModal(report){
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Що і кому (опис)</label>
     <textarea id="finGiftDesc" rows="2" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; resize:vertical;">${current?(current.giftDescription||''):''}</textarea>
     <label style="display:block; font-size:12px; font-weight:600; margin:10px 0 4px;">Сума (€)</label>
-    <input type="text" inputmode="decimal" id="finGiftAmount" value="${current?current.amount:''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
+    <input type="text" inputmode="decimal" id="finGiftAmount" value="${current?r2(current.amount):''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
     <button class="btn btn-primary" id="finGiftSaveBtn" style="width:100%; margin-top:14px;">💾 Зберегти</button>
   </div>`;
   document.body.appendChild(modal);
@@ -4789,6 +4790,279 @@ function openFinLegacyModal(report, section){
   document.getElementById('finLegacyCloseBtn').addEventListener('click', ()=> modal.remove());
 }
 
+let lastRenderedManagerReport = null;
+let mrOpenSectionKeyTracked = null;
+
+function openMrSectionModal(sectionKey){
+  const ctx = lastRenderedManagerReport;
+  if(!ctx) return;
+  const { report, officeTotal, missing, receivedTotal, receivedWithAddons, expensesTotal, corpRowHtml, expenseRowHtml, findHotel, hotelSubtotal } = ctx;
+  const existing = document.getElementById('mrSectionModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'mrSectionModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  mrOpenSectionKeyTracked = sectionKey;
+  function closeModal(){ modal.remove(); mrOpenSectionKeyTracked = null; }
+
+  let bodyHtml = '';
+  if(sectionKey==='received'){
+    const flatCorpRow = (h,c)=> `<div style="margin-bottom:4px;">
+        <span class="muted" style="font-size:10.5px; text-transform:uppercase;">${h.label}</span>
+        ${corpRowHtml(h.key,c)}
+      </div>`;
+    const corpsHtml = report.hotels.flatMap(h=> h.corporates.map(c=> flatCorpRow(h,c))).join('') || `<p class="report-note">Ще нічого не додано.</p>`;
+    bodyHtml = `
+      <p style="font-weight:700; font-size:14px; margin:0 0 6px;">Корпорати</p>
+      <div id="mrCorpWrap">${corpsHtml}</div>
+      <div class="no-print" style="display:flex; gap:6px; align-items:center; margin:8px 0 16px;">
+        <select id="mrAddCorpHotel" style="flex:1;">${report.hotels.map(h=>`<option value="${h.key}">${h.label}</option>`).join('')}</select>
+        <button class="btn btn-ghost btn-small" id="mrAddCorpBtn">+ Додати корпорат</button>
+      </div>
+
+      <p style="font-weight:700; font-size:14px; margin:0 0 6px;">Збірка</p>
+      <div class="fin-row"><span class="fin-label">Готівка</span><input type="text" inputmode="decimal" class="fin-amount" data-role="mrCollectionCash" value="${r2(report.collection.cash)}"> €</div>
+      <div class="fin-row"><span class="fin-label">ФОП</span><input type="text" inputmode="decimal" class="fin-amount" data-role="mrCollectionFop" value="${r2(report.collection.fop)}"> €</div>
+      <div class="fin-row"><span class="fin-label">р/р</span><input type="text" inputmode="decimal" class="fin-amount" data-role="mrCollectionBank" value="${r2(report.collection.bank)}"> €</div>
+
+      <p style="font-weight:700; font-size:14px; margin:16px 0 6px;">Допи прибуток</p>
+      <div class="fin-row"><span class="fin-label">Офіс з екскурсій (з Прибутковості)</span><span>${fmt(officeTotal)} €</span></div>
+      <p class="report-note" style="margin:2px 0 0;">Уже включає поправку за автобус — повну вартість екскурсійного кілометражу, який тепер повністю оплачується в "Затратах" (збігається з "Альтернативним розрахунком" у Прибутковості).</p>
+
+      <div class="fin-total-row" style="margin-top:14px;"><span>Разом</span><span>${fmt(receivedTotal)} €</span></div>
+      <div class="fin-total-row"><span>Разом з допами</span><span>${fmt(receivedWithAddons)} €</span></div>
+    `;
+  } else if(sectionKey==='paid'){
+    bodyHtml = `
+      <div class="no-print" style="margin-bottom:10px;">
+        <button class="btn btn-primary btn-small" id="mrRefreshAllBtn">🔄 Оновити все з фінансових звітів гідів</button>
+      </div>
+      <div class="no-print" style="margin-bottom:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <span style="font-size:13px; font-weight:600;">Наш автобус (по кілометражу):</span>
+        <select id="mrOwnBusGuideSelect">
+          <option value="">— не визначено —</option>
+          ${getTripData(currentTripId).guides.map(g=>`<option value="${g.name}" ${report.ownBusGuide===g.name?'selected':''}>${g.name}</option>`).join('')}
+        </select>
+        <span class="muted" style="font-size:11.5px;">Підставляється автоматично за позначкою "наш автобус" при виборі гідів. Решта — фіксовано 5120 €. Можна змінити тут вручну, якщо не так.</span>
+      </div>
+      ${missing.length ? `<div class="no-print" style="margin-bottom:10px; background:var(--whitewash-2); border-radius:8px; padding:8px 10px;">
+        <p style="font-size:11.5px; color:var(--ink-soft); margin:0 0 6px; text-transform:uppercase;">Можна додати одним кліком:</p>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          ${missing.map(m=>`<button class="btn btn-ghost btn-small" data-role="mrAddMissing" data-guide="${m.guide}" data-source="${m.sourceLabel}" style="font-size:11px;">+ ${m.label} (${fmt(m.amount)} €)</button>`).join('')}
+        </div>
+      </div>` : ''}
+      <div id="mrExpensesWrap">${report.expenses.map(expenseRowHtml).join('')}</div>
+      <div class="no-print" style="margin-top:8px;"><button class="btn btn-ghost btn-small" id="mrAddExpenseBtn">+ Додати пункт</button></div>
+      <div class="fin-total-row" style="margin-top:10px;"><span>Разом оплачено</span><span>${fmt(expensesTotal)} €</span></div>
+    `;
+  }
+
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:520px; max-height:85vh; overflow-y:auto;">
+    <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">${sectionKey==='received'?'💰 Отримав':'💸 Затрати'}</h2>
+      <button class="btn btn-ghost btn-small no-print" id="mrSectionCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+    </div>
+    ${bodyHtml}
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
+  document.getElementById('mrSectionCloseBtn').addEventListener('click', closeModal);
+
+  const rerenderInPlace = ()=>{ renderManagerReport(report, officeTotal); };
+
+  if(sectionKey==='received'){
+    modal.querySelectorAll('[data-role="mrCorpName"]').forEach(el=> el.addEventListener('input', e=>{
+      const h = findHotel(e.target.dataset.hotel);
+      const c = h.corporates.find(x=>x.id===e.target.dataset.id);
+      c.name = e.target.value;
+      debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+    }));
+    modal.querySelectorAll('[data-role="mrCorpAmount"]').forEach(el=> el.addEventListener('input', e=>{
+      const h = findHotel(e.target.dataset.hotel);
+      const c = h.corporates.find(x=>x.id===e.target.dataset.id);
+      c.amount = parseDecimalInput(e.target.value);
+      debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      debouncedManagerReportRerender(report);
+    }));
+    modal.querySelectorAll('[data-role="mrCorpFile"]').forEach(el=> el.addEventListener('change', async e=>{
+      try{
+        const file = e.target.files[0]; if(!file) return;
+        const h = findHotel(e.target.dataset.hotel);
+        const c = h.corporates.find(x=>x.id===e.target.dataset.id);
+        if(!c){ showAppAlert('Внутрішня помилка: не знайдено запис корпорату. Онови сторінку і спробуй ще раз.'); return; }
+        const path = await uploadReportFile(file, `${report.trip_id}/corporates`);
+        if(path){
+          if(c.file_path) await removeReportFile(c.file_path);
+          c.file_path = path; c.file_name = file.name;
+          await saveManagerReport(report);
+          renderManagerReport(report, officeTotal);
+        }
+      } catch(err){
+        console.error(err);
+        showAppAlert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
+      }
+    }));
+    modal.querySelectorAll('[data-role="mrCorpDelete"]').forEach(el=> el.addEventListener('click', async e=>{
+      if(!(await showAppConfirm('Видалити цей корпорат?'))) return;
+      const h = findHotel(e.target.dataset.hotel);
+      const c = h.corporates.find(x=>x.id===e.target.dataset.id);
+      if(c && c.file_path) await removeReportFile(c.file_path);
+      h.corporates = h.corporates.filter(x=>x.id!==e.target.dataset.id);
+      persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      renderManagerReport(report, officeTotal);
+    }));
+    const addCorpBtn = document.getElementById('mrAddCorpBtn');
+    if(addCorpBtn) addCorpBtn.addEventListener('click', ()=>{
+      const hotelKey = document.getElementById('mrAddCorpHotel').value;
+      const h = findHotel(hotelKey);
+      h.corporates.push(newCorporate());
+      persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      renderManagerReport(report, officeTotal);
+    });
+    modal.querySelectorAll('[data-role="mrCollectionCash"]').forEach(el=> el.addEventListener('input', e=>{
+      report.collection.cash = parseDecimalInput(e.target.value);
+      debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      debouncedManagerReportRerender(report);
+    }));
+    modal.querySelectorAll('[data-role="mrCollectionBank"]').forEach(el=> el.addEventListener('input', e=>{
+      report.collection.bank = parseDecimalInput(e.target.value);
+      debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      debouncedManagerReportRerender(report);
+    }));
+    modal.querySelectorAll('[data-role="mrCollectionFop"]').forEach(el=> el.addEventListener('input', e=>{
+      report.collection.fop = parseDecimalInput(e.target.value);
+      debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      debouncedManagerReportRerender(report);
+    }));
+  } else if(sectionKey==='paid'){
+    modal.querySelectorAll('[data-role="mrExpenseLabel"]').forEach(el=> el.addEventListener('input', e=>{
+      const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
+      ex.label = e.target.value;
+      debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+    }));
+    modal.querySelectorAll('[data-role="mrExpenseAmount"]').forEach(el=> el.addEventListener('input', e=>{
+      const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
+      ex.amount = parseDecimalInput(e.target.value);
+      debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      debouncedManagerReportRerender(report);
+    }));
+    modal.querySelectorAll('[data-role="mrOdoStart"], [data-role="mrOdoEnd"], [data-role="mrRate"]').forEach(el=> el.addEventListener('input', e=>{
+      const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
+      const role = e.target.dataset.role;
+      const val = parseDecimalInput(e.target.value);
+      if(role==='mrOdoStart') ex.odoStart = val;
+      if(role==='mrOdoEnd') ex.odoEnd = val;
+      if(role==='mrRate') ex.rate = val;
+      const r1 = (n)=> Math.round((n+Number.EPSILON)*10)/10;
+      const totalKm = r1(Math.max(0, (ex.odoEnd||0)-(ex.odoStart||0)));
+      const excInfo = computeOwnBusExcursionKm(report.trip_id);
+      const excKm = r1(excInfo.total);
+      const cleanKm = r1(Math.max(0, totalKm - excKm));
+      const rate = ex.rate||1.6;
+      ex.amount = Math.round((totalKm * rate + Number.EPSILON)*100)/100;
+      const amountInput = modal.querySelector(`[data-role="mrExpenseAmount"][data-id="${ex.id}"]`);
+      if(amountInput) amountInput.value = ex.amount;
+      const breakdownEl = document.getElementById(`mrOwnBusBreakdown-${ex.id}`);
+      if(breakdownEl){
+        const fullAmount = r2(totalKm * rate);
+        const excAmount = r2(excKm * rate);
+        breakdownEl.innerHTML = `
+          <div>Загальний кілометраж (оплачується тут повністю): <strong>${totalKm} км</strong></div>
+          <div>З них екскурсійний (по цих км прибуток гідів уже пораховано в Прибутковості — там віднято ${fmt(excAmount)} €): ${excKm} км</div>
+          ${excInfo.rows.length ? `<div style="padding-left:16px;">${excInfo.rows.map(r=>`${r.label} — ${r1(r.km)} км`).join(',<br>')}</div>` : ''}
+          <div>Чисте коло (без екскурсій): ${cleanKm} км</div>
+          <div style="margin-top:4px; padding-top:4px; border-top:1px dashed var(--line);"><strong>Сплачується тут: ${fmt(fullAmount)} €</strong> (компенсовано в "Допи прибуток")</div>
+        `;
+      }
+      debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      debouncedManagerReportRerender(report);
+    }));
+    modal.querySelectorAll('[data-role="mrExpenseFile"]').forEach(el=> el.addEventListener('change', async e=>{
+      try{
+        const file = e.target.files[0]; if(!file) return;
+        const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
+        if(!ex){ showAppAlert('Внутрішня помилка: не знайдено пункт витрат. Онови сторінку і спробуй ще раз.'); return; }
+        const path = await uploadReportFile(file, `${report.trip_id}/expenses`);
+        if(path){
+          if(ex.file_path) await removeReportFile(ex.file_path);
+          ex.file_path = path; ex.file_name = file.name;
+          await saveManagerReport(report);
+          renderManagerReport(report, officeTotal);
+        }
+      } catch(err){
+        console.error(err);
+        showAppAlert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
+      }
+    }));
+    modal.querySelectorAll('[data-role="mrExpenseDelete"]').forEach(el=> el.addEventListener('click', async e=>{
+      if(!(await showAppConfirm('Видалити цю витрату?'))) return;
+      const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
+      if(ex && ex.file_path) await removeReportFile(ex.file_path);
+      report.expenses = report.expenses.filter(x=>x.id!==e.target.dataset.id);
+      persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      renderManagerReport(report, officeTotal);
+    }));
+    const addExpBtn = document.getElementById('mrAddExpenseBtn');
+    if(addExpBtn) addExpBtn.addEventListener('click', ()=>{
+      report.expenses.push({ id: uid(), label:'Новий пункт', amount:0 });
+      persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      renderManagerReport(report, officeTotal);
+    });
+    const ownBusSelect = document.getElementById('mrOwnBusGuideSelect');
+    if(ownBusSelect) ownBusSelect.addEventListener('change', async e=>{
+      const newOwnBus = e.target.value;
+      if(!(await showAppConfirm(`Позначити ${newOwnBus || 'нікого'} як "наш автобус" (по кілометражу)? Рядки автобусів усіх гідів буде перебудовано.`))){
+        ownBusSelect.value = report.ownBusGuide||'';
+        return;
+      }
+      report.ownBusGuide = newOwnBus;
+      report.expenses = report.expenses.filter(x=> x.sourceLabel!=='Автобус' && x.sourceLabel!=='АвтобусФіксовано');
+      for(const g of getTripData(currentTripId).guides.map(x=>x.name)){
+        if(g !== newOwnBus){
+          report.expenses.push({ id: uid(), label:`Автобус (${g}) — фіксовано`, amount: 5120, guide: g, sourceLabel:'АвтобусФіксовано' });
+        }
+      }
+      await saveManagerReport(report);
+      renderManagerReport(report, officeTotal);
+    });
+    modal.querySelectorAll('[data-role="mrAddMissing"]').forEach(el=> el.addEventListener('click', e=>{
+      const guide = e.target.dataset.guide, source = e.target.dataset.source;
+      const m = missing.find(x=>x.guide===guide && x.sourceLabel===source);
+      if(!m) return;
+      report.expenses.push({ id: uid(), label:m.label, amount:m.amount, guide:m.guide, sourceLabel:m.sourceLabel });
+      persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
+      renderManagerReportSection();
+    }));
+    const refreshAllBtn = document.getElementById('mrRefreshAllBtn');
+    if(refreshAllBtn) refreshAllBtn.addEventListener('click', async ()=>{
+      refreshAllBtn.disabled = true; refreshAllBtn.textContent = 'Оновлюю…';
+      const guideNames = getTripData(currentTripId).guides.map(g=>g.name);
+      for(const ex of report.expenses){
+        if(!ex.guide || !ex.sourceLabel || ex.sourceLabel==='АвтобусФіксовано') continue;
+        ex.amount = await pullGuideFinanceLine(report.trip_id, ex.guide, ex.sourceLabel);
+      }
+      const borderEx = report.expenses.find(e=>!e.guide && (e.sourceLabel==='Кордони' || e.sourceLabel==='Кордон'));
+      if(borderEx) borderEx.amount = await pullLineTotalAcrossGuides(report.trip_id, guideNames, 'Кордони');
+      const phoneEx = report.expenses.find(e=>!e.guide && e.sourceLabel==='Телефон');
+      if(phoneEx) phoneEx.amount = await pullLineTotalAcrossGuides(report.trip_id, guideNames, 'Телефон');
+      const integrationEx = report.expenses.find(e=>!e.guide && e.sourceLabel==='Інтеграція');
+      if(integrationEx){
+        let sum = 0;
+        for(const g of guideNames) sum += await pullGuideIntegrationTotal(report.trip_id, g);
+        integrationEx.amount = sum;
+      }
+      const konstantinEx = report.expenses.find(e=>e.label==='Готель Konstantin');
+      if(konstantinEx){ const r = await pullHotelTotalAcrossGuides(report.trip_id, guideNames, 'Konstantin 3*'); konstantinEx.amount = r.sum; konstantinEx.breakdown = r.breakdown; }
+      const greatAleksanderEx = report.expenses.find(e=>e.label==='Готель Great Aleksander');
+      if(greatAleksanderEx){ const r = await pullHotelTotalAcrossGuides(report.trip_id, guideNames, 'Great Aleksander 3*'); greatAleksanderEx.amount = r.sum; greatAleksanderEx.breakdown = r.breakdown; }
+      await saveManagerReport(report);
+      renderManagerReport(report, officeTotal);
+    });
+  }
+  modal.querySelectorAll('[data-role="mrViewFile"]').forEach(el=> el.addEventListener('click', e=> openReportFile(e.target.dataset.path)));
+}
+
 function openFinSectionModal(sectionKey){
   const ctx = lastRenderedFinanceReport;
   if(!ctx) return;
@@ -5165,13 +5439,10 @@ async function openReportFile(path){
 function newCorporate(){ return { id: uid(), name:'', amount:0, file_path:'', file_name:'' }; }
 
 const DEFAULT_MANAGER_EXPENSES = [
-  {label:'Телефон', amount:30},
-  {label:'Інтеграція', amount:0},
   {label:'Поселення гідів', amount:154},
   {label:'Реклама', amount:300},
-  {label:'Кордон', amount:0},
   {label:'Страховки', amount:0},
-  {label:'Торба', amount:0},
+  {label:'Торба опл', amount:0},
   {label:'Аніматор', amount:150},
   {label:'Інше', amount:0},
   {label:'Інше', amount:0},
@@ -5180,7 +5451,15 @@ const DEFAULT_MANAGER_EXPENSES = [
 async function computeOfficeTotalForTrip(tripId){
   const tripData = getTripData(tripId);
   const perGuide = calcTripByGuide(tripData);
-  return Object.values(perGuide).reduce((s,g)=> s + (g.officeIncome||0), 0);
+  const baseOfficeTotal = Object.values(perGuide).reduce((s,g)=> s + (g.officeIncome||0), 0);
+  // Correction: "Автобус (наш) — км" in Затрати now pays for the FULL odometer distance,
+  // including the excursion km that Прибутковість already deducted (as an internal
+  // guide/office profit split) from each excursion's own profit. Since paying the bus is
+  // now purely an office-level expense (not split with guides), the office gets that
+  // excursion-km cost back in FULL here — matching "Альтернативний розрахунок" exactly.
+  const excInfo = computeOwnBusExcursionKm(tripId);
+  const excursionBusCorrection = excInfo.total * OWN_BUS_RATE;
+  return baseOfficeTotal + excursionBusCorrection;
 }
 
 // Total km driven for excursions on OUR OWN bus this trip — used to split the manager's
@@ -5207,6 +5486,30 @@ async function pullGuideFinanceLine(tripId, guideName, label){
   const entry = (data.entries||[]).find(e=> e.label===label);
   return entry ? (Number(entry.amount)||0) : 0;
 }
+async function pullLineTotalAcrossGuides(tripId, guideNames, label){
+  let sum = 0;
+  for(const g of guideNames) sum += await pullGuideFinanceLine(tripId, g, label);
+  return sum;
+}
+async function pullGuideIntegrationTotal(tripId, guideName){
+  const { data } = await sb.from('financial_reports').select('entries').eq('trip_id', tripId).eq('guide_name', guideName).maybeSingle();
+  if(!data) return 0;
+  const keys = ['integration','integration_hotel_prepay','integration_bus_prepay'];
+  return (data.entries||[]).filter(e=> keys.includes(e.itemKey)).reduce((s,e)=> s + (Number(e.amount)||0), 0);
+}
+async function pullHotelTotalAcrossGuides(tripId, guideNames, hotelValue){
+  let sum = 0;
+  const breakdown = [];
+  for(const g of guideNames){
+    const { data } = await sb.from('financial_reports').select('entries').eq('trip_id', tripId).eq('guide_name', g).maybeSingle();
+    if(!data) continue;
+    let guideSum = 0;
+    (data.entries||[]).forEach(e=>{ if(e.itemKey==='hotel' && e.hotel===hotelValue) guideSum += Number(e.amount)||0; });
+    if(guideSum) breakdown.push({ guide: g, amount: guideSum });
+    sum += guideSum;
+  }
+  return { sum, breakdown };
+}
 
 const DEFAULT_HOTELS = [
   { key:'konstantin', label:'Готель Konstantin' },
@@ -5221,9 +5524,12 @@ async function loadManagerReport(tripId){
   if(error){ console.error(error); }
   const tripData = getTripData(tripId);
   const guideNames = tripData.guides.map(g=>g.name);
-  // Which physical bus is "ours" (km-based) varies trip to trip — it's not a fixed bus name,
-  // so the manager picks it explicitly per trip instead of us guessing from a bus name.
-  const ownBusGuide = data ? (data.own_bus_guide || '') : '';
+  // Which guide has "our own bus" is already tracked per-trip when guides are picked
+  // (the "наш автобус" checkbox there) — use that as the default here so the manager
+  // doesn't have to re-pick it manually every time. They can still override it below
+  // if it's ever wrong or ambiguous (e.g. nobody flagged, or more than one flagged).
+  const detectedOwnBusGuide = tripData.guides.find(g=>g.ownBus)?.name || '';
+  const ownBusGuide = data ? (data.own_bus_guide || detectedOwnBusGuide || '') : detectedOwnBusGuide;
   const isKmBasedBus = (g)=> g === ownBusGuide;
   const FIXED_BUS_RATE = 5120;
 
@@ -5243,28 +5549,60 @@ async function loadManagerReport(tripId){
     let expenses = data.expenses||[];
     let addedAny = false;
 
-    // Ensure every trip guide always has an "Автобус (guide)" and "Добові: guide" line —
-    // regardless of whether the guide has entered anything in their own finance report yet.
+    // Ensure every FIXED-CONTRACT guide has an "Автобус (guide) — фіксовано" line. The
+    // km-based guide's bus is covered by the single "Автобус (наш) — км" odometer entry
+    // below instead — giving them a second flat entry too would double up and confuse.
     for(const g of guideNames){
-      const hasBus = expenses.some(e=>e.guide===g && (e.sourceLabel==='Автобус' || e.sourceLabel==='АвтобусФіксовано'));
-      if(!hasBus){
-        if(isKmBasedBus(g)){
-          const amt = await pullGuideFinanceLine(tripId, g, 'Автобус');
-          expenses.push({ id: uid(), label:`Автобус (${g})`, amount: amt, guide: g, sourceLabel:'Автобус' });
-        } else {
-          // Fixed-contract bus (not Миросик/Окатий) — the guide's own report never tracks this
-          // by km, so nothing to pull; the manager enters/confirms the flat contract amount here.
-          expenses.push({ id: uid(), label:`Автобус (${g}) — фіксовано`, amount: FIXED_BUS_RATE, guide: g, sourceLabel:'АвтобусФіксовано' });
+      if(isKmBasedBus(g)){
+        const staleFlatBus = expenses.find(e=>e.guide===g && e.sourceLabel==='Автобус');
+        if(staleFlatBus){
+          expenses = expenses.filter(e=>e!==staleFlatBus);
+          addedAny = true;
         }
-        addedAny = true;
+      } else {
+        const hasBus = expenses.some(e=>e.guide===g && e.sourceLabel==='АвтобусФіксовано');
+        if(!hasBus){
+          expenses.push({ id: uid(), label:`Автобус (${g}) — фіксовано`, amount: FIXED_BUS_RATE, guide: g, sourceLabel:'АвтобусФіксовано' });
+          addedAny = true;
+        }
       }
       const hasPerDiem = expenses.some(e=>e.guide===g && e.sourceLabel==='Добові');
       if(!hasPerDiem){
         const amt = await pullGuideFinanceLine(tripId, g, 'Добові');
-        expenses.push({ id: uid(), label:`Добові: ${g}`, amount: amt, guide: g, sourceLabel:'Добові' });
+        expenses.push({ id: uid(), label:`Гід ${guideNames.indexOf(g)+1}`, amount: amt, guide: g, sourceLabel:'Добові' });
         addedAny = true;
       }
     }
+
+    // Кордон / Телефон / Інтеграція — one combined trip-wide line each (not per-guide).
+    // If per-guide versions already exist from an earlier version of this screen,
+    // fold them into one combined entry (summing their amounts) instead of losing them.
+    const combineIntoOne = async (sourceLabels, displayLabel, pullFn)=>{
+      const labels = Array.isArray(sourceLabels) ? sourceLabels : [sourceLabels];
+      const canonicalLabel = labels[0];
+      const perGuideOnes = expenses.filter(e=>e.guide && labels.includes(e.sourceLabel));
+      const combinedExisting = expenses.find(e=>!e.guide && labels.includes(e.sourceLabel));
+      if(perGuideOnes.length){
+        // Merging old per-guide rows into one — pull fresh totals rather than trusting
+        // their stored amounts, which may be stale (e.g. from before an earlier label fix).
+        const sum = await pullFn();
+        expenses = expenses.filter(e=> !(e.guide && labels.includes(e.sourceLabel)));
+        if(combinedExisting) combinedExisting.amount = sum;
+        else expenses.push({ id: uid(), label: displayLabel, amount: sum, sourceLabel: canonicalLabel });
+        addedAny = true;
+      } else if(!combinedExisting){
+        const amt = await pullFn();
+        expenses.push({ id: uid(), label: displayLabel, amount: amt, sourceLabel: canonicalLabel });
+        addedAny = true;
+      }
+    };
+    await combineIntoOne(['Кордони','Кордон'], 'Кордон', ()=> pullLineTotalAcrossGuides(tripId, guideNames, 'Кордони'));
+    await combineIntoOne('Телефон', 'Телефон', ()=> pullLineTotalAcrossGuides(tripId, guideNames, 'Телефон'));
+    await combineIntoOne('Інтеграція', 'Інтеграція', async ()=>{
+      let sum = 0;
+      for(const g of guideNames) sum += await pullGuideIntegrationTotal(tripId, g);
+      return sum;
+    });
 
     // Ensure newly-added standard items (e.g. Інтеграція, a 2nd Інше) exist even in older reports.
     const requiredCounts = {};
@@ -5278,46 +5616,79 @@ async function loadManagerReport(tripId){
 
     // Ensure the "our own bus" and both hotel expense lines exist too.
     if(!expenses.some(e=>e.ownBus)){ expenses.push({ id: uid(), label:'Автобус (наш) — км', amount:0, ownBus:true, odoStart:0, odoEnd:0, rate:1.6 }); addedAny = true; }
-    if(!expenses.some(e=>e.label==='Готель Konstantin')){ expenses.push({ id: uid(), label:'Готель Konstantin', amount:0, file_path:'', file_name:'' }); addedAny = true; }
-    if(!expenses.some(e=>e.label==='Готель Great Aleksander')){ expenses.push({ id: uid(), label:'Готель Great Aleksander', amount:0, file_path:'', file_name:'' }); addedAny = true; }
+    const ownBusEx = expenses.find(e=>e.ownBus);
+    if(ownBusEx){
+      const totalKm = Math.max(0, (ownBusEx.odoEnd||0)-(ownBusEx.odoStart||0));
+      const correctAmount = Math.round((totalKm * (ownBusEx.rate||1.6) + Number.EPSILON)*100)/100;
+      if(ownBusEx.amount !== correctAmount){ ownBusEx.amount = correctAmount; addedAny = true; }
+    }
+    if(!expenses.some(e=>e.label==='Готель Konstantin')){
+      const r = await pullHotelTotalAcrossGuides(tripId, guideNames, 'Konstantin 3*');
+      expenses.push({ id: uid(), label:'Готель Konstantin', amount: r.sum, breakdown: r.breakdown, file_path:'', file_name:'' }); addedAny = true;
+    }
+    if(!expenses.some(e=>e.label==='Готель Great Aleksander')){
+      const r = await pullHotelTotalAcrossGuides(tripId, guideNames, 'Great Aleksander 3*');
+      expenses.push({ id: uid(), label:'Готель Great Aleksander', amount: r.sum, breakdown: r.breakdown, file_path:'', file_name:'' }); addedAny = true;
+    }
 
-    const reconciled = { trip_id: tripId, hotels, expenses, submitted: !!data.submitted, ownBusGuide };
+    // Migrate Збірка (готівка/ФОП/р-р) from per-hotel to one combined trip-wide number,
+    // if not already migrated. The old per-hotel numbers stay in `hotels[]` untouched
+    // (harmless, just unused going forward) so nothing is lost.
+    let collection = data.collection || null;
+    if(!collection){
+      collection = {
+        cash: hotels.reduce((s,h)=> s + (Number(h.cash)||0), 0),
+        bank: hotels.reduce((s,h)=> s + (Number(h.bank)||0), 0),
+        fop: hotels.reduce((s,h)=> s + (Number(h.fop)||0), 0),
+      };
+      addedAny = true;
+    }
+
+    const reconciled = { trip_id: tripId, hotels, expenses, submitted: !!data.submitted, ownBusGuide, collection };
     if(addedAny) await saveManagerReport(reconciled);
     return reconciled;
   }
 
   const busEntries = [];
   for(const g of guideNames){
-    if(isKmBasedBus(g)){
-      const amt = await pullGuideFinanceLine(tripId, g, 'Автобус');
-      busEntries.push({ id: uid(), label:`Автобус (${g})`, amount: amt, guide: g, sourceLabel:'Автобус' });
-    } else {
+    if(!isKmBasedBus(g)){
       busEntries.push({ id: uid(), label:`Автобус (${g}) — фіксовано`, amount: FIXED_BUS_RATE, guide: g, sourceLabel:'АвтобусФіксовано' });
     }
   }
   const perDiemEntries = [];
   for(const g of guideNames){
     const amt = await pullGuideFinanceLine(tripId, g, 'Добові');
-    perDiemEntries.push({ id: uid(), label:`Добові: ${g}`, amount: amt, guide: g, sourceLabel:'Добові' });
+    perDiemEntries.push({ id: uid(), label:`Гід ${guideNames.indexOf(g)+1}`, amount: amt, guide: g, sourceLabel:'Добові' });
   }
+  const borderTotal = await pullLineTotalAcrossGuides(tripId, guideNames, 'Кордони');
+  const phoneTotal = await pullLineTotalAcrossGuides(tripId, guideNames, 'Телефон');
+  let integrationTotal = 0;
+  for(const g of guideNames) integrationTotal += await pullGuideIntegrationTotal(tripId, g);
+  const konstantinPull = await pullHotelTotalAcrossGuides(tripId, guideNames, 'Konstantin 3*');
+  const greatAleksanderPull = await pullHotelTotalAcrossGuides(tripId, guideNames, 'Great Aleksander 3*');
   const expenses = [
     ...busEntries,
     { id: uid(), label:'Автобус (наш) — км', amount:0, ownBus:true, odoStart:0, odoEnd:0, rate:1.6 },
-    { id: uid(), label:'Готель Konstantin', amount:0, file_path:'', file_name:'' },
-    { id: uid(), label:'Готель Great Aleksander', amount:0, file_path:'', file_name:'' },
+    { id: uid(), label:'Готель Konstantin', amount: konstantinPull.sum, breakdown: konstantinPull.breakdown, file_path:'', file_name:'' },
+    { id: uid(), label:'Готель Great Aleksander', amount: greatAleksanderPull.sum, breakdown: greatAleksanderPull.breakdown, file_path:'', file_name:'' },
     ...perDiemEntries,
+    { id: uid(), label:'Кордон', amount: borderTotal, sourceLabel:'Кордони' },
+    { id: uid(), label:'Телефон', amount: phoneTotal, sourceLabel:'Телефон' },
+    { id: uid(), label:'Інтеграція', amount: integrationTotal, sourceLabel:'Інтеграція' },
     ...DEFAULT_MANAGER_EXPENSES.map(e=>({ id: uid(), label:e.label, amount:e.amount })),
   ];
   return {
     trip_id: tripId, hotels: DEFAULT_HOTELS.map(newHotelGroup),
-    expenses, submitted:false, ownBusGuide: ''
+    expenses, submitted:false, ownBusGuide: ownBusGuide,
+    collection: { cash:0, bank:0, fop:0 }
   };
 }
 
 async function saveManagerReport(report){
   const { error } = await sb.from('manager_reports').upsert({
     trip_id: report.trip_id, hotels: report.hotels,
-    expenses: report.expenses, submitted: !!report.submitted, own_bus_guide: report.ownBusGuide||''
+    expenses: report.expenses, submitted: !!report.submitted, own_bus_guide: report.ownBusGuide||'',
+    collection: report.collection || { cash:0, bank:0, fop:0 }
   }, { onConflict: 'trip_id' });
   if(error){ console.error(error); showAppAlert('Не вдалося зберегти звіт: ' + friendlyErrorMessage(error)); }
 }
@@ -5327,7 +5698,7 @@ let pendingManagerReport;
 function debouncedManagerReportRerender(report){
   clearTimeout(managerReportRerenderTimer);
   pendingManagerReport = report;
-  managerReportRerenderTimer = setTimeout(()=> renderManagerReport(report), 2500);
+  managerReportRerenderTimer = setTimeout(()=> renderManagerReport(report, undefined, undefined, true), 2500);
 }
 
 async function computeMissingPullSuggestions(tripId, report){
@@ -5341,7 +5712,7 @@ async function computeMissingPullSuggestions(tripId, report){
 
     const perDiemAmt = await pullGuideFinanceLine(tripId, g, 'Добові');
     const hasPerDiem = report.expenses.some(e=>e.guide===g && e.sourceLabel==='Добові');
-    if(!hasPerDiem) suggestions.push({ label:`Добові: ${g}`, amount:perDiemAmt, guide:g, sourceLabel:'Добові' });
+    if(!hasPerDiem) suggestions.push({ label:`Гід ${guideNames.indexOf(g)+1}`, amount:perDiemAmt, guide:g, sourceLabel:'Добові' });
   }
   return suggestions;
 }
@@ -6989,7 +7360,7 @@ async function renderManagerReportSection(){
   renderManagerReport(report, officeTotal, missing);
 }
 
-function renderManagerReport(report, officeTotal, missing){
+function renderManagerReport(report, officeTotal, missing, skipModalReopen){
   missing = missing || report._missing || [];
   report._missing = missing;
   const block = document.getElementById('managerReportBlock');
@@ -6997,8 +7368,9 @@ function renderManagerReport(report, officeTotal, missing){
   officeTotal = officeTotal !== undefined ? officeTotal : (report._officeTotal||0);
   report._officeTotal = officeTotal;
 
-  const hotelSubtotal = (h)=> h.corporates.reduce((s,c)=>s+(Number(c.amount)||0),0) + (Number(h.cash)||0) + (Number(h.bank)||0) + (Number(h.fop)||0);
-  const receivedTotal = report.hotels.reduce((s,h)=> s + hotelSubtotal(h), 0);
+  const hotelSubtotal = (h)=> h.corporates.reduce((s,c)=>s+(Number(c.amount)||0),0);
+  const collectionTotal = (Number(report.collection.cash)||0) + (Number(report.collection.bank)||0) + (Number(report.collection.fop)||0);
+  const receivedTotal = report.hotels.reduce((s,h)=> s + hotelSubtotal(h), 0) + collectionTotal;
   const receivedWithAddons = receivedTotal + officeTotal;
   const expensesTotal = report.expenses.reduce((s,e)=> s+(Number(e.amount)||0), 0);
   const diff = receivedWithAddons - expensesTotal;
@@ -7007,7 +7379,7 @@ function renderManagerReport(report, officeTotal, missing){
 
   const corpRowHtml = (hotelKey, c)=> `<div class="fin-row">
       <input type="text" class="fin-label-input" data-role="mrCorpName" data-hotel="${hotelKey}" data-id="${c.id}" value="${c.name}" placeholder="Назва корпорату">
-      <input type="text" inputmode="decimal" class="fin-amount" data-role="mrCorpAmount" data-hotel="${hotelKey}" data-id="${c.id}" value="${c.amount}"> €
+      <input type="text" inputmode="decimal" class="fin-amount" data-role="mrCorpAmount" data-hotel="${hotelKey}" data-id="${c.id}" value="${r2(c.amount)}"> €
       <input type="file" accept=".xlsx,.xls,.pdf" data-role="mrCorpFile" data-hotel="${hotelKey}" data-id="${c.id}" style="width:110px; font-size:11px;">
       ${c.file_name ? `<button class="btn btn-ghost btn-small no-print" data-role="mrViewFile" data-path="${c.file_path}">📎 ${c.file_name.length>14?c.file_name.slice(0,12)+'…':c.file_name}</button>` : ''}
       <button class="row-del no-print" data-role="mrCorpDelete" data-hotel="${hotelKey}" data-id="${c.id}" title="Видалити">✕</button>
@@ -7021,38 +7393,47 @@ function renderManagerReport(report, officeTotal, missing){
     <p class="report-note" style="margin:2px 0 8px;">Корпорати для цього готелю:</p>
     <div data-hotel-corp-wrap="${h.key}">${h.corporates.map(c=>corpRowHtml(h.key,c)).join('')}</div>
     <div class="no-print" style="margin:6px 0 10px;"><button class="btn btn-ghost btn-small" data-role="mrAddCorpBtn" data-hotel="${h.key}">+ Додати корпорат</button></div>
-    <div class="fin-row"><span class="fin-label">Готівка</span><input type="text" inputmode="decimal" class="fin-amount" data-role="mrHotelCash" data-hotel="${h.key}" value="${h.cash}"> €</div>
-    <div class="fin-row"><span class="fin-label">р/р</span><input type="text" inputmode="decimal" class="fin-amount" data-role="mrHotelBank" data-hotel="${h.key}" value="${h.bank}"> €</div>
-    <div class="fin-row"><span class="fin-label">ФОП</span><input type="text" inputmode="decimal" class="fin-amount" data-role="mrHotelFop" data-hotel="${h.key}" value="${h.fop}"> €</div>
-    <p class="muted" style="font-size:12px; margin-top:6px;">Підсумок по готелю: ${fmt(hotelSubtotal(h))} €</p>
+    <p class="muted" style="font-size:12px; margin-top:6px;">Підсумок корпоратів: ${fmt(hotelSubtotal(h))} €</p>
   </div>`;
 
   const expenseRowHtml = (e)=>{
     const isOwnBus = !!e.ownBus;
     const isHotel = e.label.startsWith('Готель');
-    const isPulled = !!e.guide && !!e.sourceLabel && e.sourceLabel!=='АвтобусФіксовано';
+    const r1 = (n)=> Math.round((n+Number.EPSILON)*10)/10;
     let ownBusBreakdownHtml = '';
+    let ownBusLabel = e.label;
     if(isOwnBus){
-      const totalKm = Math.max(0, (e.odoStart||e.odoEnd) ? (e.odoEnd||0)-(e.odoStart||0) : 0);
+      ownBusLabel = report.ownBusGuide ? `Автобус (${report.ownBusGuide}) — по кілометражу` : e.label;
+      const totalKm = r1(Math.max(0, (e.odoStart||e.odoEnd) ? (e.odoEnd||0)-(e.odoStart||0) : 0));
       const excInfo = computeOwnBusExcursionKm(currentTripId);
-      const cleanKm = Math.max(0, totalKm - excInfo.total);
-      ownBusBreakdownHtml = `<div class="no-print" style="width:100%; font-size:11px; color:var(--ink-soft); margin-top:2px;">
-        Загальний кілометраж: ${totalKm} км · Екскурсійний (вже враховано в прибутку з екскурсій): ${excInfo.total} км${excInfo.rows.length ? ' ('+excInfo.rows.map(r=>`${r.label} — ${r.km} км`).join(', ')+')' : ''} · <strong>Чисте коло (оплачується тут): ${cleanKm} км</strong>
+      const excTotal = r1(excInfo.total);
+      const cleanKm = r1(Math.max(0, totalKm - excTotal));
+      const rate = e.rate||1.6;
+      const fullAmount = r2(totalKm * rate);
+      const excAmount = r2(excTotal * rate);
+      ownBusBreakdownHtml = `<div class="no-print" id="mrOwnBusBreakdown-${e.id}" style="width:100%; font-size:11px; color:var(--ink-soft); margin-top:2px;">
+        <div>Загальний кілометраж (оплачується тут повністю): <strong>${totalKm} км</strong></div>
+        <div>З них екскурсійний (по цих км прибуток гідів уже пораховано в Прибутковості — там віднято ${fmt(excAmount)} €): ${excTotal} км</div>
+        ${excInfo.rows.length ? `<div style="padding-left:16px;">${excInfo.rows.map(r=>`${r.label} — ${r1(r.km)} км`).join(',<br>')}</div>` : ''}
+        <div>Чисте коло (без екскурсій): ${cleanKm} км</div>
+        <div style="margin-top:4px; padding-top:4px; border-top:1px dashed var(--line);"><strong>Сплачується тут: ${fmt(fullAmount)} €</strong> (компенсовано в "Допи прибуток")</div>
       </div>`;
     }
     return `<div class="fin-row" style="flex-wrap:wrap;">
-      <input type="text" class="fin-label-input" data-role="mrExpenseLabel" data-id="${e.id}" value="${e.label}">
+      <input type="text" class="fin-label-input" data-role="mrExpenseLabel" data-id="${e.id}" value="${ownBusLabel}" ${isOwnBus?'disabled title="Назва підставляється автоматично за іменем гіда з позначкою наш автобус"':''}>
       ${isOwnBus ? `
         <span class="muted" style="font-size:11px;">од. поч.:</span><input type="text" inputmode="decimal" class="fin-amount" style="width:80px;" data-role="mrOdoStart" data-id="${e.id}" value="${e.odoStart||0}">
         <span class="muted" style="font-size:11px;">од. кін.:</span><input type="text" inputmode="decimal" class="fin-amount" style="width:80px;" data-role="mrOdoEnd" data-id="${e.id}" value="${e.odoEnd||0}">
         <span class="muted" style="font-size:11px;">€/км:</span><input type="text" inputmode="decimal" step="0.1" class="fin-amount" style="width:60px;" data-role="mrRate" data-id="${e.id}" value="${e.rate||1.6}">
       ` : ''}
-      ${isPulled ? `<button class="edit-toggle-btn no-print" data-role="mrRefreshPulled" data-id="${e.id}" title="Підтягнути актуальну суму з фінзвіту гіда (${e.sourceLabel})" style="font-size:12px;">🔄</button>` : ''}
-      <input type="text" inputmode="decimal" class="fin-amount" data-role="mrExpenseAmount" data-id="${e.id}" value="${e.amount}" ${isOwnBus?'disabled title="Рахується з чистого кола (без екскурсійних км)"':''}> €
+      <input type="text" inputmode="decimal" class="fin-amount" data-role="mrExpenseAmount" data-id="${e.id}" value="${r2(e.amount)}" ${isOwnBus?'disabled title="Рахується з чистого кола (без екскурсійних км)"':''}> €
       ${isHotel ? `<input type="file" accept=".xlsx,.xls,.pdf" data-role="mrExpenseFile" data-id="${e.id}" style="width:110px; font-size:11px;">
         ${e.file_name ? `<button class="btn btn-ghost btn-small no-print" data-role="mrViewFile" data-path="${e.file_path}">📎 ${e.file_name.length>14?e.file_name.slice(0,12)+'…':e.file_name}</button>` : ''}` : ''}
       <button class="row-del no-print" data-role="mrExpenseDelete" data-id="${e.id}" title="Видалити">✕</button>
       ${ownBusBreakdownHtml}
+      ${isHotel && e.breakdown && e.breakdown.length ? `<div class="no-print" style="width:100%; font-size:11px; color:var(--ink-soft); margin-top:2px;">
+        Складається з: ${e.breakdown.map(b=>`${b.guide} — ${fmt(b.amount)} €`).join(', ')}
+      </div>` : ''}
     </div>`;
   };
 
@@ -7062,41 +7443,45 @@ function renderManagerReport(report, officeTotal, missing){
       <p class="report-note" style="margin:2px 0 0;">Заїзд: ${def?def.label:''}</p>
     </div>
 
-    <p class="fin-section-title">Отримав</p>
-    ${report.hotels.map(hotelGroupHtml).join('')}
-
-    <div class="fin-total-row"><span>Разом</span><span>${fmt(receivedTotal)} €</span></div>
-    <div class="fin-total-row"><span>Разом з допами (+ офіс з екскурсій ${fmt(officeTotal)} €)</span><span>${fmt(receivedWithAddons)} €</span></div>
-
-    <p class="fin-section-title">Затрати</p>
-    <div class="no-print" style="margin-bottom:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <span style="font-size:13px; font-weight:600;">Наш автобус (по кілометражу):</span>
-      <select id="mrOwnBusGuideSelect">
-        <option value="">— не визначено —</option>
-        ${getTripData(currentTripId).guides.map(g=>`<option value="${g.name}" ${report.ownBusGuide===g.name?'selected':''}>${g.name}</option>`).join('')}
-      </select>
-      <span class="muted" style="font-size:11.5px;">Решта — фіксовано 5120 €. Це змінюється щоразу по-новому, тому обирайте вручну щоразу для цього заїзду.</span>
+    <div class="row-card-summary fin-section-summary" data-role="mrSectionOpen" data-section="received" style="margin-top:14px;">
+      <span style="flex:1;">💰 Отримав</span>
+      <span class="row-summary-result">${fmt(receivedWithAddons)} €</span>
     </div>
-    ${missing.length ? `<div class="no-print" style="margin-bottom:10px; background:var(--whitewash-2); border-radius:8px; padding:8px 10px;">
-      <p style="font-size:11.5px; color:var(--ink-soft); margin:0 0 6px; text-transform:uppercase;">Можна додати одним кліком:</p>
-      <div style="display:flex; gap:6px; flex-wrap:wrap;">
-        ${missing.map(m=>`<button class="btn btn-ghost btn-small" data-role="mrAddMissing" data-guide="${m.guide}" data-source="${m.sourceLabel}" style="font-size:11px;">+ ${m.label} (${fmt(m.amount)} €)</button>`).join('')}
+    <div class="row-card-summary fin-section-summary" data-role="mrSectionOpen" data-section="paid" style="margin-top:10px;">
+      <span style="flex:1;">💸 Затрати</span>
+      <span class="row-summary-result">${fmt(expensesTotal)} €</span>
+    </div>
+
+    <div class="fin-section-summary" style="margin-top:14px; display:block;">
+      <p style="font-weight:700; font-size:16px; margin:0 0 10px;">📊 Розрахунок</p>
+      <div class="fin-total-row"><span>Отримано − Оплачено</span><span>${fmt(diff)} €</span></div>
+      <div class="fin-total-row"><span>Офіс здати (70%)</span><span>${fmt(officeShare)} €</span></div>
+      <div class="fin-total-row"><span>Керівник заробіток (30%)</span><span>${fmt(managerEarning)} €</span></div>
+      <div class="no-print" style="margin-top:14px; text-align:center;">
+        <button class="btn" id="mrSubmittedBtn" style="background:${report.submitted?'#3f7a4f':'#c65b43'}; color:#fff; font-weight:700; padding:12px 28px;">
+          ${report.submitted ? '✓ Звіт здав' : 'Звіт не здав'}
+        </button>
       </div>
-    </div>` : ''}
-    <div id="mrExpensesWrap">${report.expenses.map(expenseRowHtml).join('')}</div>
-    <div class="no-print" style="margin-top:8px;"><button class="btn btn-ghost btn-small" id="mrAddExpenseBtn">+ Додати пункт</button></div>
-    <div class="fin-total-row"><span>Разом оплачено</span><span>${fmt(expensesTotal)} €</span></div>
-
-    <p class="fin-section-title">Розрахунок</p>
-    <div class="fin-total-row"><span>Отримано − Оплачено</span><span>${fmt(diff)} €</span></div>
-    <div class="fin-total-row"><span>Офіс здати (70%)</span><span>${fmt(officeShare)} €</span></div>
-    <div class="fin-total-row"><span>Керівник заробіток (30%)</span><span>${fmt(managerEarning)} €</span></div>
-
-    <div class="no-print" style="margin-top:14px; text-align:center;">
-      <button class="btn" id="mrSubmittedBtn" style="background:${report.submitted?'#3f7a4f':'#c65b43'}; color:#fff; font-weight:700; padding:12px 28px;">
-        ${report.submitted ? '✓ Звіт здав' : 'Звіт не здав'}
-      </button>
     </div>
+
+    <div class="fin-print-only" style="margin-top:14px;">
+      <p style="font-weight:700; font-size:15px;">💰 Отримав</p>
+      ${report.hotels.map(hotelGroupHtml).join('')}
+      <p style="font-weight:700; font-size:13px; margin-top:8px;">Збірка</p>
+      <div class="fin-row"><span class="fin-label">Готівка</span><span>${fmt(report.collection.cash)} €</span></div>
+      <div class="fin-row"><span class="fin-label">ФОП</span><span>${fmt(report.collection.fop)} €</span></div>
+      <div class="fin-row"><span class="fin-label">р/р</span><span>${fmt(report.collection.bank)} €</span></div>
+      <div class="fin-total-row"><span>Разом</span><span>${fmt(receivedTotal)} €</span></div>
+      <div class="fin-total-row"><span>Разом з допами (+ офіс з екскурсій ${fmt(officeTotal)} €)</span><span>${fmt(receivedWithAddons)} €</span></div>
+      <p style="font-weight:700; font-size:15px; margin-top:14px;">💸 Затрати</p>
+      <div>${report.expenses.map(expenseRowHtml).join('')}</div>
+      <div class="fin-total-row"><span>Разом оплачено</span><span>${fmt(expensesTotal)} €</span></div>
+      <p style="font-weight:700; font-size:15px; margin-top:14px;">📊 Розрахунок</p>
+      <div class="fin-total-row"><span>Отримано − Оплачено</span><span>${fmt(diff)} €</span></div>
+      <div class="fin-total-row"><span>Офіс здати (70%)</span><span>${fmt(officeShare)} €</span></div>
+      <div class="fin-total-row"><span>Керівник заробіток (30%)</span><span>${fmt(managerEarning)} €</span></div>
+    </div>
+
     <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:16px; border-top:1px solid var(--line); padding-top:14px;">
       <button class="btn btn-ghost btn-small" id="mrExportExcelBtn">📥 Excel</button>
       <button class="btn btn-ghost btn-small" id="mrExportWordBtn">📥 Word</button>
@@ -7106,171 +7491,10 @@ function renderManagerReport(report, officeTotal, missing){
     </div>
   `;
 
-  function findHotel(key){ return report.hotels.find(h=>h.key===key); }
+  lastRenderedManagerReport = { report, officeTotal, missing, receivedTotal, receivedWithAddons, expensesTotal, diff, officeShare, managerEarning, def, hotelGroupHtml, corpRowHtml, expenseRowHtml, findHotel, hotelSubtotal };
 
-  // --- Corporates (per hotel) ---
-  block.querySelectorAll('[data-role="mrCorpName"]').forEach(el=> el.addEventListener('input', e=>{
-    const h = findHotel(e.target.dataset.hotel);
-    const c = h.corporates.find(x=>x.id===e.target.dataset.id);
-    c.name = e.target.value;
-    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
-  }));
-  block.querySelectorAll('[data-role="mrCorpAmount"]').forEach(el=> el.addEventListener('input', e=>{
-    const h = findHotel(e.target.dataset.hotel);
-    const c = h.corporates.find(x=>x.id===e.target.dataset.id);
-    c.amount = parseDecimalInput(e.target.value);
-    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    debouncedManagerReportRerender(report);
-  }));
-  block.querySelectorAll('[data-role="mrCorpFile"]').forEach(el=> el.addEventListener('change', async e=>{
-    try{
-      const file = e.target.files[0]; if(!file) return;
-      const h = findHotel(e.target.dataset.hotel);
-      const c = h.corporates.find(x=>x.id===e.target.dataset.id);
-      if(!c){ showAppAlert('Внутрішня помилка: не знайдено запис корпорату. Онови сторінку і спробуй ще раз.'); return; }
-      const path = await uploadReportFile(file, `${report.trip_id}/corporates`);
-      if(path){
-        if(c.file_path) await removeReportFile(c.file_path);
-        c.file_path = path; c.file_name = file.name;
-        await saveManagerReport(report);
-        renderManagerReport(report, officeTotal);
-      }
-    } catch(err){
-      console.error(err);
-      showAppAlert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
-    }
-  }));
-  block.querySelectorAll('[data-role="mrCorpDelete"]').forEach(el=> el.addEventListener('click', async e=>{
-    if(!(await showAppConfirm('Видалити цей корпорат?'))) return;
-    const h = findHotel(e.target.dataset.hotel);
-    const c = h.corporates.find(x=>x.id===e.target.dataset.id);
-    if(c && c.file_path) await removeReportFile(c.file_path);
-    h.corporates = h.corporates.filter(x=>x.id!==e.target.dataset.id);
-    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    renderManagerReport(report, officeTotal);
-  }));
-  block.querySelectorAll('[data-role="mrAddCorpBtn"]').forEach(el=> el.addEventListener('click', e=>{
-    const h = findHotel(e.target.dataset.hotel);
-    h.corporates.push(newCorporate());
-    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    renderManagerReport(report, officeTotal);
-  }));
-
-  // --- Per-hotel fixed fields ---
-  block.querySelectorAll('[data-role="mrHotelCrm"]').forEach(el=> el.addEventListener('input', e=>{
-    findHotel(e.target.dataset.hotel).crm_number = e.target.value;
-    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
-  }));
-  block.querySelectorAll('[data-role="mrHotelCash"]').forEach(el=> el.addEventListener('input', e=>{
-    findHotel(e.target.dataset.hotel).cash = parseDecimalInput(e.target.value);
-    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    debouncedManagerReportRerender(report);
-  }));
-  block.querySelectorAll('[data-role="mrHotelBank"]').forEach(el=> el.addEventListener('input', e=>{
-    findHotel(e.target.dataset.hotel).bank = parseDecimalInput(e.target.value);
-    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    debouncedManagerReportRerender(report);
-  }));
-  block.querySelectorAll('[data-role="mrHotelFop"]').forEach(el=> el.addEventListener('input', e=>{
-    findHotel(e.target.dataset.hotel).fop = parseDecimalInput(e.target.value);
-    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    debouncedManagerReportRerender(report);
-  }));
-
-  // --- Expenses ---
-  block.querySelectorAll('[data-role="mrExpenseLabel"]').forEach(el=> el.addEventListener('input', e=>{
-    const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
-    ex.label = e.target.value;
-    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
-  }));
-  block.querySelectorAll('[data-role="mrExpenseAmount"]').forEach(el=> el.addEventListener('input', e=>{
-    const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
-    ex.amount = parseDecimalInput(e.target.value);
-    debouncedPersist('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    debouncedManagerReportRerender(report);
-  }));
-  block.querySelectorAll('[data-role="mrOdoStart"], [data-role="mrOdoEnd"], [data-role="mrRate"]').forEach(el=> el.addEventListener('input', e=>{
-    const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
-    const role = e.target.dataset.role;
-    const val = parseDecimalInput(e.target.value);
-    if(role==='mrOdoStart') ex.odoStart = val;
-    if(role==='mrOdoEnd') ex.odoEnd = val;
-    if(role==='mrRate') ex.rate = val;
-    const totalKm = Math.max(0, (ex.odoEnd||0)-(ex.odoStart||0));
-    const excKm = computeOwnBusExcursionKm(report.trip_id).total;
-    const cleanKm = Math.max(0, totalKm - excKm);
-    ex.amount = cleanKm * (ex.rate||1.6);
-    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    renderManagerReport(report, officeTotal);
-  }));
-  block.querySelectorAll('[data-role="mrExpenseFile"]').forEach(el=> el.addEventListener('change', async e=>{
-    try{
-      const file = e.target.files[0]; if(!file) return;
-      const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
-      if(!ex){ showAppAlert('Внутрішня помилка: не знайдено пункт витрат. Онови сторінку і спробуй ще раз.'); return; }
-      const path = await uploadReportFile(file, `${report.trip_id}/expenses`);
-      if(path){
-        if(ex.file_path) await removeReportFile(ex.file_path);
-        ex.file_path = path; ex.file_name = file.name;
-        await saveManagerReport(report);
-        renderManagerReport(report, officeTotal);
-      }
-    } catch(err){
-      console.error(err);
-      showAppAlert('Помилка при завантаженні файлу: ' + (err && err.message ? err.message : err));
-    }
-  }));
-  block.querySelectorAll('[data-role="mrExpenseDelete"]').forEach(el=> el.addEventListener('click', async e=>{
-    if(!(await showAppConfirm('Видалити цю витрату?'))) return;
-    const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
-    if(ex && ex.file_path) await removeReportFile(ex.file_path);
-    report.expenses = report.expenses.filter(x=>x.id!==e.target.dataset.id);
-    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    renderManagerReport(report, officeTotal);
-  }));
-  document.getElementById('mrAddExpenseBtn').addEventListener('click', ()=>{
-    report.expenses.push({ id: uid(), label:'Новий пункт', amount:0 });
-    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    renderManagerReport(report, officeTotal);
-  });
-  const ownBusSelect = document.getElementById('mrOwnBusGuideSelect');
-  if(ownBusSelect) ownBusSelect.addEventListener('change', async e=>{
-    const newOwnBus = e.target.value;
-    if(!(await showAppConfirm(`Позначити ${newOwnBus || 'нікого'} як "наш автобус" (по кілометражу)? Рядки автобусів усіх гідів буде перебудовано.`))){
-      ownBusSelect.value = report.ownBusGuide||'';
-      return;
-    }
-    report.ownBusGuide = newOwnBus;
-    report.expenses = report.expenses.filter(x=> x.sourceLabel!=='Автобус' && x.sourceLabel!=='АвтобусФіксовано');
-    for(const g of getTripData(currentTripId).guides.map(x=>x.name)){
-      if(g === newOwnBus){
-        const amt = await pullGuideFinanceLine(report.trip_id, g, 'Автобус');
-        report.expenses.push({ id: uid(), label:`Автобус (${g})`, amount: amt, guide: g, sourceLabel:'Автобус' });
-      } else {
-        report.expenses.push({ id: uid(), label:`Автобус (${g}) — фіксовано`, amount: 5120, guide: g, sourceLabel:'АвтобусФіксовано' });
-      }
-    }
-    await saveManagerReport(report);
-    renderManagerReport(report, officeTotal);
-  });
-  block.querySelectorAll('[data-role="mrAddMissing"]').forEach(el=> el.addEventListener('click', e=>{
-    const guide = e.target.dataset.guide, source = e.target.dataset.source;
-    const m = missing.find(x=>x.guide===guide && x.sourceLabel===source);
-    if(!m) return;
-    report.expenses.push({ id: uid(), label:m.label, amount:m.amount, guide:m.guide, sourceLabel:m.sourceLabel });
-    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    renderManagerReportSection();
-  }));
-  block.querySelectorAll('[data-role="mrRefreshPulled"]').forEach(el=> el.addEventListener('click', async e=>{
-    const ex = report.expenses.find(x=>x.id===e.target.dataset.id);
-    if(!ex) return;
-    const amt = await pullGuideFinanceLine(report.trip_id, ex.guide, ex.sourceLabel);
-    ex.amount = amt;
-    persistNow('mr:'+report.trip_id, ()=> saveManagerReport(report));
-    renderManagerReport(report, officeTotal);
-  }));
-
-  block.querySelectorAll('[data-role="mrViewFile"]').forEach(el=> el.addEventListener('click', e=> openReportFile(e.target.dataset.path)));
+  block.querySelectorAll('[data-role="mrSectionOpen"]').forEach(el=> el.addEventListener('click', ()=> openMrSectionModal(el.dataset.section)));
+  if(mrOpenSectionKeyTracked && !skipModalReopen) openMrSectionModal(mrOpenSectionKeyTracked);
 
   document.getElementById('mrSubmittedBtn').addEventListener('click', ()=>{
     report.submitted = !report.submitted;
@@ -7305,6 +7529,9 @@ function renderManagerReport(report, officeTotal, missing){
     if(error){ showAppAlert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти в сховище").'); return; }
     window.open(data.signedUrl, '_blank');
   });
+
+  function findHotel(key){ return report.hotels.find(h=>h.key===key); }
+
   function buildManagerReportRows(){
     const rows = [];
     rows.push(['Звіт керівника', def?def.label:'']);
@@ -7313,12 +7540,14 @@ function renderManagerReport(report, officeTotal, missing){
     report.hotels.forEach(h=>{
       rows.push([h.label, h.crm_number||'']);
       h.corporates.forEach(c=> rows.push(['  '+c.name, fmt(c.amount)+' €']));
-      rows.push(['  Готівка', fmt(h.cash)+' €']);
-      rows.push(['  р/р', fmt(h.bank)+' €']);
-      rows.push(['  ФОП', fmt(h.fop)+' €']);
-      rows.push(['  Підсумок', fmt(hotelSubtotal(h))+' €']);
+      rows.push(['  Підсумок корпоратів', fmt(hotelSubtotal(h))+' €']);
       rows.push([]);
     });
+    rows.push(['Збірка']);
+    rows.push(['  Готівка', fmt(report.collection.cash)+' €']);
+    rows.push(['  ФОП', fmt(report.collection.fop)+' €']);
+    rows.push(['  р/р', fmt(report.collection.bank)+' €']);
+    rows.push([]);
     rows.push(['Разом', fmt(receivedTotal)+' €']);
     rows.push(['Разом з допами', fmt(receivedWithAddons)+' €']);
     rows.push([]);
@@ -7345,11 +7574,14 @@ function renderManagerReport(report, officeTotal, missing){
       <h3>${h.label} ${h.crm_number ? '(№ '+h.crm_number+')' : ''}</h3>
       <table border="1" cellpadding="4" style="border-collapse:collapse; width:100%;">
         ${h.corporates.map(c=>`<tr><td>${c.name}</td><td align="right">${fmt(c.amount)} €</td></tr>`).join('')}
-        <tr><td>Готівка</td><td align="right">${fmt(h.cash)} €</td></tr>
-        <tr><td>р/р</td><td align="right">${fmt(h.bank)} €</td></tr>
-        <tr><td>ФОП</td><td align="right">${fmt(h.fop)} €</td></tr>
-        <tr><td><b>Підсумок</b></td><td align="right"><b>${fmt(hotelSubtotal(h))} €</b></td></tr>
-      </table>`).join('');
+        <tr><td><b>Підсумок корпоратів</b></td><td align="right"><b>${fmt(hotelSubtotal(h))} €</b></td></tr>
+      </table>`).join('') + `
+      <h3>Збірка</h3>
+      <table border="1" cellpadding="4" style="border-collapse:collapse; width:100%;">
+        <tr><td>Готівка</td><td align="right">${fmt(report.collection.cash)} €</td></tr>
+        <tr><td>ФОП</td><td align="right">${fmt(report.collection.fop)} €</td></tr>
+        <tr><td>р/р</td><td align="right">${fmt(report.collection.bank)} €</td></tr>
+      </table>`;
     const expensesHtml = report.expenses.map(e=>`<tr><td>${e.label}</td><td align="right">${fmt(e.amount)} €</td></tr>`).join('');
     const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
       <head><meta charset="utf-8"><title>Звіт керівника</title></head>
