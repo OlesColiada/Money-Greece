@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="uk">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0047)file:///C:/Users/38097/Downloads/index_320.html -->
+<html lang="uk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Money-Greece</title>
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="file:///C:/Users/38097/Downloads/manifest.json">
 <meta name="theme-color" content="#1c5a7a">
-<link rel="icon" href="icon-192_1.png">
+<link rel="icon" href="file:///C:/Users/38097/Downloads/icon-192_1.png">
 <!-- iOS "Add to Home Screen" support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Rich Tour">
-<link rel="apple-touch-icon" href="icon-192_1.png">
+<link rel="apple-touch-icon" href="file:///C:/Users/38097/Downloads/icon-192_1.png">
 <script>
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
@@ -20,8 +20,8 @@
     });
   }
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link href="./index_files/css2" rel="stylesheet">
 <style>
   @keyframes fadeInUp{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
   @keyframes tpGroupPulse{ 0%,100%{ box-shadow:0 0 0 3px #111827; } 50%{ box-shadow:0 0 0 3px #fbbf24; } }
@@ -468,11 +468,11 @@
   .hb-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:400; padding:12px; animation: fadeIn 0.18s ease both; }
   .hb-modal-card{ background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:520px; width:100%; padding:20px; max-height:92vh; overflow-y:auto; animation: modalPop 0.2s ease both; }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+<script src="./index_files/supabase.min.js.download"></script>
+<script src="./index_files/xlsx.full.min.js.download"></script>
+<script src="./index_files/jszip.min.js.download"></script>
+<script src="./index_files/pdf-lib.min.js.download"></script>
+<script src="./index_files/fontkit.umd.min.js.download"></script>
 <style>
   .login-overlay{
     position:fixed; inset:0; background:var(--whitewash); z-index:1000;
@@ -516,7 +516,7 @@
     </div>
   </div>
 
-  </div>
+  
 
   <div class="step-block no-print manager-only" id="managerTripPickBlock" style="margin-top:14px;">
     <p class="step-title" style="margin:0 0 8px;">Заїзд</p>
@@ -656,14 +656,15 @@
         <details style="margin-top:10px;">
           <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft);">Або вставити текстом (без файлу)</summary>
           <p class="report-note" style="margin-top:8px;">По одному туристу на рядок, розділювач — табуляція (як при копіюванні з таблиці) або крапка з комою, завжди в порядку: <code>Прізвище Ім'я [Tab] Дата народження [Tab] Паспортні дані</code></p>
-          <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Петренко Іван	1990-05-12	ФГ123456&#10;Іваненко Марія	2015-08-03	"></textarea>
+          <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Петренко Іван	1990-05-12	ФГ123456
+Іваненко Марія	2015-08-03	"></textarea>
           <button class="btn btn-ghost btn-small" id="bulkAddTouristBtn" style="margin-top:6px;">Додати список</button>
         </details>
       </details>
     </div>
 
     <section class="step-block" id="touristListBlock" style="margin-top:16px;">
-      <details id="touristListDetails" class="top-accordion" open>
+      <details id="touristListDetails" class="top-accordion" open="">
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Туристи</summary>
         <div style="margin-top:10px;">
           <div style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -855,7 +856,7 @@
     </div>
     <div style="display:flex; gap:10px; margin-top:16px;">
       <button onclick="tpSaveEditTouristModal()" class="btn btn-primary" style="flex:1;">Зберегти</button>
-      <button onclick="document.getElementById('tpEditTouristModal').classList.add('app-hidden')" class="btn btn-ghost" style="flex:1;">Скасувати</button>
+      <button onclick="document.getElementById(&#39;tpEditTouristModal&#39;).classList.add(&#39;app-hidden&#39;)" class="btn btn-ghost" style="flex:1;">Скасувати</button>
     </div>
   </div>
 </div>
@@ -911,8 +912,8 @@
     <div id="hbWizardGroupCard" style="margin-bottom:12px;"></div>
 
     <div style="display:flex; gap:6px; margin-bottom:10px;">
-      <button id="hbWizardTabHotelBtn" onclick="hbWizardSwitchTab('hotel')" class="btn btn-small" style="flex:1;">🏨 Структура готелю</button>
-      <button id="hbWizardTabGroupBtn" onclick="hbWizardSwitchTab('group')" class="btn btn-small" style="flex:1;">👥 Список групи</button>
+      <button id="hbWizardTabHotelBtn" onclick="hbWizardSwitchTab(&#39;hotel&#39;)" class="btn btn-small" style="flex:1;">🏨 Структура готелю</button>
+      <button id="hbWizardTabGroupBtn" onclick="hbWizardSwitchTab(&#39;group&#39;)" class="btn btn-small" style="flex:1;">👥 Список групи</button>
     </div>
 
     <div id="hbWizardTabHotel">
@@ -8206,6 +8207,49 @@ function tripPrepGroups(){
   return groups;
 }
 
+async function importCorpFile(file, tripId, corpName, hotel){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, {defval:'', raw:true});
+  if(!rows.length){ showAppAlert('Файл порожній.'); return false; }
+  const headers = Object.keys(rows[0]);
+  const keyName = findHeaderKey(headers, ["Прізвище та ім'я","Прізвище ім'я",'ПІБ']);
+  if(!keyName){ showAppAlert('Не знайшов колонку з ПІБ (очікую заголовок типу "Прізвище та ім\'я"). Перевір файл.'); return false; }
+  const keyBirth = findHeaderKey(headers, ['Дата народження','ДН']);
+  const keyPassport = findHeaderKey(headers, ['Паспорт']);
+  const keyCity = findHeaderKey(headers, ['Місце посадки','Місто посадки','Посадка']);
+  const keyPhone = findHeaderKey(headers, ['Телефон']);
+  const keyInsurance = findHeaderKey(headers, ['Страхівка']);
+  const keyPaidSeats = findHeaderKey(headers, ['Платні місця']);
+
+  const bookingClean = corpName.replace(/^#/,'');
+  const existingMatch = tripPrepData.tourists.find(t=>(t.booking_number||'').replace(/^#/,'')===bookingClean);
+  const linkGroup = existingMatch ? existingMatch.link_group : corpName;
+  const finalHotel = existingMatch ? (existingMatch.target_hotel || hotel) : hotel;
+  const maxRow = Math.max(0, ...tripPrepData.tourists.map(t=>t.row_order||0));
+
+  const parsed = rows.map((r, idx)=>{
+    const fullName = String(r[keyName]||'').trim();
+    if(!fullName) return null;
+    const birthDate = keyBirth ? normalizeDateValue(r[keyBirth]) : null;
+    return {
+      trip_id: tripId, row_order: maxRow+1+idx, booking_number: corpName, link_group: linkGroup,
+      full_name: fullName, birth_date: birthDate, passport: keyPassport ? String(r[keyPassport]||'').trim() : '',
+      target_hotel: finalHotel, pickup_city: keyCity ? String(r[keyCity]||'').trim() : '',
+      phone: keyPhone ? String(r[keyPhone]||'').trim() : '', agency: 'Корпорат',
+      insurance: keyInsurance ? parseDecimalInput(r[keyInsurance]) : 0,
+      paid_seats: keyPaidSeats ? parseDecimalInput(r[keyPaidSeats]) : 0
+    };
+  }).filter(Boolean);
+  if(!parsed.length){ showAppAlert('У файлі не знайшлось жодного імені.'); return false; }
+
+  const { error } = await sb.from('trip_prep_tourists').insert(parsed);
+  if(error){ showAppAlert('Не вдалося додати корпорат: ' + friendlyErrorMessage(error)); return false; }
+  hbShowToast(`✅ Корпорат "${corpName}" додано: ${parsed.length} ос. (${HB_HOTEL_STRUCTURE[finalHotel].name})`);
+  return true;
+}
+
 async function importTripPrepFile(file, tripId, targetHotel){
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, {type:'array'});
@@ -8690,12 +8734,10 @@ function renderTripPrepOverview(){
           </div>
         </div>
         <div style="margin-top:8px;">
-          <label style="display:block; font-size:11px; font-weight:600;">Список людей (по одному імені на рядок)</label>
-          <textarea id="tpCorpNames" rows="5" placeholder="Іваненко Іван
-Петренко Петро
-Сидоренко Оксана" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; resize:vertical;"></textarea>
+          <label style="display:block; font-size:11px; font-weight:600;">Файл зі списком (.xlsx) — колонка з ПІБ обов'язкова, решта (дата народження/паспорт/телефон/місто) необов'язкові</label>
+          <input type="file" accept=".xlsx,.xls" id="tpCorpFileInput">
         </div>
-        <button class="btn btn-primary btn-small" id="tpAddCorpBtn" style="margin-top:8px;">+ Додати корпорат</button>
+        <div id="tpCorpImportStatus" class="report-note" style="margin-top:6px;"></div>
       </details>
     </div>
     <p class="report-note">Якщо дві чи більше заявок насправді одна компанія (у файлі позначено кольором/смугою, а не текстом у коментарі) — постав галочки навпроти них (в одній з таблиць нижче) і натисни "Об'єднати".</p>
@@ -8825,29 +8867,22 @@ function renderTripPrepOverview(){
       ? `✅ ${fullName} додано до заявки №${bookingClean} (${HB_HOTEL_STRUCTURE[hotel].name}) — автобус признач вручну у вкладці "Автобуси"`
       : `✅ ${fullName} додано до списку (${HB_HOTEL_STRUCTURE[hotel].name})`);
   });
-  document.getElementById('tpAddCorpBtn').addEventListener('click', async ()=>{
+  document.getElementById('tpCorpFileInput').addEventListener('change', async e=>{
+    const file = e.target.files[0]; if(!file) return;
     const corpName = document.getElementById('tpCorpName').value.trim();
-    if(!corpName){ showAppAlert('Впиши назву корпорату.'); return; }
+    if(!corpName){ showAppAlert('Впиши назву корпорату.'); e.target.value = ''; return; }
     const hotel = document.getElementById('tpCorpHotel').value;
-    const names = document.getElementById('tpCorpNames').value.split('\n').map(s=>s.trim()).filter(Boolean);
-    if(!names.length){ showAppAlert('Впиши хоча б одне ім\'я в список.'); return; }
-    const bookingClean = corpName.replace(/^#/,'');
-    const existingMatch = tripPrepData.tourists.find(t=>(t.booking_number||'').replace(/^#/,'')===bookingClean);
-    const linkGroup = existingMatch ? existingMatch.link_group : corpName;
-    const finalHotel = existingMatch ? (existingMatch.target_hotel || hotel) : hotel;
-    const maxRow = Math.max(0, ...tripPrepData.tourists.map(t=>t.row_order||0));
-    const rows = names.map((fullName, i)=> ({
-      trip_id: currentTripId, row_order: maxRow+1+i, booking_number: corpName, link_group: linkGroup,
-      full_name: fullName, birth_date: null, passport: '', target_hotel: finalHotel,
-      pickup_city: '', phone: '', agency: 'Корпорат', insurance: 0, paid_seats: 0
-    }));
-    const { error } = await sb.from('trip_prep_tourists').insert(rows);
-    if(error){ showAppAlert('Не вдалося додати корпорат: ' + friendlyErrorMessage(error)); return; }
-    document.getElementById('tpCorpName').value = '';
-    document.getElementById('tpCorpNames').value = '';
-    tripPrepData = await loadTripPrepData(currentTripId);
-    renderTripPrepView();
-    hbShowToast(`✅ Корпорат "${corpName}" додано: ${names.length} ос. (${HB_HOTEL_STRUCTURE[finalHotel].name})`);
+    const statusEl = document.getElementById('tpCorpImportStatus');
+    statusEl.textContent = 'Імпортую…';
+    const ok = await importCorpFile(file, currentTripId, corpName, hotel);
+    e.target.value = '';
+    if(ok){
+      document.getElementById('tpCorpName').value = '';
+      tripPrepData = await loadTripPrepData(currentTripId);
+      renderTripPrepView();
+    } else {
+      statusEl.textContent = '';
+    }
   });
   document.getElementById('tpQuickMergeBtn').addEventListener('click', async ()=>{
     const raw = document.getElementById('tpQuickMergeInput').value.trim();
@@ -13361,5 +13396,6 @@ document.addEventListener('blur', function(e){
   if(session) await afterAuthSuccess();
 })();
 </script>
-</body>
-</html>
+
+
+</body></html>
