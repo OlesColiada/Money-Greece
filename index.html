@@ -5581,16 +5581,21 @@ async function loadManagerReport(tripId){
       const labels = Array.isArray(sourceLabels) ? sourceLabels : [sourceLabels];
       const canonicalLabel = labels[0];
       const perGuideOnes = expenses.filter(e=>e.guide && labels.includes(e.sourceLabel));
-      const combinedExisting = expenses.find(e=>!e.guide && labels.includes(e.sourceLabel));
-      if(perGuideOnes.length){
-        // Merging old per-guide rows into one — pull fresh totals rather than trusting
-        // their stored amounts, which may be stale (e.g. from before an earlier label fix).
+      const taggedExisting = expenses.find(e=>!e.guide && labels.includes(e.sourceLabel));
+      // Also catch an old untagged flat default (e.g. from before sourceLabel tracking existed) —
+      // same label, no guide, no sourceLabel at all — otherwise it sits alongside a new
+      // properly-tagged entry and looks like a duplicate.
+      const legacyUntagged = expenses.filter(e=> !e.guide && !e.sourceLabel && e.label===displayLabel && e!==taggedExisting);
+      if(perGuideOnes.length || legacyUntagged.length){
+        // Merging old rows into one — pull fresh totals rather than trusting their stored
+        // amounts, which may be stale (e.g. from before an earlier label fix, or just the
+        // old flat default that was never connected to the guides' actual reports).
         const sum = await pullFn();
-        expenses = expenses.filter(e=> !(e.guide && labels.includes(e.sourceLabel)));
-        if(combinedExisting) combinedExisting.amount = sum;
+        expenses = expenses.filter(e=> !(e.guide && labels.includes(e.sourceLabel)) && !legacyUntagged.includes(e));
+        if(taggedExisting) taggedExisting.amount = sum;
         else expenses.push({ id: uid(), label: displayLabel, amount: sum, sourceLabel: canonicalLabel });
         addedAny = true;
-      } else if(!combinedExisting){
+      } else if(!taggedExisting){
         const amt = await pullFn();
         expenses.push({ id: uid(), label: displayLabel, amount: amt, sourceLabel: canonicalLabel });
         addedAny = true;
@@ -8539,7 +8544,9 @@ function renderTripPrepOverview(){
       ? distinctBookings.map(b=>`<span style="display:inline-flex; align-items:center; gap:4px; background:var(--whitewash-2); border-radius:6px; padding:2px 6px; margin:1px;">${b}<button class="no-print" data-role="tpUnmergeBooking" data-group="${gk}" data-booking="${b}" title="Роз'єднати цю заявку з групи" style="border:none; background:none; color:#b45309; cursor:pointer; font-weight:700;">✕</button></span>`).join('')
       : (distinctBookings[0] || '—');
     return `<tr>
-      <td class="no-print"><input type="checkbox" class="tp-group-cb" data-group="${gk}"></td>
+      <td class="no-print" style="position:relative;">
+        <button class="btn btn-ghost btn-small no-print" data-role="tpRowMenuBtn" data-group="${gk}" title="Дії" style="padding:3px 8px;">⋮</button>
+      </td>
       <td style="text-align:left;">${bookingHtml}</td>
       <td style="text-align:left;">${names}</td>
       <td>${members.length}</td>
@@ -8668,11 +8675,30 @@ function renderTripPrepOverview(){
         </div>
       </details>
     </div>
-    <p class="report-note">Якщо дві чи більше заявок насправді одна компанія (у файлі позначено кольором/смугою, а не текстом у коментарі) — постав галочки навпроти них (в одній з таблиць нижче) і натисни "Об'єднати".</p>
-    <div class="no-print" style="margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap;">
-      <button class="btn btn-ghost btn-small" id="tpMergeGroupsBtn">🔗 Об'єднати вибрані групи</button>
-      <button class="btn btn-ghost btn-small" id="tpMoveHotelBtn">🔄 Перенести вибрані в інший готель</button>
+
+    <div class="step-block no-print" style="margin-bottom:14px;">
+      <details>
+        <summary style="cursor:pointer; font-weight:700; font-size:15px;">🏢 Додати корпорат</summary>
+        <p class="report-note" style="margin-top:8px;">Корпорат — організація чи особа, яка привозить цілу групу окремо від агенцій у файлі. Назва корпорату працює як номер заявки — за нею група відображається й розпізнається так само, як звичайна заявка.</p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-top:8px;">
+          <div><label style="display:block; font-size:11px; font-weight:600;">Назва корпорату</label><input type="text" id="tpCorpName" placeholder="напр. ТОВ Мандри" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px; width:180px;"></div>
+          <div><label style="display:block; font-size:11px; font-weight:600;">Готель</label>
+            <select id="tpCorpHotel" style="padding:6px 8px; border:2px solid var(--line); border-radius:6px;">
+              <option value="konstantin">Hotel Konstantin 3*</option>
+              <option value="greataleksander">Great Aleksander 3*</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <label style="display:block; font-size:11px; font-weight:600;">Список людей (по одному імені на рядок)</label>
+          <textarea id="tpCorpNames" rows="5" placeholder="Іваненко Іван
+Петренко Петро
+Сидоренко Оксана" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; resize:vertical;"></textarea>
+        </div>
+        <button class="btn btn-primary btn-small" id="tpAddCorpBtn" style="margin-top:8px;">+ Додати корпорат</button>
+      </details>
     </div>
+    <p class="report-note">Якщо дві чи більше заявок насправді одна компанія (у файлі позначено кольором/смугою, а не текстом у коментарі) — постав галочки навпроти них (в одній з таблиць нижче) і натисни "Об'єднати".</p>
     <div class="step-block no-print" style="margin-bottom:14px; background:#eff6ff; border-color:#93c5fd;">
       <p class="step-title" style="margin:0 0 6px;">🔗 Швидке об'єднання (за номерами заявок)</p>
       <p class="report-note">Впиши номери заявок, які треба об'єднати в одну компанію, через кому чи пробіл — не треба шукати їх у списку нижче.</p>
@@ -8681,6 +8707,7 @@ function renderTripPrepOverview(){
         <button class="btn btn-primary btn-small" id="tpQuickMergeBtn">Об'єднати</button>
       </div>
     </div>
+    <p class="report-note no-print">Щоб перенести заявку в інший готель — натисни "⋮" навпроти неї в списку нижче.</p>
     ${buildTableHtml('🏨 Hotel Konstantin 3*', konstantinKeys)}
     ${buildTableHtml('🏨 Great Aleksander 3*', greatKeys)}
     ${otherKeys.length ? buildTableHtml('❓ Без прив\'язки до готелю (старі дані)', otherKeys) : ''}
@@ -8798,18 +8825,29 @@ function renderTripPrepOverview(){
       ? `✅ ${fullName} додано до заявки №${bookingClean} (${HB_HOTEL_STRUCTURE[hotel].name}) — автобус признач вручну у вкладці "Автобуси"`
       : `✅ ${fullName} додано до списку (${HB_HOTEL_STRUCTURE[hotel].name})`);
   });
-  document.getElementById('tpMergeGroupsBtn').addEventListener('click', async ()=>{
-    const checked = Array.from(content.querySelectorAll('.tp-group-cb:checked')).map(cb=>cb.dataset.group);
-    if(checked.length < 2){ showAppAlert('Постав галочки щонайменше на двох групах, які треба об\'єднати.'); return; }
-    const newKey = checked[0];
-    const idsToUpdate = [];
-    checked.forEach(gk=>{
-      (groups[gk]||[]).forEach(m=> idsToUpdate.push(m.id));
-    });
-    const { error } = await sb.from('trip_prep_tourists').update({ link_group: newKey }).in('id', idsToUpdate);
-    if(error){ showAppAlert('Не вдалося об\'єднати: ' + friendlyErrorMessage(error)); return; }
+  document.getElementById('tpAddCorpBtn').addEventListener('click', async ()=>{
+    const corpName = document.getElementById('tpCorpName').value.trim();
+    if(!corpName){ showAppAlert('Впиши назву корпорату.'); return; }
+    const hotel = document.getElementById('tpCorpHotel').value;
+    const names = document.getElementById('tpCorpNames').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    if(!names.length){ showAppAlert('Впиши хоча б одне ім\'я в список.'); return; }
+    const bookingClean = corpName.replace(/^#/,'');
+    const existingMatch = tripPrepData.tourists.find(t=>(t.booking_number||'').replace(/^#/,'')===bookingClean);
+    const linkGroup = existingMatch ? existingMatch.link_group : corpName;
+    const finalHotel = existingMatch ? (existingMatch.target_hotel || hotel) : hotel;
+    const maxRow = Math.max(0, ...tripPrepData.tourists.map(t=>t.row_order||0));
+    const rows = names.map((fullName, i)=> ({
+      trip_id: currentTripId, row_order: maxRow+1+i, booking_number: corpName, link_group: linkGroup,
+      full_name: fullName, birth_date: null, passport: '', target_hotel: finalHotel,
+      pickup_city: '', phone: '', agency: 'Корпорат', insurance: 0, paid_seats: 0
+    }));
+    const { error } = await sb.from('trip_prep_tourists').insert(rows);
+    if(error){ showAppAlert('Не вдалося додати корпорат: ' + friendlyErrorMessage(error)); return; }
+    document.getElementById('tpCorpName').value = '';
+    document.getElementById('tpCorpNames').value = '';
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
+    hbShowToast(`✅ Корпорат "${corpName}" додано: ${names.length} ос. (${HB_HOTEL_STRUCTURE[finalHotel].name})`);
   });
   document.getElementById('tpQuickMergeBtn').addEventListener('click', async ()=>{
     const raw = document.getElementById('tpQuickMergeInput').value.trim();
@@ -8829,28 +8867,43 @@ function renderTripPrepOverview(){
     renderTripPrepView();
     hbShowToast(`✅ Об'єднано: №${foundNumbers.join(', №')}${missing.length ? ` (не знайдено: №${missing.join(', №')})` : ''}`);
   });
-  document.getElementById('tpMoveHotelBtn').addEventListener('click', async ()=>{
-    const checked = Array.from(content.querySelectorAll('.tp-group-cb:checked')).map(cb=>cb.dataset.group);
-    if(!checked.length){ showAppAlert('Постав галочку хоча б на одній групі, яку треба перенести.'); return; }
+  async function transferGroupToOtherHotel(gk){
     const otherHotel = { konstantin:'greataleksander', greataleksander:'konstantin' };
-    const byNewHotel = {};
-    checked.forEach(gk=>{
-      const current = groups[gk][0].target_hotel;
-      const next = otherHotel[current];
-      if(!next) return; // skip groups without a clear hotel (old/unassigned data)
-      if(!byNewHotel[next]) byNewHotel[next] = [];
-      groups[gk].forEach(m=> byNewHotel[next].push(m.id));
-    });
-    if(!Object.keys(byNewHotel).length){ showAppAlert('У вибраних груп не визначено готель — перенесення неможливе.'); return; }
-    const summary = Object.keys(byNewHotel).map(h=>`${HB_HOTEL_STRUCTURE[h].name}: ${byNewHotel[h].length} осіб`).join(', ');
-    if(!(await showAppConfirm(`Перенести вибрані групи? ${summary}.\n\n⚠️ Якщо для когось із них уже є бронювання кімнати у старому готелі — його треба буде скасувати вручну у вкладці "Готель" (тут воно НЕ видаляється автоматично).`))) return;
-    for(const hotel of Object.keys(byNewHotel)){
-      const { error } = await sb.from('trip_prep_tourists').update({ target_hotel: hotel }).in('id', byNewHotel[hotel]);
-      if(error){ showAppAlert('Не вдалося перенести: ' + friendlyErrorMessage(error)); return; }
-    }
+    const current = groups[gk][0].target_hotel;
+    const next = otherHotel[current];
+    if(!next){ showAppAlert('У цієї групи не визначено готель — перенесення неможливе.'); return; }
+    const ids = groups[gk].map(m=>m.id);
+    if(!(await showAppConfirm(`Перенести цю заявку (${ids.length} ос.) в "${HB_HOTEL_STRUCTURE[next].name}"?\n\n⚠️ Якщо для когось із них уже є бронювання кімнати у старому готелі — його треба буде скасувати вручну у вкладці "Готель" (тут воно НЕ видаляється автоматично).`))) return;
+    const { error } = await sb.from('trip_prep_tourists').update({ target_hotel: next }).in('id', ids);
+    if(error){ showAppAlert('Не вдалося перенести: ' + friendlyErrorMessage(error)); return; }
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
-  });
+  }
+  content.querySelectorAll('[data-role="tpRowMenuBtn"]').forEach(el=> el.addEventListener('click', e=>{
+    e.stopPropagation();
+    const gk = el.dataset.group;
+    const existing = document.getElementById('tpRowMenuModal');
+    if(existing) existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'tpRowMenuModal';
+    modal.className = 'hb-modal-overlay';
+    modal.style.zIndex = String(nextModalZ());
+    modal.innerHTML = `<div class="hb-modal-card" style="max-width:320px;">
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+        <h2 style="flex:1; font-size:16px; font-weight:700; margin:0;">Заявка</h2>
+        <button class="btn btn-ghost btn-small no-print" id="tpRowMenuCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+      </div>
+      <button class="btn btn-ghost" id="tpRowMenuMoveBtn" style="width:100%; text-align:left;">🔄 Перенести в інший готель</button>
+    </div>`;
+    document.body.appendChild(modal);
+    const close = ()=> modal.remove();
+    modal.addEventListener('click', ev=>{ if(ev.target===modal) close(); });
+    document.getElementById('tpRowMenuCloseBtn').addEventListener('click', close);
+    document.getElementById('tpRowMenuMoveBtn').addEventListener('click', async ()=>{
+      close();
+      await transferGroupToOtherHotel(gk);
+    });
+  }));
   content.querySelectorAll('[data-role="tpUnmergeBooking"]').forEach(el=> el.addEventListener('click', async e=>{
     e.stopPropagation();
     const booking = e.target.dataset.booking;
@@ -12194,7 +12247,7 @@ async function hbConfirmBooking(){
 
   const requestTourists = (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===requestNum);
   if(requestTourists.length && requestTourists[0].target_hotel && requestTourists[0].target_hotel !== hbCurrentHotel){
-    return showAppAlert(`⛔ Заявка №${requestNum} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — зроби це через "🔄 Перенести вибрані в інший готель" у вкладці "Огляд і імпорт".`);
+    return showAppAlert(`⛔ Заявка №${requestNum} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — натисни "⋮" навпроти неї у вкладці "Огляд і імпорт" і обери "🔄 Перенести в інший готель".`);
   }
 
   const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
