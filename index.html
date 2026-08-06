@@ -8221,9 +8221,13 @@ async function importCorpFile(file, tripId, corpName, hotel){
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, {type:'array'});
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  // No header row expected — corp lists come as plain data: A=ПІБ, B=дата народження, C=паспорт.
+  // A=ПІБ, B=дата народження, C=паспорт, D=місто — header row optional, auto-detected below.
   const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:true});
   if(!rows.length){ showAppAlert('Файл порожній.'); return false; }
+  // Some corp files start with a header row (e.g. "ПІБ" in column A), some don't — detect and skip it.
+  const firstCellRaw = String(rows[0][0]||'').trim().toLowerCase();
+  const looksLikeHeader = ['піб','прізвище та ім\'я','прізвище ім\'я',"прізвище та ім'я",'full name','name','ім\'я'].includes(firstCellRaw);
+  const dataRows = looksLikeHeader ? rows.slice(1) : rows;
 
   const bookingClean = corpName.replace(/^#/,'');
   const existingMatch = tripPrepData.tourists.find(t=>(t.booking_number||'').replace(/^#/,'')===bookingClean);
@@ -8231,7 +8235,7 @@ async function importCorpFile(file, tripId, corpName, hotel){
   const finalHotel = existingMatch ? (existingMatch.target_hotel || hotel) : hotel;
   const maxRow = Math.max(0, ...tripPrepData.tourists.map(t=>t.row_order||0));
 
-  const parsed = rows.map((r, idx)=>{
+  const parsed = dataRows.map((r, idx)=>{
     const fullName = String(r[0]||'').trim();
     if(!fullName) return null;
     const birthDate = r[1] ? normalizeDateValue(r[1]) : null;
@@ -8916,6 +8920,18 @@ function renderTripPrepOverview(){
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepView();
   }
+  async function deleteWholeGroup(gk){
+    const members = groups[gk]||[];
+    if(!members.length) return;
+    const label = members[0].booking_number || gk;
+    if(!(await showAppConfirm(`Видалити ВСЮ заявку "${label}" (${members.length} ос.)? Це не можна скасувати — якщо хтось уже поселений у кімнату, поселення теж треба буде скасувати вручну у вкладці "Готель" (тут воно НЕ скасовується автоматично).`))) return;
+    const ids = members.map(m=>m.id);
+    const { error } = await sb.from('trip_prep_tourists').delete().in('id', ids);
+    if(error){ showAppAlert('Не вдалося видалити: ' + friendlyErrorMessage(error)); return; }
+    tripPrepData = await loadTripPrepData(currentTripId);
+    renderTripPrepView();
+    hbShowToast(`✅ Заявку "${label}" видалено (${members.length} ос.)`);
+  }
   content.querySelectorAll('[data-role="tpRowMenuBtn"]').forEach(el=> el.addEventListener('click', e=>{
     e.stopPropagation();
     const gk = el.dataset.group;
@@ -8931,6 +8947,7 @@ function renderTripPrepOverview(){
         <button class="btn btn-ghost btn-small no-print" id="tpRowMenuCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
       </div>
       <button class="btn btn-ghost" id="tpRowMenuMoveBtn" style="width:100%; text-align:left;">🔄 Перенести в інший готель</button>
+      <button class="btn btn-ghost" id="tpRowMenuDeleteBtn" style="width:100%; text-align:left; color:#dc2626; margin-top:6px;">🗑️ Видалити всю заявку</button>
     </div>`;
     document.body.appendChild(modal);
     const close = ()=> modal.remove();
@@ -8939,6 +8956,10 @@ function renderTripPrepOverview(){
     document.getElementById('tpRowMenuMoveBtn').addEventListener('click', async ()=>{
       close();
       await transferGroupToOtherHotel(gk);
+    });
+    document.getElementById('tpRowMenuDeleteBtn').addEventListener('click', async ()=>{
+      close();
+      await deleteWholeGroup(gk);
     });
   }));
   content.querySelectorAll('[data-role="tpUnmergeBooking"]').forEach(el=> el.addEventListener('click', async e=>{
@@ -9094,9 +9115,12 @@ async function renderTripPrepBuses(){
   const PICKUP_BLUE = ['івано-франківськ','коломия','чернівці','снятин'];
   const PICKUP_PINK = ['стрий','мукачево','ужгород'];
   const classifyPickupColor = (members)=>{
-    const cities = members.map(m=>normalizeCityName(m.pickup_city)).filter(Boolean);
+    const rawCities = members.map(m=>m.pickup_city).filter(Boolean);
+    const cities = rawCities.map(normalizeCityName);
     if(cities.some(c=>PICKUP_BLUE.includes(c))) return 'blue';
     if(cities.some(c=>PICKUP_PINK.includes(c))) return 'pink';
+    if(rawCities.some(c=>getCustomCityDirection(c)==='blue')) return 'blue';
+    if(rawCities.some(c=>getCustomCityDirection(c)==='pink')) return 'pink';
     return 'none';
   };
   const unassignedSorted = [...unassigned].sort((a,b)=>{
@@ -9124,17 +9148,24 @@ async function renderTripPrepBuses(){
       return `
       <div style="margin-top:6px; padding:6px 8px; background:#fff7ed; border:2px solid #fdba74; border-radius:8px; font-size:12px;">
         ⚠️ Місто "<b>${rawCity}</b>" не розпізнано — у: <b>${namesWithThisCity}</b>.
-        <select data-role="tpCityFix" data-raw="${rawCity}" style="margin-left:4px; padding:2px 4px; border:2px solid var(--line); border-radius:6px;">
-          <option value="">— обрати найближче —</option>
-          ${KNOWN_CANONICAL_CITIES.map(c=>`<option value="${c}">${c}</option>`).join('')}
-        </select>
-        <button class="btn btn-ghost btn-small no-print" data-role="tpApplyCityFix" data-raw="${rawCity}" style="margin-left:4px;">Виправити всюди</button>
+        <div style="margin-top:4px;">
+          <select data-role="tpCityFix" data-raw="${rawCity}" style="padding:2px 4px; border:2px solid var(--line); border-radius:6px;">
+            <option value="">— це те саме, що вже є в базі —</option>
+            ${KNOWN_CANONICAL_CITIES.map(c=>`<option value="${c}">${c}</option>`).join('')}
+          </select>
+          <button class="btn btn-ghost btn-small no-print" data-role="tpApplyCityFix" data-raw="${rawCity}" style="margin-left:4px;">Виправити всюди</button>
+        </div>
+        <div style="margin-top:6px; padding-top:6px; border-top:1px dashed #fdba74;">
+          <span class="muted">Або це нове місто — запам'ятати його напрям на майбутнє:</span><br>
+          <button class="btn btn-ghost btn-small no-print" data-role="tpRegisterCityDirection" data-raw="${rawCity}" data-direction="blue" style="margin-top:4px; background:#eff6ff; border-color:#93c5fd;">🔵 Напрям Чернівці</button>
+          <button class="btn btn-ghost btn-small no-print" data-role="tpRegisterCityDirection" data-raw="${rawCity}" data-direction="pink" style="margin-top:4px; background:#fdf2f8; border-color:#f9a8d4;">🌸 Напрям Закарпаття</button>
+        </div>
       </div>`;
     }).join('');
 
     return `<div class="fin-row" style="flex-wrap:wrap; background:${bg}; border:${border}; border-radius:8px; padding:8px; margin-bottom:6px; flex-direction:column; align-items:stretch;">
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-        <span class="fin-label" style="min-width:220px;">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} <span class="muted">(${members.length} ос.${city ? ', '+city : ''})</span></span>
+        <span class="fin-label" style="min-width:220px;"><span style="display:inline-block; background:var(--whitewash-2); border-radius:6px; padding:1px 6px; font-weight:700; margin-right:4px;">${members.length} ос.</span>${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')}${city ? ` <span class="muted">(${city})</span>` : ''}</span>
         <select data-role="tpBusSelect" data-group="${gk}">
           ${busNames.map(b=>`<option value="${b}" ${suggestion===b?'selected':''}>${b} (зараз ${busCount[b]} ос.)</option>`).join('')}
         </select>
@@ -9235,7 +9266,7 @@ async function renderTripPrepBuses(){
     const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean))].join(', ');
     const currentGuide = members[0].assigned_bus || '';
     return `<div class="fin-row" style="flex-wrap:wrap; background:#f3f4f6; border:1px dashed #9ca3af; border-radius:8px; padding:8px; margin-bottom:6px;">
-      <span class="fin-label" style="min-width:220px;">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} <span class="muted">(${members.length} ос.)</span> · 🚶 без автобуса</span>
+      <span class="fin-label" style="min-width:220px;"><span style="display:inline-block; background:var(--whitewash-2); border-radius:6px; padding:1px 6px; font-weight:700; margin-right:4px;">${members.length} ос.</span>${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} · 🚶 без автобуса</span>
       ${currentGuide
         ? `<span style="font-size:13px;">Відповідальний гід: <b>${currentGuide}</b></span>
            <button class="btn btn-danger-ghost btn-small no-print" data-role="tpUnassignSelfArrivingGuide" data-group="${gk}">Скасувати</button>`
@@ -9250,7 +9281,7 @@ async function renderTripPrepBuses(){
     const members = groupSplits[gk].busNeeding;
     const bookingNumbers = [...new Set(members.map(m=>m.booking_number).filter(Boolean))].join(', ');
     return `<div class="fin-row" style="background:#fff7ed; border:2px solid #fdba74; border-radius:8px; padding:8px; margin-bottom:6px;">
-      <span class="fin-label">${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} <span class="muted">(${members.length} ос.)</span> · ❓ місто посадки не вказано</span>
+      <span class="fin-label"><span style="display:inline-block; background:var(--whitewash-2); border-radius:6px; padding:1px 6px; font-weight:700; margin-right:4px;">${members.length} ос.</span>${bookingNumbers ? `<b>${bookingNumbers}</b> — ` : ''}${members.map(nameWithComment).join(', ')} · ❓ місто посадки не вказано</span>
     </div>`;
   }).join('') || `<p class="report-note">Немає.</p>`;
 
@@ -9408,6 +9439,13 @@ async function renderTripPrepBuses(){
     tripPrepData = await loadTripPrepData(currentTripId);
     renderTripPrepBuses();
     hbShowToast(`✅ "${rawCity}" → "${corrected}" (${idsToFix.length} чол)`);
+  }));
+  content.querySelectorAll('[data-role="tpRegisterCityDirection"]').forEach(el=> el.addEventListener('click', ()=>{
+    const rawCity = el.dataset.raw;
+    const direction = el.dataset.direction;
+    addCustomCity(rawCity, direction);
+    renderTripPrepBuses();
+    hbShowToast(`✅ "${rawCity}" запам'ятано як ${direction==='blue'?'напрям Чернівці 🔵':'напрям Закарпаття 🌸'} — наступного разу розпізнається автоматично.`);
   }));
   content.querySelectorAll('[data-role="tpUnassignBus"]').forEach(el=> el.addEventListener('click', async e=>{
     if(!(await showAppConfirm('Зняти цю групу з автобуса?'))) return;
@@ -9895,19 +9933,28 @@ const CITY_ALIASES = {
 const KNOWN_CANONICAL_CITIES = ['Львів','Івано-Франківськ','Коломия','Чернівці','Снятин','Стрий','Мукачево','Ужгород'];
 
 function getCustomCities(){
-  try{ return JSON.parse(localStorage.getItem('customPickupCities') || '[]'); } catch(e){ return []; }
+  try{
+    const raw = JSON.parse(localStorage.getItem('customPickupCities') || '[]');
+    // Backward-compat: older versions stored plain strings, no direction.
+    return raw.map(c=> typeof c==='string' ? { name:c, direction:'' } : c);
+  } catch(e){ return []; }
 }
-function addCustomCity(name){
+function addCustomCity(name, direction){
   const clean = String(name||'').trim();
   if(!clean) return;
   const list = getCustomCities();
-  if(!list.some(c=>c.toLowerCase()===clean.toLowerCase())){
-    list.push(clean);
-    localStorage.setItem('customPickupCities', JSON.stringify(list));
-  }
+  const existing = list.find(c=>c.name.toLowerCase()===clean.toLowerCase());
+  if(existing){ if(direction) existing.direction = direction; }
+  else list.push({ name: clean, direction: direction||'' });
+  localStorage.setItem('customPickupCities', JSON.stringify(list));
+}
+function getCustomCityDirection(rawCity){
+  const raw = normalizeCityName(rawCity);
+  const found = getCustomCities().find(c=>normalizeCityName(c.name)===raw);
+  return found ? found.direction : '';
 }
 function allKnownCities(){
-  return [...KNOWN_CANONICAL_CITIES, ...getCustomCities()];
+  return [...KNOWN_CANONICAL_CITIES, ...getCustomCities().map(c=>c.name)];
 }
 function isCityRecognized(rawCity){
   const raw = String(rawCity||'').trim();
