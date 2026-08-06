@@ -756,13 +756,24 @@
     <h2 style="font-size:20px; font-weight:700; margin-bottom:4px;">Бронювання: <span id="hbModalRoomNumber" style="color:var(--aegean-deep);"></span></h2>
     <p id="hbModalCapacityInfo" style="font-size:14px; font-weight:600; color:#374151; margin-bottom:16px;"></p>
     <div style="display:flex; flex-direction:column; gap:14px;">
-      <div>
-        <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">Номер заявки (4-5 цифр)</label>
+      <label style="display:flex; align-items:center; gap:8px; padding:10px; border:2px solid #93c5fd; background:#eff6ff; border-radius:10px; cursor:pointer;">
+        <input id="hbStaffCheckbox" type="checkbox" onchange="hbModalStaffToggled()" style="width:18px; height:18px;">
+        <span style="font-size:13px; font-weight:600; color:#1e40af;">🧑‍💼 Це персонал (гід/супровід), а не турист</span>
+      </label>
+      <div id="hbRequestNumWrap">
+        <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">Номер заявки (4-5 цифр) або назва корпорату</label>
         <div style="position:relative;">
           <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:16px; font-weight:600; color:var(--ink-soft); pointer-events:none;">#</span>
-          <input id="hbRequestNum" type="text" maxlength="5" oninput="hbLookupRequestInModal()" style="width:100%; padding:12px 12px 12px 26px; border:2px solid var(--line); border-radius:10px; font-size:16px; font-weight:600; box-sizing:border-box;">
+          <input id="hbRequestNum" type="text" oninput="hbLookupRequestInModal()" style="width:100%; padding:12px 12px 12px 26px; border:2px solid var(--line); border-radius:10px; font-size:16px; font-weight:600; box-sizing:border-box;">
         </div>
         <div id="hbRequestLookupInfo" style="margin-top:6px;"></div>
+      </div>
+      <div id="hbStaffNameWrap" style="display:none;">
+        <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">Хто</label>
+        <select id="hbStaffName" style="width:100%; padding:12px; border:2px solid var(--line); border-radius:10px; font-size:16px; font-weight:600; box-sizing:border-box;">
+          <option value="Гід">Гід</option>
+          <option value="Водії">Водії</option>
+        </select>
       </div>
       <div id="hbModalNamedChecklistWrap" style="display:none;">
         <div class="muted" style="font-size:11.5px; text-transform:uppercase; margin-bottom:4px;">Кого з заявки поселити в цю кімнату (можна не всіх — решту поселиш окремо потім):</div>
@@ -11821,9 +11832,10 @@ function hbLoadRoomsGrid(){
     const extraBedBadge = hasExtraBed ? `<div style="position:absolute; top:-8px; right:-8px; background:#facc15; color:#1f2937; font-size:10px; font-weight:700; padding:2px 6px; border-radius:9999px; box-shadow:0 1px 4px rgba(0,0,0,.3); z-index:10;">🛏️+1</div>` : '';
     const validReqs = shares.map(s=>s.requestNum).filter(Boolean);
     const dataReqs = validReqs.length ? `data-hbreqs="${validReqs.join(',')}"` : '';
+    const shareLabel = s=> s.isStaff ? `🧑‍💼 ${s.staffName||'персонал'}` : (s.requestNum ? '№'+s.requestNum : '⚠️ без №');
     const centerInfo = shares.length===0 ? '' : shares.length===1
-      ? `<div style="font-size:11px; margin-top:6px; font-weight:700; background:rgba(255,255,255,.3); padding:3px; border-radius:6px;">${shares[0].requestNum ? '№'+shares[0].requestNum : '⚠️ без №'}</div>`
-      : `<div style="font-size:10px; margin-top:6px; font-weight:700; background:rgba(255,255,255,.3); padding:3px; border-radius:6px; line-height:1.3;">${shares.map(s=> s.requestNum ? `№${s.requestNum} (${s.total})` : `⚠️ без № (${s.total||0})`).join('<br>')}</div>`;
+      ? `<div style="font-size:11px; margin-top:6px; font-weight:700; background:rgba(255,255,255,.3); padding:3px; border-radius:6px;">${shareLabel(shares[0])}</div>`
+      : `<div style="font-size:10px; margin-top:6px; font-weight:700; background:rgba(255,255,255,.3); padding:3px; border-radius:6px; line-height:1.3;">${shares.map(s=> `${shareLabel(s)} (${s.total||0})`).join('<br>')}</div>`;
     const occBadge = shares.length ? `<div class="hb-occupancy-badge" style="font-size:10px;">${occupancy}/${capacity}</div>` : '';
     const label = isExtra ? room.label : room.number;
     const subLabel = isExtra ? `${room.maxGuests} чол` : `${room.sea ? '🌊 ' : ''}${room.type}`;
@@ -11962,16 +11974,53 @@ function hbHandleRoomClick(roomNum){
 
 function hbLookupRequestInModal(){
   const infoEl = document.getElementById('hbRequestLookupInfo');
-  const reqNum = document.getElementById('hbRequestNum').value.trim().replace(/^#/,'');
+  const reqNumRaw = document.getElementById('hbRequestNum').value.trim().replace(/^#/,'');
   const checklistWrap = document.getElementById('hbModalNamedChecklistWrap');
   const plainWrap = document.getElementById('hbModalPlainCountsWrap');
-  if(!reqNum || reqNum.length<4){
+  if(!reqNumRaw){
     infoEl.innerHTML = '';
     checklistWrap.style.display = 'none';
     plainWrap.style.display = 'grid';
     return;
   }
   const tourists = tripPrepData.tourists || [];
+  const isNumeric = /^\d+$/.test(reqNumRaw);
+  let reqNum = reqNumRaw;
+
+  // Not a plain numeric booking (or too short to be one) — try matching a corp name instead.
+  if(!isNumeric || reqNumRaw.length < 4){
+    const corpNames = [...new Set(tourists.filter(t=>t.agency==='Корпорат').map(t=>t.booking_number).filter(Boolean))];
+    const exactCorp = corpNames.find(n=> n.toLowerCase()===reqNumRaw.toLowerCase());
+    if(exactCorp){
+      reqNum = exactCorp;
+    } else if(reqNumRaw.length>=2){
+      const suggestions = corpNames.filter(n=> n.toLowerCase().startsWith(reqNumRaw.toLowerCase()));
+      if(suggestions.length===1){
+        reqNum = suggestions[0];
+      } else if(suggestions.length>1){
+        infoEl.innerHTML = `<div style="font-size:12px; color:var(--ink-soft); margin-bottom:4px;">Схожі корпорати:</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">${suggestions.map(n=>`<button type="button" class="btn btn-ghost btn-small" data-role="hbCorpSuggest" data-name="${n}" style="font-size:12px;">${n}</button>`).join('')}</div>`;
+        infoEl.querySelectorAll('[data-role="hbCorpSuggest"]').forEach(btn=> btn.addEventListener('click', ()=>{
+          document.getElementById('hbRequestNum').value = btn.dataset.name;
+          hbLookupRequestInModal();
+        }));
+        checklistWrap.style.display = 'none';
+        plainWrap.style.display = 'grid';
+        return;
+      } else if(!isNumeric){
+        infoEl.innerHTML = `<div style="font-size:12px; color:#9ca3af;">Немає корпорату з такою назвою в цьому заїзді.</div>`;
+        checklistWrap.style.display = 'none';
+        plainWrap.style.display = 'grid';
+        return;
+      }
+    }
+  }
+  if(isNumeric && reqNumRaw.length<4 && reqNum===reqNumRaw){
+    infoEl.innerHTML = '';
+    checklistWrap.style.display = 'none';
+    plainWrap.style.display = 'grid';
+    return;
+  }
   const matched = tourists.filter(t=>(t.booking_number||'').replace(/^#/,'')===reqNum);
   if(!matched.length){
     infoEl.innerHTML = `<div style="font-size:12px; color:#9ca3af;">Немає в базовому списку (або він ще не завантажений для цього готелю).</div>`;
@@ -12052,6 +12101,16 @@ function hbModalResetRemaining(reqNum){
   hbLookupRequestInModal();
 }
 
+function hbModalStaffToggled(){
+  const isStaff = document.getElementById('hbStaffCheckbox').checked;
+  document.getElementById('hbRequestNumWrap').style.display = isStaff ? 'none' : 'block';
+  document.getElementById('hbStaffNameWrap').style.display = isStaff ? 'block' : 'none';
+  document.getElementById('hbModalNamedChecklistWrap').style.display = 'none';
+  document.getElementById('hbModalPlainCountsWrap').style.display = 'grid';
+  document.getElementById('hbSeekingWrap').style.display = isStaff ? 'none' : 'flex';
+  if(isStaff) document.getElementById('hbRequestNum').value = '';
+  else document.getElementById('hbStaffName').value = '';
+}
 function hbModalExtraBedToggled(){
   const extraBedChecked = document.getElementById('hbExtraBedCheckbox').checked;
   const boxes = Array.from(document.querySelectorAll('.hb-modal-member-cb'));
@@ -12101,6 +12160,10 @@ function hbOpenBookingModal(roomNum, mode){
     : `Місткість номера: ${capacity} осіб`;
   document.getElementById('hbRequestNum').value = '';
   document.getElementById('hbRequestLookupInfo').innerHTML = '';
+  document.getElementById('hbStaffCheckbox').checked = false;
+  document.getElementById('hbStaffName').value = '';
+  document.getElementById('hbRequestNumWrap').style.display = 'block';
+  document.getElementById('hbStaffNameWrap').style.display = 'none';
   document.getElementById('hbModalNamedChecklistWrap').style.display = 'none';
   document.getElementById('hbModalPlainCountsWrap').style.display = 'grid';
   document.getElementById('hbAdults').value = mode==='add' ? 1 : 2;
@@ -12259,21 +12322,29 @@ async function hbSuggestMoveSiblingNear(req, targetRoomNum){
 }
 
 async function hbConfirmBooking(){
-  const requestNum = document.getElementById('hbRequestNum').value.trim().replace(/^#/,'');
+  const isStaff = document.getElementById('hbStaffCheckbox').checked;
   const adults = parseInt(document.getElementById('hbAdults').value) || 0;
   const kids612 = parseInt(document.getElementById('hbKids612').value) || 0;
   const kidsUnder6 = parseInt(document.getElementById('hbKidsUnder6').value) || 0;
   const extraBed = document.getElementById('hbExtraBedCheckbox').checked;
-  const seeking = document.getElementById('hbSeekingCheckbox').checked;
+  const seeking = !isStaff && document.getElementById('hbSeekingCheckbox').checked;
   const notes = document.getElementById('hbShareNotes').value.trim();
   const total = adults + kids612 + kidsUnder6;
   const roomNum = hbModalRoomNum;
 
-  if(!requestNum || requestNum.length<4) return showAppAlert("Введіть номер заявки (4-5 цифр)");
+  let requestNum, staffName = '';
+  if(isStaff){
+    staffName = document.getElementById('hbStaffName').value.trim();
+    if(!staffName) return showAppAlert("Введіть ім'я співробітника.");
+    requestNum = 'STAFF:' + staffName;
+  } else {
+    requestNum = document.getElementById('hbRequestNum').value.trim().replace(/^#/,'');
+    if(!requestNum || requestNum.length<4) return showAppAlert("Введіть номер заявки (4-5 цифр)");
 
-  const requestTourists = (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===requestNum);
-  if(requestTourists.length && requestTourists[0].target_hotel && requestTourists[0].target_hotel !== hbCurrentHotel){
-    return showAppAlert(`⛔ Заявка №${requestNum} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — натисни "⋮" навпроти неї у вкладці "Огляд і імпорт" і обери "🔄 Перенести в інший готель".`);
+    const requestTourists = (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===requestNum);
+    if(requestTourists.length && requestTourists[0].target_hotel && requestTourists[0].target_hotel !== hbCurrentHotel){
+      return showAppAlert(`⛔ Заявка №${requestNum} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — натисни "⋮" навпроти неї у вкладці "Огляд і імпорт" і обери "🔄 Перенести в інший готель".`);
+    }
   }
 
   const entry = hbGetRoomEntry(hbCurrentHotel, hbCurrentPeriod, roomNum);
@@ -12291,7 +12362,7 @@ async function hbConfirmBooking(){
     const checkedIdxForNames = Array.from(document.querySelectorAll('.hb-modal-member-cb:checked')).map(cb=>parseInt(cb.dataset.idx));
     shareMemberNames = checkedIdxForNames.map(i=>pool[i]).filter(Boolean).map(m=>m.full_name);
   }
-  const share = { requestNum, adults, kids612, kidsUnder6, total, extraBed: extraBed||alreadyHasExtraBed, seeking: seeking && (occupancy+total<effectiveCapacity), notes, memberNames: shareMemberNames };
+  const share = { requestNum, adults, kids612, kidsUnder6, total, extraBed: extraBed||alreadyHasExtraBed, seeking: seeking && (occupancy+total<effectiveCapacity), notes, memberNames: shareMemberNames, isStaff, staffName };
 
   const saved = await hbSaveShare(hbCurrentHotel, hbCurrentPeriod, roomNum, share);
   if(!saved) return;
