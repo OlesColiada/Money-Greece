@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<!-- saved from url=(0047)file:///C:/Users/38097/Downloads/index_341.html -->
-<html lang="uk"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Money-Greece</title>
-<link rel="manifest" href="file:///C:/Users/38097/Downloads/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1c5a7a">
-<link rel="icon" href="file:///C:/Users/38097/Downloads/icon-192_1.png">
+<link rel="icon" href="icon-192_1.png">
 <!-- iOS "Add to Home Screen" support -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Rich Tour">
-<link rel="apple-touch-icon" href="file:///C:/Users/38097/Downloads/icon-192_1.png">
+<link rel="apple-touch-icon" href="icon-192_1.png">
 <script>
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
@@ -20,8 +20,8 @@
     });
   }
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com/">
-<link href="./index_files/css2" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
   @keyframes fadeInUp{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
   @keyframes tpGroupPulse{ 0%,100%{ box-shadow:0 0 0 3px #111827; } 50%{ box-shadow:0 0 0 3px #fbbf24; } }
@@ -471,11 +471,11 @@
   .hb-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:400; padding:12px; animation: fadeIn 0.18s ease both; }
   .hb-modal-card{ background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:520px; width:100%; padding:20px; max-height:92vh; overflow-y:auto; animation: modalPop 0.2s ease both; }
 </style>
-<script src="./index_files/supabase.min.js.download"></script>
-<script src="./index_files/xlsx.full.min.js.download"></script>
-<script src="./index_files/jszip.min.js.download"></script>
-<script src="./index_files/pdf-lib.min.js.download"></script>
-<script src="./index_files/fontkit.umd.min.js.download"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
 <style>
   .login-overlay{
     position:fixed; inset:0; background:var(--whitewash); z-index:1000;
@@ -520,7 +520,7 @@
     </div>
   </div>
 
-  
+  </div>
 
   <div class="step-block no-print manager-only" id="managerTripPickBlock" style="margin-top:14px;">
     <p class="step-title" style="margin:0 0 8px;">Заїзд</p>
@@ -661,15 +661,14 @@
         <details style="margin-top:10px;">
           <summary style="cursor:pointer; font-size:12.5px; color:var(--ink-soft);">Або вставити текстом (без файлу)</summary>
           <p class="report-note" style="margin-top:8px;">По одному туристу на рядок, розділювач — табуляція (як при копіюванні з таблиці) або крапка з комою, завжди в порядку: <code>Прізвище Ім'я [Tab] Дата народження [Tab] Паспортні дані</code></p>
-          <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Петренко Іван	1990-05-12	ФГ123456
-Іваненко Марія	2015-08-03	"></textarea>
+          <textarea id="bulkTouristInput" rows="6" style="width:100%; font-family:inherit; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px;" placeholder="Петренко Іван	1990-05-12	ФГ123456&#10;Іваненко Марія	2015-08-03	"></textarea>
           <button class="btn btn-ghost btn-small" id="bulkAddTouristBtn" style="margin-top:6px;">Додати список</button>
         </details>
       </details>
     </div>
 
     <section class="step-block" id="touristListBlock" style="margin-top:16px;">
-      <details id="touristListDetails" class="top-accordion" open="">
+      <details id="touristListDetails" class="top-accordion" open>
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Туристи</summary>
         <div style="margin-top:10px;">
           <div style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -881,7 +880,7 @@
     </div>
     <div style="display:flex; gap:10px; margin-top:16px;">
       <button onclick="tpSaveEditTouristModal()" class="btn btn-primary" style="flex:1;">Зберегти</button>
-      <button onclick="document.getElementById(&#39;tpEditTouristModal&#39;).classList.add(&#39;app-hidden&#39;)" class="btn btn-ghost" style="flex:1;">Скасувати</button>
+      <button onclick="document.getElementById('tpEditTouristModal').classList.add('app-hidden')" class="btn btn-ghost" style="flex:1;">Скасувати</button>
     </div>
   </div>
 </div>
@@ -937,8 +936,8 @@
     <div id="hbWizardGroupCard" style="margin-bottom:12px;"></div>
 
     <div style="display:flex; gap:6px; margin-bottom:10px;">
-      <button id="hbWizardTabHotelBtn" onclick="hbWizardSwitchTab(&#39;hotel&#39;)" class="btn btn-small" style="flex:1;">🏨 Структура готелю</button>
-      <button id="hbWizardTabGroupBtn" onclick="hbWizardSwitchTab(&#39;group&#39;)" class="btn btn-small" style="flex:1;">👥 Список групи</button>
+      <button id="hbWizardTabHotelBtn" onclick="hbWizardSwitchTab('hotel')" class="btn btn-small" style="flex:1;">🏨 Структура готелю</button>
+      <button id="hbWizardTabGroupBtn" onclick="hbWizardSwitchTab('group')" class="btn btn-small" style="flex:1;">👥 Список групи</button>
     </div>
 
     <div id="hbWizardTabHotel">
@@ -13717,5 +13716,5 @@ document.addEventListener('blur', function(e){
   if(session) await afterAuthSuccess();
 })();
 </script>
-
-</body></html>
+</body>
+</html>
