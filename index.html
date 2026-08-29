@@ -203,13 +203,13 @@
     font-family:'Inter',sans-serif; font-size:15px; border:1px solid var(--line);
     background:#fff; border-radius:8px; padding:8px 10px; color:var(--ink);
   }
-  select:focus, input:focus{outline:2px solid var(--aegean); outline-offset:1px;}
-  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:14.5px; border:none; border-radius:8px; padding:9px 14px; cursor:pointer; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;}
+  select:focus, input:focus{outline:1.5px solid var(--aegean); outline-offset:1px;}
+  .btn{font-family:'Inter',sans-serif; font-weight:600; font-size:14.5px; border:none; border-radius:12px; padding:9px 14px; cursor:pointer; transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;}
   .btn:active{transform:translateY(1px) scale(0.97);}
   .btn:hover{box-shadow:0 3px 10px rgba(0,0,0,.08);}
   .btn-primary{background:var(--aegean); color:#fff;} .btn-primary:hover{background:var(--aegean-deep);}
-  .btn-ghost{background:transparent; color:var(--aegean); border:1px solid var(--aegean);} .btn-ghost:hover{background:rgba(28,90,122,.06);}
-  .btn-danger-ghost{background:transparent; color:var(--bad); border:1px solid #e3b8b8; font-size:12px; padding:6px 10px;}
+  .btn-ghost{background:#f3f4f6; color:#1f2937; border:none;} .btn-ghost:hover{background:#e5e7eb;}
+  .btn-danger-ghost{background:#fdf2f2; color:var(--bad); border:none; font-size:12px; padding:6px 10px;}
   .btn-small{padding:6px 11px; font-size:13.5px;}
 
   .step-block{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; box-shadow:var(--shadow); animation: fadeInUp 0.28s ease both;}
@@ -469,8 +469,25 @@
     z-index: 20;
     box-shadow: 0 0 0 4px #a855f7, 0 10px 24px rgba(0,0,0,.35) !important;
   }
-  .hb-modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index:400; padding:12px; animation: fadeIn 0.18s ease both; }
-  .hb-modal-card{ background:#fff; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:520px; width:100%; padding:20px; max-height:92vh; overflow-y:auto; animation: modalPop 0.2s ease both; }
+  .hb-modal-overlay{ position:fixed; inset:0; background:rgba(20,20,20,.45); display:flex; align-items:center; justify-content:center; z-index:400; padding:12px; animation: fadeIn 0.18s ease both; }
+  .hb-modal-card{ background:#fff; border-radius:24px; box-shadow:0 20px 60px rgba(0,0,0,.25); max-width:520px; width:100%; padding:24px; max-height:92vh; overflow-y:auto; font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',system-ui,sans-serif; animation: modalPop 0.2s ease both; }
+  /* Загальний стиль для контенту модальних вікон — використовувати в БУДЬ-ЯКОМУ новому вікні замість власних inline-стилів */
+  .hb-modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .hb-modal-title{ font-size:18px; font-weight:600; margin:0; display:flex; align-items:center; gap:6px; color:#1f2937; }
+  .hb-modal-title .hb-modal-title-icon{ font-size:15px; color:#6b7280; }
+  .hb-modal-subtitle{ margin:0 0 24px; font-size:14px; color:#9ca3af; }
+  .hb-close-btn{ width:44px; height:44px; flex-shrink:0; border:none; border-radius:12px; background:#f3f4f6; color:#4b5563; font-size:18px; line-height:1; cursor:pointer; }
+  /* Компактний чіп для короткого списку (2–4 пункти) — гіди/партнери/варіанти вибору. НЕ на всю ширину. */
+  .hb-chip-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .hb-chip{ display:inline-flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; background:#fff; border:1px solid #eef0eb; border-radius:14px; padding:8px 16px; min-height:44px; min-width:80px; }
+  .hb-chip-name{ font-size:16px; font-weight:600; color:#1f2937; }
+  .hb-chip-sub{ font-size:11px; color:#6b7280; }
+  /* Повноширинний рядок для довшого списку (5+ пунктів) з ознакою клікабельності праворуч */
+  .hb-list-row{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; cursor:pointer; background:#fff; border:1px solid #eef0eb; border-radius:14px; padding:10px 14px; min-height:48px; }
+  .hb-list-row .chevron{ color:#c1c5bd; font-size:18px; }
+  /* Компактна кнопка-піктограма пікера зі значенням і шевроном справа (наприклад "Екскурсія"/"Відповідальний гід") */
+  .hb-picker-btn{ display:flex; align-items:center; justify-content:space-between; gap:16px; min-width:200px; min-height:48px; padding:13px 20px; margin:0 auto 16px; background:#f3f4f6; border:none; border-radius:14px; font-size:16px; color:#1f2937; text-align:left; }
+  .hb-picker-btn .chevron{ color:#9ca3af; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -503,7 +520,7 @@
   <div class="login-card">
     <img src="data:image/jpeg;base64,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" alt="Rich Tour">
     <h2>Money-Greece</h2>
-    <p style="text-align:center; font-size:11px; color:#9aa; margin:-8px 0 10px;">білд: 2026-08-10-s</p>
+    <p style="text-align:center; font-size:11px; color:#9aa; margin:-8px 0 10px;">білд: 2026-08-12-i</p>
     <input type="text" id="loginInput" placeholder="Логін" autocomplete="username">
     <input type="password" id="passwordInput" placeholder="Пароль" autocomplete="current-password">
     <button class="btn btn-primary" id="loginSubmitBtn">Увійти</button>
@@ -593,7 +610,7 @@
 
   <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:16px; border-top:1px solid var(--line); padding-top:14px;">
     <button class="btn btn-ghost btn-small" id="excursionsSaveBtn">💾 Зберегти</button>
-    <button class="btn btn-ghost btn-small" id="excursionsDownloadBtn">⬇ Завантажити збережений</button>
+    <button class="btn btn-ghost btn-small" id="excursionsDownloadBtn">⬇ Завантажити</button>
   </div>
 
   <section class="step-block manager-only" id="tripReportSection" style="margin-top:34px;">
@@ -659,12 +676,12 @@
         <summary style="cursor:pointer; font-weight:700; font-size:15px;">Туристи</summary>
         <div style="margin-top:10px;">
           <div style="display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px;">
-            <button class="btn btn-danger-ghost no-print manager-only" id="clearTouristListBtn" style="display:none;">Видалити весь список</button>
+            <button class="btn btn-danger-ghost no-print manager-only" id="clearTouristListBtn" style="display:none;">Видалити список</button>
           </div>
           <div id="touristListWrap"></div>
           <div class="no-print" style="margin-top:14px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--line); padding-top:14px;">
             <button class="btn btn-ghost btn-small" id="touristListSaveBtn">💾 Зберегти</button>
-            <button class="btn btn-ghost btn-small" id="touristListDownloadBtn">⬇ Завантажити збережений</button>
+            <button class="btn btn-ghost btn-small" id="touristListDownloadBtn">⬇ Завантажити</button>
           </div>
         </div>
       </details>
@@ -716,10 +733,10 @@
   <div id="previewSection" style="display:none;">
     <div class="step-block">
       <div style="display:flex; flex-direction:column; align-items:flex-start; gap:10px; margin-top:4px;">
-        <button class="btn btn-primary" id="touristStatsOpenBtn">📊 Статистика по екскурсіях</button>
+        <button class="btn btn-primary" id="touristStatsOpenBtn">📊 Статистика</button>
         <button class="btn btn-primary" id="previewOpenListBtn">📋 Екскурсійка</button>
         <button class="btn btn-primary" id="previewOpenProfitBtn">💰 Калькулятор екскурсій</button>
-        <button class="btn btn-primary" id="excListsOpenBtn">📄 Списки на екскурсії</button>
+        <button class="btn btn-primary" id="excListsOpenBtn">📄 Списки</button>
       </div>
     </div>
   </div>
@@ -814,7 +831,7 @@
     <p id="hbRaCapacityLine" style="font-size:13px; color:#6b7280; margin-bottom:14px;"></p>
     <div id="hbRaSharesList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:14px;"></div>
     <div id="hbRaAddSharerWrap" style="margin-bottom:10px;"></div>
-    <button onclick="hbCloseRoomActionsModal()" class="btn btn-ghost" style="width:100%;">Закрити</button>
+    <div style="text-align:center;"><button onclick="hbCloseRoomActionsModal()" class="btn btn-ghost">Закрити</button></div>
   </div>
 </div>
 
@@ -912,7 +929,7 @@
     <button onclick="hbComputePlanSuggestions()" class="btn btn-primary" style="width:100%; margin-bottom:14px;">🔍 Порахувати варіант</button>
     <p style="font-size:11px; color:#9ca3af; margin-bottom:10px;">⚠️ Підказчик враховує лише загальну кількість людей у заявці.</p>
     <div id="hbPlannerResults" style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;"></div>
-    <button onclick="hbClosePlannerModal()" class="btn btn-ghost" style="width:100%;">Закрити</button>
+    <div style="text-align:center;"><button onclick="hbClosePlannerModal()" class="btn btn-ghost">Закрити</button></div>
   </div>
 </div>
 
@@ -947,7 +964,7 @@
     </div>
 
     <div style="display:flex; gap:10px; margin-top:16px;">
-      <button onclick="hbWizardSkip()" class="btn btn-ghost" style="flex:1;">⏭ Пропустити (розселю пізніше)</button>
+      <button onclick="hbWizardSkip()" class="btn btn-ghost" style="flex:1;">⏭ Пізніше</button>
       <button onclick="hbCloseWizard()" class="btn btn-ghost" style="flex:1;">✕ Закрити</button>
     </div>
   </div>
@@ -955,7 +972,7 @@
 
 <footer class="savebar no-print app-hidden" id="appFooter">
   <span class="save-status" id="saveStatus">—</span>
-  <button class="btn btn-ghost btn-small manager-only" id="printBtn">🖨 Друк зведеного звіту</button>
+  <button class="btn btn-ghost btn-small manager-only" id="printBtn">🖨 Друк звіту</button>
   <button class="logout-link manager-only" id="tabGuideBtn" title="Переглянути застосунок як гід (тестовий перегляд)">Перегляд як гід</button>
   <button class="logout-link app-hidden" id="tabManagerBtn">Керівник напрямку</button>
   <button class="logout-link" id="changePasswordBtn">Змінити пароль</button>
@@ -1130,6 +1147,9 @@ function friendlyErrorMessage(error){
   if(!navigator.onLine || (error && /fetch|network|failed to fetch/i.test(error.message||''))){
     return "Немає інтернету — зміни НЕ збережено. Спробуй ще раз, коли з'явиться зв'язок.";
   }
+  if(error && /foreign key constraint/i.test(error.message||'')){
+    return "Дані на екрані застаріли (ця екскурсія чи рядок уже не існують у базі так, як показано). Онови сторінку (перезавантаж) і спробуй виправити ще раз.";
+  }
   return (error && error.message) || 'Невідома помилка.';
 }
 function renderOfflineBanner(){
@@ -1272,14 +1292,42 @@ window.addEventListener('online', ()=>{
 setInterval(rtProcessOutbox, 30000);
 
 /* ---------- Live sync for Прибутковість (Supabase Realtime) ----------
-   Falls back gracefully to the existing 30-sec poll if the realtime
-   connection ever drops — this is additive, not a replacement. */
+   Refreshes only on actual data changes (no blind polling). Also tracks
+   Presence on the same channel so guides can see who else is currently
+   working in this trip's Калькулятор екскурсій, like Google Sheets. */
 let profitRealtimeChannel = null;
 let profitRealtimeTripId = null;
 let profitRealtimeDebounceTimer = null;
+function renderProfitPresenceBanner(){
+  const existing = document.getElementById('profitPresenceBanner');
+  if(currentSection !== 'profit' || !profitRealtimeChannel){
+    if(existing) existing.remove();
+    return;
+  }
+  const state = profitRealtimeChannel.presenceState();
+  const others = new Set();
+  Object.values(state).forEach(metas=> metas.forEach(m=>{
+    if(m.guide_name && m.guide_name !== currentProfile.guide_name) others.add(m.guide_name);
+  }));
+  if(!others.size){ if(existing) existing.remove(); return; }
+  const wrap = document.getElementById('excursionsWrap');
+  if(!wrap) return;
+  let banner = existing;
+  if(!banner){
+    banner = document.createElement('div');
+    banner.id = 'profitPresenceBanner';
+    banner.className = 'no-print';
+    banner.style.cssText = 'background:#fff7ed; border:1px solid #fdba74; border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:12.5px; color:#9a5b1a;';
+    wrap.parentElement.insertBefore(banner, wrap);
+  }
+  const names = [...others].map(n=> guideDisplayLabel(currentTripId, n)).join(', ');
+  banner.textContent = `👀 Зараз тут працює: ${names}`;
+}
 function teardownProfitRealtimeSubscription(){
   if(profitRealtimeChannel){ sb.removeChannel(profitRealtimeChannel); profitRealtimeChannel = null; }
   profitRealtimeTripId = null;
+  const banner = document.getElementById('profitPresenceBanner');
+  if(banner) banner.remove();
 }
 function setupProfitRealtimeSubscription(tripId){
   teardownProfitRealtimeSubscription();
@@ -1309,7 +1357,12 @@ function setupProfitRealtimeSubscription(tripId){
     .on('postgres_changes', { event:'*', schema:'public', table:'excursions', filter:'trip_id=eq.'+tripId }, handleChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'excursion_rows', filter:'trip_id=eq.'+tripId }, handleChange)
     .on('postgres_changes', { event:'*', schema:'public', table:'trip_guides', filter:'trip_id=eq.'+tripId }, handleChange)
-    .subscribe();
+    .on('presence', { event:'sync' }, renderProfitPresenceBanner)
+    .subscribe(async (status)=>{
+      if(status==='SUBSCRIBED' && currentProfile && currentProfile.role==='guide' && currentProfile.guide_name){
+        await profitRealtimeChannel.track({ guide_name: currentProfile.guide_name });
+      }
+    });
 }
 updateOutboxBadge();
 
@@ -1376,14 +1429,14 @@ async function fetchTrips(){
 
 function rowFromDb(r){
   return { id:r.id, personType:r.person_type, person:r.person, customPartnerName:r.custom_partner_name||"", chol:r.chol, zibrano:r.zibrano, quitky:r.quitky, isTest: !!r.is_test,
-    received: !!r.received, receivedBy: r.received_by||"", receivedAt: r.received_at||null };
+    received: !!r.received, receivedBy: r.received_by||"", receivedAt: r.received_at||null, assignedTouristIds: r.assigned_tourist_ids||null };
 }
 function excFromDb(e, rows){
   return {
     id:e.id, name:e.name, customName:e.custom_name||"",
     busOwner:e.bus_owner, busRate:e.bus_rate, km:e.km,
     guideFeeDefault:e.guide_fee_default, guideFee:e.guide_fee, guideFeeReason:e.guide_fee_reason||"",
-    recipientGuide:e.recipient_guide||"", payerGuide:e.payer_guide||"",
+    recipientGuide:e.recipient_guide||"", payerGuide:e.payer_guide||"", responsibleGuide:e.responsible_guide||"",
     recipientPaid: !!e.recipient_paid, payerPaid: !!e.payer_paid,
     recipientPaidAt: e.recipient_paid_at||null, payerPaidAt: e.payer_paid_at||null,
     fromPartnerOverride: (e.from_partner_override===undefined || e.from_partner_override===null) ? '' : e.from_partner_override,
@@ -1723,6 +1776,39 @@ function personSelectHTML(row, tripGuides, takenGuides){
   html += `</optgroup>`;
   return html;
 }
+function openPersonPickerModal(tripGuides, takenGuides, onPick){
+  const existing = document.getElementById('personPickerModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'personPickerModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  const guideOptions = tripGuides.filter(g => !(takenGuides||[]).includes(g));
+  const guidesHtml = guideOptions.map(g=>
+    `<button class="btn btn-ghost btn-small" data-role="ppOption" data-type="guide" data-name="${g}" style="width:100%; text-align:left;">${g}</button>`
+  ).join('') || `<p class="report-note" style="margin:4px 0;">Усі гіди вже призначені.</p>`;
+  const partnersHtml = PARTNERS_FIXED.map(p=>
+    `<button class="btn btn-ghost btn-small" data-role="ppOption" data-type="partner" data-name="${p}" style="width:100%; text-align:left;">${p}</button>`
+  ).join('') + `<button class="btn btn-ghost btn-small" data-role="ppOption" data-type="partner" data-name="${CUSTOM_PARTNER_VALUE}" style="width:100%; text-align:left;">+ Новий партнер...</button>`;
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:360px; max-height:80vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h2 style="font-size:18px; font-weight:700; margin:0;">Гід чи партнер?</h2>
+      <button class="btn btn-ghost btn-small" id="ppCloseBtn">✕</button>
+    </div>
+    <p class="muted" style="font-size:12px; font-weight:600; margin:0 0 6px;">Гіди заїзду</p>
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">${guidesHtml}</div>
+    <p class="muted" style="font-size:12px; font-weight:600; margin:0 0 6px;">Постійні партнери</p>
+    <div style="display:flex; flex-direction:column; gap:6px;">${partnersHtml}</div>
+  </div>`;
+  document.body.appendChild(modal);
+  function close(){ modal.remove(); }
+  modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
+  document.getElementById('ppCloseBtn').addEventListener('click', close);
+  modal.querySelectorAll('[data-role="ppOption"]').forEach(btn=> btn.addEventListener('click', ()=>{
+    onPick(btn.dataset.type, btn.dataset.name);
+    close();
+  }));
+}
 function personColor(row){
   if(row.personType==='guide') return guideColor(row.person);
   return "#8c8f7a";
@@ -1757,6 +1843,7 @@ function renderExcursionPicker(){
       renderAll();
       upsertExcursion(currentTripId, exc);
       exc.rows.forEach(r=> upsertRow(currentTripId, exc.id, r));
+      openExcCreateModal(exc.id, ()=> renderAll());
     });
     picker.appendChild(chip);
   });
@@ -1827,7 +1914,7 @@ function renderExcursions(){
     card.className = 'row-card';
     card.innerHTML = `
       <div class="row-card-summary" data-role="openExcModal" data-exc-id="${exc.id}">
-        <span class="exc-title-text">${displayName}</span>
+        <span class="exc-title-text">${numberedExcursionLabel(tripData, exc)}</span>
         <span class="row-summary-mid muted">${calc.totalPeople} чол</span>
         <span class="row-summary-result ${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span>
       </div>
@@ -1883,6 +1970,535 @@ function renderExcursionRowsInto(tbody, exc, calc, onChange){
 // (bus/guide info, participants, summary) now opens here, one level "inside" the
 // excursion's name. Nested modals (bus/guide, participant) stack on top and, when they
 // close, call back into this modal's own draw() so it reflects whatever changed.
+function openExcCreateModal(excId, onDone){
+  const existing = document.getElementById('excCreateModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'excCreateModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  function closeModal(){ modal.remove(); }
+  function draw(){
+    const tripData = getTripData(currentTripId);
+    const exc = tripData.excursions.find(e=>e.id===excId);
+    if(!exc){ closeModal(); return; }
+    const displayName = exc.name==="Інше..." ? (exc.customName || "Інше") : exc.name;
+    const content = stableModalContent(modal, "max-width:360px;");
+    content.innerHTML = `
+      <div class="hb-modal-head" style="margin-bottom:24px;">
+        <button id="ecmFullListBtn" class="hb-close-btn" title="Загальний список туристів на екскурсію">${icon('clipboard')}</button>
+        <h2 class="hb-modal-title" style="font-size:20px;">Екскурсія</h2>
+        <button id="ecmCloseBtn" class="hb-close-btn">✕</button>
+      </div>
+      <button id="ecmName" class="hb-picker-btn"><span>${displayName ? numberedExcursionLabel(tripData, exc) : 'Екскурсія'}</span><span class="chevron">⌄</span></button>
+      <button id="ecmGuide" class="hb-picker-btn" style="margin-bottom:24px;"><span>${exc.responsibleGuide ? guideDisplayLabel(currentTripId, exc.responsibleGuide) : 'Відповідальний гід'}</span><span class="chevron">⌄</span></button>
+      <button id="ecmDoneBtn" style="width:100%; min-height:54px; border:none; border-radius:16px; background:var(--aegean); color:#fff; font-size:17px; font-weight:600;">Готово</button>
+    `;
+  }
+  modal.addEventListener('click', e=>{
+    if(e.target===modal){ closeModal(); return; }
+    if(e.target.closest('#ecmCloseBtn')){ closeModal(); return; }
+    if(e.target.closest('#ecmFullListBtn')){
+      const tripData = getTripData(currentTripId);
+      const exc = tripData.excursions.find(x=>x.id===excId);
+      if(exc) openFullExcursionListModal(exc, tripData);
+      return;
+    }
+    if(e.target.closest('#ecmName')){ openExcNameModal(excId, draw); return; }
+    if(e.target.closest('#ecmGuide')){ openResponsibleGuideModal(excId, draw); return; }
+    if(e.target.closest('#ecmDoneBtn')){ closeModal(); if(onDone) onDone(); return; }
+  });
+  document.body.appendChild(modal);
+  draw();
+}
+async function openFullExcursionListModal(exc, tripData){
+  const existing = document.getElementById('fullExcListModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'fullExcListModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  function closeModal(){ modal.remove(); }
+  const displayName = exc.name==="Інше..." ? (exc.customName||"Інше") : exc.name;
+  const content = stableModalContent(modal, 'max-width:420px; max-height:85vh; overflow-y:auto;');
+  content.innerHTML = `
+    <div class="hb-modal-head">
+      <h2 class="hb-modal-title">${icon('clipboard')}Список на екскурсію</h2>
+      <button id="felCloseBtn" class="hb-close-btn">✕</button>
+    </div>
+    <p class="hb-modal-subtitle">${displayName}</p>
+    <p class="muted" style="font-size:12px; text-align:center;">Завантажую…</p>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{ if(e.target===modal || e.target.closest('#felCloseBtn')) closeModal(); });
+
+  // Тих самих туристів, кого гід власноруч бачить, беремо з готового джерела; для повного
+  // трипланового списку по всіх гідах використовуємо ту саму захищену RPC-функцію, що й
+  // "Зі списку" для відповідального гіда.
+  const { data, error } = await sb.rpc('get_all_tourists_for_excursion', { p_excursion_id: exc.id });
+  const people = [];
+  if(!error){
+    (data||[]).forEach(r=> people.push({ id:r.tourist_id, name:`${r.last_name} ${r.first_name}`, isPink:false }));
+  }
+  if(exc.name==='Скіатос'){
+    const { data: extras } = await sb.from('skiatos_manifest_extras').select('*')
+      .eq('trip_id', currentTripId).eq('entry_type','extra_person');
+    (extras||[]).forEach(e=> people.push({ id:e.id, name:`${e.last_name} ${e.first_name}`, isPink:true }));
+  }
+
+  // Хто вже призначений в ІНШИЙ автобус тієї ж назви — позначаємо неактивним з підписом, який саме.
+  const assignedMap = {};
+  tripData.excursions.forEach(other=>{
+    const otherDisplay = other.name==="Інше..." ? (other.customName||"Інше") : other.name;
+    if(otherDisplay !== displayName) return;
+    (other.rows||[]).forEach(row=>{
+      if(Array.isArray(row.assignedTouristIds)) row.assignedTouristIds.forEach(tid=>{ assignedMap[tid] = other; });
+    });
+  });
+  people.forEach(p=>{
+    const assignedExc = assignedMap[p.id];
+    if(assignedExc && assignedExc.id !== exc.id) p.assignedLabel = numberedExcursionLabel(tripData, assignedExc);
+  });
+
+  const listHtml = people.map(p=>{
+    const inactive = !!p.assignedLabel;
+    return `<div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; margin-bottom:4px; ${p.isPink ? 'background:#fce8ee;' : ''} ${inactive ? 'opacity:0.5;' : ''}">
+      <span style="flex:1; font-size:14px;">${p.name}</span>
+      ${inactive ? `<span style="font-size:11px; color:#6b7280;">${p.assignedLabel}</span>` : ''}
+    </div>`;
+  }).join('') || `<p class="report-note">${error ? friendlyErrorMessage(error) : 'Немає записаних туристів.'}</p>`;
+
+  const body = document.getElementById('fullExcListModal');
+  if(!body) return; // закрили, поки завантажувалось
+  content.innerHTML = `
+    <div class="hb-modal-head">
+      <h2 class="hb-modal-title">${icon('clipboard')}Список на екскурсію</h2>
+      <button id="felCloseBtn" class="hb-close-btn">✕</button>
+    </div>
+    <p class="hb-modal-subtitle">${displayName} · ${people.length} чол</p>
+    <div>${listHtml}</div>
+  `;
+  document.getElementById('felCloseBtn').addEventListener('click', closeModal);
+}
+function openResponsibleGuideModal(excId, onClose){
+  const tripData = getTripData(currentTripId);
+  const exc = tripData.excursions.find(e=>e.id===excId);
+  if(!exc) return;
+  const existing = document.getElementById('responsibleGuideModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'responsibleGuideModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  const optionsHtml = tripData.guides.map(g=>
+    `<button class="btn btn-ghost btn-small ${exc.responsibleGuide===g.name?'btn-primary':''}" data-role="respGuideOption" data-name="${g.name}" style="width:100%; text-align:left;">${g.name}</button>`
+  ).join('');
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:340px; max-height:80vh; overflow-y:auto;">
+    <h2 style="font-size:16px; font-weight:700; margin-bottom:12px;">${icon('user')}Відповідальний гід</h2>
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">${optionsHtml}</div>
+    <div style="text-align:center;"><button class="btn btn-ghost" id="responsibleGuideCancelBtn">${exc.responsibleGuide ? '✕ Прибрати призначення' : 'Пропустити'}</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+  function close(){ modal.remove(); if(onClose) onClose(); }
+  async function save(name){
+    exc.responsibleGuide = name || null;
+    await upsertExcursion(currentTripId, exc);
+    close();
+  }
+  modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
+  document.getElementById('responsibleGuideCancelBtn').addEventListener('click', ()=>{
+    if(exc.responsibleGuide) save(null); else close();
+  });
+  modal.querySelectorAll('[data-role="respGuideOption"]').forEach(btn=> btn.addEventListener('click', ()=> save(btn.dataset.name)));
+}
+async function fetchRelevantTouristsForGuideRow(excId, exc, displayName, tripData, rowGuideName){
+  const isOwnRow = rowGuideName === currentProfile.guide_name;
+  const isResponsibleGuide = currentProfile.role==='guide' && exc.responsibleGuide && currentProfile.guide_name===exc.responsibleGuide;
+  let sourceTourists = [], sourceSelections = [], rpcError = null;
+
+  if(isOwnRow){
+    await loadTourists();
+    touristData.tourists.forEach(t=> sourceTourists.push(t));
+    Object.values(touristData.selectionsByTourist).forEach(sels=> sels.forEach(s=> sourceSelections.push(s)));
+  } else if(isResponsibleGuide){
+    const { data, error } = await sb.rpc('get_all_tourists_for_excursion', { p_excursion_id: excId });
+    if(error) rpcError = error;
+    else (data||[]).forEach(r=>{
+      sourceTourists.push({ id:r.tourist_id, first_name:r.first_name, last_name:r.last_name, birth_date:r.birth_date, passport_data:r.passport_data, guide_name:r.guide_name });
+      sourceSelections.push({ tourist_id:r.tourist_id, excursion_name: exc.name, price:r.price, going:true, cancelled:false });
+    });
+  } else {
+    return { relevant:[], error:null, notAllowed:true };
+  }
+  if(rpcError) return { relevant:[], error:rpcError, notAllowed:false };
+
+  // Хто з туристів гіда (rowGuideName) вже призначений на ІНШИЙ автобус цієї ж екскурсії —
+  // таких не можна пропонувати повторно, інакше одна людина порахується двічі.
+  const siblingIds = new Set();
+  tripData.excursions.forEach(other=>{
+    if(other.id===excId) return;
+    const otherDisplayName = other.name==="Інше..." ? (other.customName||"Інше") : other.name;
+    if(otherDisplayName !== displayName) return;
+    (other.rows||[]).forEach(orow=>{
+      if(orow.personType==='guide' && orow.person===rowGuideName && Array.isArray(orow.assignedTouristIds)){
+        orow.assignedTouristIds.forEach(id=> siblingIds.add(id));
+      }
+    });
+  });
+
+  const relevant = [];
+  const byId = {}; sourceTourists.forEach(t=> byId[t.id]=t);
+  sourceSelections.forEach(s=>{
+    const t = byId[s.tourist_id];
+    if(!t) return;
+    if(t.guide_name !== rowGuideName) return;
+    if(siblingIds.has(t.id)) return;
+    if(s.excursion_name===exc.name && s.going && !s.cancelled) relevant.push({ sel:s, t });
+  });
+  return { relevant, error:null, notAllowed:false, hadSiblingExclusions: siblingIds.size>0, isOwnRow };
+}
+async function fetchRelevantSkiatosExtrasForPartner(excId, exc, displayName, tripData, partnerName){
+  const { data, error } = await sb.from('skiatos_manifest_extras').select('*')
+    .eq('trip_id', currentTripId).eq('entry_type', 'extra_person');
+  if(error) return { relevant:[], error, notAllowed:false };
+
+  const matches = (data||[]).filter(e=>
+    partnerName==='Інші туристи' ? !e.partner_operator : e.partner_operator===partnerName
+  );
+
+  // Ті самі туристи вже призначені на ІНШИЙ автобус цієї ж назви екскурсії — виключаємо, щоб не порахувати двічі.
+  const siblingIds = new Set();
+  tripData.excursions.forEach(other=>{
+    if(other.id===excId) return;
+    const otherDisplayName = other.name==="Інше..." ? (other.customName||"Інше") : other.name;
+    if(otherDisplayName !== displayName) return;
+    (other.rows||[]).forEach(orow=>{
+      if(orow.personType==='partner' && orow.person===partnerName && Array.isArray(orow.assignedTouristIds)){
+        orow.assignedTouristIds.forEach(id=> siblingIds.add(id));
+      }
+    });
+  });
+
+  const relevant = matches
+    .filter(e=> !siblingIds.has(e.id))
+    .map(e=>({ sel:{ tourist_id:e.id, price:e.price }, t:{ id:e.id, first_name:e.first_name, last_name:e.last_name, guide_name:e.guide_name } }));
+  return { relevant, error:null, notAllowed:false, hadSiblingExclusions: siblingIds.size>0 };
+}
+function openGuideAssignModal(excId, guideName, onCloseParent){
+  const existing = document.getElementById('guideAssignModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'guideAssignModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  function closeModal(){ modal.remove(); if(onCloseParent) onCloseParent(); }
+
+  function findOrCreateRow(tripData, exc){
+    let row = exc.rows.find(r=> r.personType==='guide' && r.person===guideName);
+    if(!row){
+      row = newRow(); row.personType='guide'; row.person=guideName;
+      exc.rows.push(row);
+      upsertRow(currentTripId, exc.id, row, true);
+    }
+    return row;
+  }
+
+  function drawShell(){
+    const tripData = getTripData(currentTripId);
+    const exc = tripData.excursions.find(e=>e.id===excId);
+    if(!exc){ closeModal(); return null; }
+    const displayName = exc.name==="Інше..." ? (exc.customName||"Інше") : exc.name;
+    const row = findOrCreateRow(tripData, exc);
+    const calc = calcExcursion(exc);
+    const rr = calc.rowResults.find(r=>r.id===row.id);
+    const hasData = rr && Number(rr.chol) > 0;
+
+    const content = stableModalContent(modal, 'max-width:380px; max-height:85vh; overflow-y:auto;');
+    content.innerHTML = `
+      <div class="hb-modal-head">
+        <h2 class="hb-modal-title">${guideName}</h2>
+        <button class="hb-close-btn" id="gamCloseBtn">✕</button>
+      </div>
+      <p class="hb-modal-subtitle">${numberedExcursionLabel(tripData, exc)}</p>
+      ${hasData ? `<div style="background:var(--whitewash); border-radius:10px; padding:10px; text-align:center; margin-bottom:12px;">
+        <span style="font-size:18px; font-weight:700;">${Math.round(rr.chol)} чол · ${fmt(rr.zibrano)} €</span>
+      </div>` : ''}
+      <div id="gamChoices" style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+        <p class="muted" style="font-size:12px; text-align:center; margin:0;">Перевіряю список туристів…</p>
+      </div>
+      <div style="display:flex; justify-content:center; margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
+        <button class="btn btn-danger-ghost btn-small no-print" id="gamDelete" title="Прибрати гіда з екскурсії">${icon('trash')}Прибрати гіда</button>
+      </div>
+    `;
+    document.getElementById('gamCloseBtn').addEventListener('click', closeModal);
+    document.getElementById('gamDelete').addEventListener('click', async ()=>{
+      const deleted = await deleteRow(excId, row.id);
+      if(deleted) closeModal();
+    });
+    return { tripData, exc, row, displayName };
+  }
+
+  async function refreshChoices(){
+    // Дані заїзду підвантажуються у фоні — вікно вже показане, тут лише перевіряємо права
+    // (чи призначений відповідальним) і оновлюємо саме варіанти вибору, не все вікно.
+    await loadTripData(currentTripId);
+    const ctx = drawShell(); // re-render with fresh data now that it's arrived (still instant, no visible network pause)
+    if(!ctx) return;
+    const { tripData, exc, row, displayName } = ctx;
+    const { relevant, error, notAllowed, hadSiblingExclusions } = await fetchRelevantTouristsForGuideRow(excId, exc, displayName, tripData, guideName);
+    const choicesEl = document.getElementById('gamChoices');
+    if(!choicesEl) return; // modal already redrawn/closed
+    if(notAllowed){
+      choicesEl.innerHTML = `<p class="report-note" style="margin:0; text-align:center;">Це не твій рядок. Тільки сам гід або призначений "відповідальний гід" на цю екскурсію може підтягнути сюди туристів.</p>`;
+      return;
+    }
+    if(error){
+      choicesEl.innerHTML = `<p class="report-note" style="margin:0; text-align:center; color:#b91c1c;">${friendlyErrorMessage(error)}</p>`;
+      return;
+    }
+    if(!relevant.length){
+      choicesEl.innerHTML = `<p class="report-note" style="margin:0; text-align:center;">${hadSiblingExclusions ? 'Усі відповідні туристи вже призначені в інший автобус.' : 'У списку туристів поки немає даних для цієї екскурсії.'}</p>`;
+      return;
+    }
+    const availCount = relevant.length;
+    const availSum = relevant.reduce((s,x)=>s+(Number(x.sel.price)||0),0);
+    choicesEl.innerHTML = `
+      <button class="btn btn-primary" id="gamAllBtn">${icon('clipboard')}Всі туристи (${availCount} чол · ${fmt(availSum)} €)</button>
+      <button class="btn btn-ghost" id="gamPartBtn">Частина групи</button>
+    `;
+    document.getElementById('gamAllBtn').addEventListener('click', ()=>{
+      row.chol = availCount; row.zibrano = availSum; row.assignedTouristIds = relevant.map(x=>x.t.id);
+      upsertRow(currentTripId, exc.id, row);
+      closeModal();
+    });
+    document.getElementById('gamPartBtn').addEventListener('click', ()=>{
+      openPickTouristsForBusModal(relevant, (picked)=>{
+        row.chol = picked.length;
+        row.zibrano = picked.reduce((s,x)=>s+(Number(x.sel.price)||0),0);
+        row.assignedTouristIds = picked.map(x=>x.t.id);
+        upsertRow(currentTripId, exc.id, row);
+        closeModal();
+      }, ()=>{});
+    });
+  }
+  modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
+  document.body.appendChild(modal);
+  drawShell(); // instant paint with whatever data is already in memory
+  refreshChoices(); // then quietly bring in fresh data + the actual choices
+}
+function openParticipantsModal(excId, onClose){
+  const existing = document.getElementById('participantsModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'participantsModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  function closeModal(){ modal.remove(); if(onClose) onClose(); }
+  function draw(){
+    const tripData = getTripData(currentTripId);
+    const exc = tripData.excursions.find(e=>e.id===excId);
+    if(!exc){ closeModal(); return; }
+    const calc = calcExcursion(exc);
+    const guidesHtml = tripData.guides.map(g=>{
+      const rr = calc.rowResults.find(r=> r.personType==='guide' && r.person===g.name);
+      const hasData = rr && Number(rr.chol) > 0;
+      return `<button class="hb-chip" data-role="pmGuideOpen" data-guide="${g.name}">
+        <span class="hb-chip-name">${g.name}</span>
+        ${hasData ? `<span class="hb-chip-sub">${Math.round(Number(rr.chol)||0)} чол · ${fmt(rr.profit)} €</span>` : `<span class="hb-chip-sub" style="color:#c1c5bd;">оберіть</span>`}
+      </button>`;
+    }).join('') || `<p class="report-note">На заїзді ще немає гідів.</p>`;
+    const content = stableModalContent(modal, 'max-width:420px; max-height:80vh; overflow-y:auto;');
+    content.innerHTML = `
+      <div class="hb-modal-head">
+        <h2 class="hb-modal-title"><span class="hb-modal-title-icon">${icon('users')}</span>Учасники</h2>
+        <button class="hb-close-btn" id="pmCloseBtn">✕</button>
+      </div>
+      <p class="hb-modal-subtitle">${numberedExcursionLabel(tripData, exc)}</p>
+      <div class="hb-chip-row">${guidesHtml}</div>
+    `;
+  }
+  modal.addEventListener('click', e=>{
+    if(e.target===modal){ closeModal(); return; }
+    if(e.target.closest('#pmCloseBtn')){ closeModal(); return; }
+    const guideBtn = e.target.closest('[data-role="pmGuideOpen"]');
+    if(guideBtn) openGuideAssignModal(excId, guideBtn.dataset.guide, draw);
+  });
+  document.body.appendChild(modal);
+  draw();
+}
+function openPartnersModal(excId, onClose){
+  const existing = document.getElementById('partnersModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'partnersModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  function closeModal(){ modal.remove(); if(onClose) onClose(); }
+  function findOrCreatePartnerRow(tripData, exc, partnerName){
+    let row = exc.rows.find(r=> r.personType==='partner' && r.person===partnerName);
+    if(!row){
+      row = newRow(); row.personType='partner'; row.person=partnerName;
+      exc.rows.push(row);
+      upsertRow(currentTripId, exc.id, row, true);
+    }
+    return row;
+  }
+  function draw(){
+    const tripData = getTripData(currentTripId);
+    const exc = tripData.excursions.find(e=>e.id===excId);
+    if(!exc){ closeModal(); return; }
+    const calc = calcExcursion(exc);
+    const isSkiatos = exc.name === 'Скіатос';
+    const partnerOptions = isSkiatos ? [...PARTNERS_FIXED, 'Інші туристи', CUSTOM_PARTNER_VALUE] : [...PARTNERS_FIXED, CUSTOM_PARTNER_VALUE];
+    const partnersHtml = partnerOptions.map(p=>{
+      const rr = calc.rowResults.find(r=> r.personType==='partner' && r.person===p);
+      const hasData = rr && Number(rr.chol) > 0;
+      const label = p===CUSTOM_PARTNER_VALUE ? '+ Новий' : p;
+      return `<button class="hb-chip" data-role="pmPartnerOpen" data-partner="${p}">
+        <span class="hb-chip-name">${label}</span>
+        ${hasData ? `<span class="hb-chip-sub">${Math.round(Number(rr.chol)||0)} чол</span>` : ''}
+      </button>`;
+    }).join('');
+    const content = stableModalContent(modal, 'max-width:420px; max-height:80vh; overflow-y:auto;');
+    content.innerHTML = `
+      <div class="hb-modal-head">
+        <h2 class="hb-modal-title"><span class="hb-modal-title-icon">${icon('briefcase')}</span>Партнери</h2>
+        <button class="hb-close-btn" id="pmCloseBtn">✕</button>
+      </div>
+      <p class="hb-modal-subtitle">${numberedExcursionLabel(tripData, exc)}</p>
+      <div class="hb-chip-row">${partnersHtml}</div>
+    `;
+  }
+  modal.addEventListener('click', e=>{
+    if(e.target===modal){ closeModal(); return; }
+    if(e.target.closest('#pmCloseBtn')){ closeModal(); return; }
+    const partnerBtn = e.target.closest('[data-role="pmPartnerOpen"]');
+    if(partnerBtn){
+      const tripData = getTripData(currentTripId);
+      const exc = tripData.excursions.find(x=>x.id===excId);
+      const row = findOrCreatePartnerRow(tripData, exc, partnerBtn.dataset.partner);
+      openRowDetailModal(excId, row.id, draw);
+    }
+  });
+  document.body.appendChild(modal);
+  draw();
+}
+const ICONS = {
+  trash: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>',
+  clipboard: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>',
+  users: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+  user: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>',
+  save: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>',
+  briefcase: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>',
+  bus: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17h16V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11z"></path><path d="M4 12h16"></path><circle cx="7.5" cy="19" r="1.5"></circle><circle cx="16.5" cy="19" r="1.5"></circle></svg>',
+  check: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 17.01"></polyline></svg>',
+  x: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+  alert: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+  refresh: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>',
+  money: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>',
+  download: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
+  upload: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>',
+  lock: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>',
+  unlock: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>',
+  edit: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
+  link: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>',
+  search: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
+  printer: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>',
+  eye: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+  plus: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
+  hotel: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="9" y1="7" x2="15" y2="7"></line><line x1="9" y1="12" x2="15" y2="12"></line><line x1="9" y1="17" x2="12" y2="17"></line></svg>',
+  bed: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"></path><path d="M2 20h20"></path><path d="M4 10V6a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v4"></path></svg>',
+  calendar: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>',
+  paperclip: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>',
+  helpcircle: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+  xcircle: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>',
+  settings: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>',
+  shuffle: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>',
+  ticket: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"></path><line x1="9" y1="9" x2="9" y2="15"></line></svg>',
+  bulb: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"></path></svg>',
+  waves: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0 3 2 4.5 0"></path><path d="M2 17c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0 3 2 4.5 0"></path></svg>',
+  building: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="0"></rect><line x1="9" y1="6" x2="9" y2="6"></line><line x1="15" y1="6" x2="15" y2="6"></line><line x1="9" y1="10" x2="9" y2="10"></line><line x1="15" y1="10" x2="15" y2="10"></line><line x1="9" y1="14" x2="9" y2="14"></line><line x1="15" y1="14" x2="15" y2="14"></line></svg>'
+};
+function icon(name){ return `<span style="display:inline-flex; vertical-align:-3px; margin-right:2px;">${ICONS[name]||''}</span>`; }
+
+// Автоматична заміна emoji на лінійні SVG-іконки по всьому застосунку — працює на рівні
+// вже відрендереного тексту, тож не потребує редагування сотень окремих місць у коді.
+const EMOJI_ICON_MAP = {
+  '✅':'check', '💾':'save', '⚠️':'alert', '⚠':'alert', '🔄':'refresh', '💰':'money',
+  '📥':'download', '🔒':'lock', '🔓':'unlock', '🗑️':'trash', '🗑':'trash', '📋':'clipboard',
+  '➕':'plus', '🏨':'hotel', '✏️':'edit', '✏':'edit', '🛏️':'bed', '🛏':'bed', '🔗':'link',
+  '🔍':'search', '🖨️':'printer', '🖨':'printer', '❓':'helpcircle', '👁️':'eye', '👁':'eye',
+  '👥':'users', '🤝':'briefcase', '📤':'upload', '💡':'bulb', '📅':'calendar', '🎫':'ticket',
+  '🌊':'waves', '❌':'xcircle', '📎':'paperclip', '🚌':'bus', '⚙️':'settings', '⚙':'settings',
+  '🔀':'shuffle', '👤':'user', '📊':'clipboard', '📄':'clipboard', '📜':'clipboard'
+};
+const EMOJI_REGEX = new RegExp('(' + Object.keys(EMOJI_ICON_MAP).map(e=>e.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')', 'g');
+function replaceEmojiInNode(root){
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(n){ EMOJI_REGEX.lastIndex = 0; return EMOJI_REGEX.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP; }
+  });
+  const targets = [];
+  let n; while(n = walker.nextNode()) targets.push(n);
+  targets.forEach(textNode=>{
+    EMOJI_REGEX.lastIndex = 0;
+    const text = textNode.nodeValue;
+    const parts = text.split(EMOJI_REGEX);
+    const frag = document.createDocumentFragment();
+    parts.forEach(part=>{
+      if(EMOJI_ICON_MAP[part]){
+        const span = document.createElement('span');
+        span.style.cssText = 'display:inline-flex; vertical-align:-3px; margin:0 1px;';
+        span.innerHTML = ICONS[EMOJI_ICON_MAP[part]];
+        frag.appendChild(span);
+      } else if(part){
+        frag.appendChild(document.createTextNode(part));
+      }
+    });
+    textNode.parentNode.replaceChild(frag, textNode);
+  });
+}
+let emojiObserverRaf = null;
+const emojiPendingNodes = [];
+const emojiIconObserver = new MutationObserver((mutations)=>{
+  mutations.forEach(m=>{
+    m.addedNodes.forEach(node=>{
+      if(node.nodeType===1) emojiPendingNodes.push(node);
+    });
+    if(m.type==='characterData' && m.target.parentNode) emojiPendingNodes.push(m.target.parentNode);
+  });
+  if(emojiObserverRaf) return;
+  emojiObserverRaf = requestAnimationFrame(()=>{
+    emojiObserverRaf = null;
+    const batch = emojiPendingNodes.splice(0, emojiPendingNodes.length);
+    batch.forEach(node=>{ if(node.isConnected) replaceEmojiInNode(node); });
+  });
+});
+function startEmojiIconObserver(){
+  emojiIconObserver.observe(document.body, { childList:true, subtree:true, characterData:true });
+  replaceEmojiInNode(document.body);
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', startEmojiIconObserver);
+else startEmojiIconObserver();
+function numberedExcursionLabel(tripData, exc){
+  const baseDisplayName = exc.name==="Інше..." ? (exc.customName||"Інше") : exc.name;
+  const siblings = tripData.excursions.filter(e=>{
+    const otherDisplay = e.name==="Інше..." ? (e.customName||"Інше") : e.name;
+    return otherDisplay === baseDisplayName;
+  });
+  if(siblings.length <= 1) return baseDisplayName;
+  const idx = siblings.findIndex(e=>e.id===exc.id);
+  return `${baseDisplayName} ${idx+1}`;
+}
+function stableModalContent(modal, cardStyle){
+  // Тримає саму картку (.hb-modal-card) незмінною між перемальовуваннями — інакше вона пересоздається
+  // щоразу і CSS-анімація появи переграється при кожній дії, що виглядає як блимання.
+  let content = modal.querySelector('.stable-modal-content');
+  if(!content){
+    modal.innerHTML = `<div class="hb-modal-card" style="${cardStyle||''}"><div class="stable-modal-content"></div></div>`;
+    content = modal.querySelector('.stable-modal-content');
+  }
+  return content;
+}
 function openExcursionModal(excId){
   const existing = document.getElementById('excursionModal');
   if(existing) existing.remove();
@@ -1901,19 +2517,24 @@ function openExcursionModal(excId){
     const displayName = exc.name==="Інше..." ? (exc.customName || "Інше") : exc.name;
     const totalProfit = calc.rowResults.filter(r=>r.isGuide && !r.isTest).reduce((s,r)=>s+(Number(r.profit)||0),0);
 
-    modal.innerHTML = `<div class="hb-modal-card" style="max-width:460px; max-height:88vh; overflow-y:auto;">
-      <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-        <h2 style="flex:1; min-width:0; font-size:19px; font-weight:700; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${displayName}</h2>
-        <button class="btn btn-ghost btn-small no-print" id="emCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+    const content = stableModalContent(modal, 'max-width:460px; max-height:88vh; overflow-y:auto;');
+    content.innerHTML = `
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:14px;">
+        <button class="hb-close-btn" id="emCloseBtn" title="Закрити" style="margin-left:auto;">✕</button>
       </div>
-      <div class="muted" style="font-size:12.5px; margin-bottom:14px;">${calc.totalPeople} чол · <span class="${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span></div>
+      <div class="row-card-summary" id="emNameGuide" style="margin-bottom:14px; cursor:pointer;">
+        <span class="row-summary-mid muted"><b>${numberedExcursionLabel(tripData, exc)}</b> · ${icon('user')}${exc.responsibleGuide ? guideDisplayLabel(currentTripId, exc.responsibleGuide) : 'не призначено'}</span>
+        <span class="row-summary-result muted">${calc.totalPeople} чол · <span class="${totalProfit>=0?'profit-pos':'profit-neg'}">${fmt(totalProfit)} €</span></span>
+      </div>
 
       <div class="row-card-summary bus-fee-summary" id="emBusFee" style="margin-bottom:14px;">
-        <span class="row-summary-mid muted">🚌 <b>Автобус і Екскурсовод:</b> ${exc.busOwner==='own' ? 'наш' : 'партнерський ('+Number(exc.busRate).toFixed(1)+' €/км)'} · ${String(exc.km).replace('.',',')} км → ${fmt(calc.busPayment)} €${noGuideFee ? '' : ' · ' + fmt(exc.guideFee) + ' €'}</span>
+        <span class="row-summary-mid muted">${icon('bus')}<b>Автобус і Екскурсовод:</b> ${exc.busOwner==='own' ? 'наш' : 'партнерський ('+Number(exc.busRate).toFixed(1)+' €/км)'} · ${String(exc.km).replace('.',',')} км → ${fmt(calc.busPayment)} €${noGuideFee ? '' : ' · ' + fmt(exc.guideFee) + ' €'}</span>
       </div>
 
-      <div class="rows-cards" id="emRowsBody"></div>
-      <button class="btn btn-ghost btn-small add-row-btn no-print" id="emAddRow">+ Додати рядок</button>
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <button class="btn btn-ghost no-print" id="emOpenParticipants" style="flex:1;">${icon('users')}Учасники</button>
+        <button class="btn btn-ghost no-print" id="emOpenPartners" style="flex:1;">${icon('briefcase')}Партнери</button>
+      </div>
 
       <div class="exc-summary">
         <div class="stat"><span class="label">Всього людей</span><span class="value">${calc.totalPeople}</span></div>
@@ -1928,12 +2549,9 @@ function openExcursionModal(excId){
       </div>
 
       <div style="display:flex; gap:8px; margin-top:16px; padding-top:12px; border-top:1px dashed var(--line);">
-        ${currentProfile && currentProfile.role==='manager' ? `<button class="btn btn-ghost btn-small no-print" id="emEditName" style="flex:1;">✏️ Назва</button>` : ''}
-        <button class="btn btn-danger-ghost btn-small no-print" id="emDelete" style="flex:1;">🗑️ Видалити екскурсію</button>
+        <button class="btn btn-danger-ghost btn-small no-print" id="emDelete" style="flex:1;">${icon('trash')}Видалити екскурсію</button>
       </div>
-    </div>`;
-
-    renderExcursionRowsInto(modal.querySelector('#emRowsBody'), exc, calc, draw);
+    `;
   }
 
   // Single delegated handler attached once to the modal element itself (which persists
@@ -1941,8 +2559,10 @@ function openExcursionModal(excId){
   // previously proven unreliable for taps on Android/Chrome.
   modal.addEventListener('click', async e=>{
     if(e.target===modal){ closeModal(); return; }
-    if(e.target.closest('#emEditName')){ e.preventDefault(); e.stopPropagation(); openExcNameModal(excId, draw); return; }
+    if(e.target.closest('#emNameGuide')){ e.preventDefault(); e.stopPropagation(); openExcCreateModal(excId, draw); return; }
     if(e.target.closest('#emBusFee')){ e.preventDefault(); e.stopPropagation(); openBusFeeModal(excId, draw); return; }
+    if(e.target.closest('#emOpenParticipants')){ e.preventDefault(); e.stopPropagation(); openParticipantsModal(excId, draw); return; }
+    if(e.target.closest('#emOpenPartners')){ e.preventDefault(); e.stopPropagation(); openPartnersModal(excId, draw); return; }
     if(e.target.closest('#emDelete')){
       e.preventDefault(); e.stopPropagation();
       await deleteExcursion(excId); // has its own confirm() dialog
@@ -1950,7 +2570,6 @@ function openExcursionModal(excId){
       if(!stillExists) closeModal();
       return;
     }
-    if(e.target.closest('#emAddRow')){ addRow(excId); draw(); return; }
     if(e.target.closest('#emCloseBtn')){ closeModal(); return; }
   });
 
@@ -2151,25 +2770,29 @@ async function upsertExcursion(tripId, exc){
     id: exc.id, trip_id: tripId, name: exc.name, custom_name: exc.customName,
     bus_owner: exc.busOwner, bus_rate: Number(exc.busRate)||0, km: Number(exc.km)||0,
     guide_fee_default: Number(exc.guideFeeDefault)||0, guide_fee: Number(exc.guideFee)||0,
-    guide_fee_reason: exc.guideFeeReason, recipient_guide: exc.recipientGuide, payer_guide: exc.payerGuide,
+    guide_fee_reason: exc.guideFeeReason, recipient_guide: exc.recipientGuide, payer_guide: exc.payerGuide, responsible_guide: exc.responsibleGuide||null,
     from_partner_override: (exc.fromPartnerOverride===undefined || exc.fromPartnerOverride===null || exc.fromPartnerOverride==='') ? null : Number(exc.fromPartnerOverride),
     to_partner_override: (exc.toPartnerOverride===undefined || exc.toPartnerOverride===null || exc.toPartnerOverride==='') ? null : Number(exc.toPartnerOverride)
   });
   if(queued) setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет");
   else setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
   if(error){ console.error(error); showAppAlert(friendlyErrorMessage(error)); }
+  return { error, queued };
 }
-async function upsertRow(tripId, excId, row){
+async function upsertRow(tripId, excId, row, silent){
   const { error, queued } = await rtGuideWrite('upsert', 'excursion_rows', {
     id: row.id, excursion_id: excId, trip_id: tripId,
     person_type: row.personType, person: row.person, custom_partner_name: row.customPartnerName,
     chol: Number(row.chol)||0, zibrano: Number(row.zibrano)||0, quitky: Number(row.quitky)||0,
     is_test: !!(currentProfile && currentProfile.is_test_account),
-    received: !!row.received, received_by: row.receivedBy||null, received_at: row.receivedAt||null
+    received: !!row.received, received_by: row.receivedBy||null, received_at: row.receivedAt||null,
+    assigned_tourist_ids: row.assignedTouristIds || null
   });
+  if(silent){ if(error) console.error(error); return { error, queued }; }
   if(queued) setStatus("💾 Збережено локально — синхронізується, коли з'явиться інтернет");
   else setStatus(error ? "Помилка збереження!" : "Збережено · " + new Date().toLocaleTimeString('uk-UA'));
   if(error){ console.error(error); showAppAlert(friendlyErrorMessage(error)); }
+  return { error, queued };
 }
 async function upsertGuide(tripId, guide){
   const { error } = await rtGuideWrite('upsert', 'trip_guides', { id: guide.id, trip_id: tripId, guide_name: guide.name, own_bus: !!guide.ownBus, substitute_note: guide.substituteNote||'' });
@@ -2282,7 +2905,7 @@ function showAppAlert(message){
   modal.style.zIndex = String(nextModalZ());
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:340px;">
     <p id="finAlertMsg" style="margin:0 0 16px; font-size:14px; white-space:pre-wrap;"></p>
-    <button class="btn btn-primary" id="finAlertOkBtn" style="width:100%;">Зрозуміло</button>
+    <div style="text-align:center;"><button class="btn btn-primary" id="finAlertOkBtn">Зрозуміло</button></div>
   </div>`;
   modal.querySelector('#finAlertMsg').textContent = message;
   document.body.appendChild(modal);
@@ -2319,40 +2942,51 @@ function openExcNameModal(excId, onClose){
   if(!exc) return;
   const existing = document.getElementById('excNameModal');
   if(existing) existing.remove();
-  const nameOptions = EXCURSIONS.map(n=>`<option value="${n}" ${n===exc.name?'selected':''}>${n}</option>`).join('');
   const modal = document.createElement('div');
   modal.id = 'excNameModal';
   modal.className = 'hb-modal-overlay';
   modal.style.zIndex = String(nextModalZ());
-  modal.innerHTML = `<div class="hb-modal-card" style="max-width:360px;">
-    <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">Назва екскурсії</h2>
-      <button class="btn btn-ghost btn-small no-print" id="excNameModalCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
-    </div>
-    <select id="excNameModalSelect" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; font-weight:600;">${nameOptions}</select>
-    <input type="text" id="excNameModalCustom" placeholder="Назва екскурсії" value="${exc.customName||''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; margin-top:10px; ${exc.name==='Інше...'?'':'display:none;'}">
-    <button class="btn btn-primary" id="excNameModalSaveBtn" style="width:100%; margin-top:14px;">💾 Зберегти</button>
-  </div>`;
-  document.body.appendChild(modal);
   function closeModal(){ modal.remove(); }
   function closeAndNotify(){ modal.remove(); if(typeof onClose==='function') onClose(); }
-  modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
-  document.getElementById('excNameModalCancelBtn').addEventListener('click', closeModal);
-  const selectEl = document.getElementById('excNameModalSelect');
-  const customEl = document.getElementById('excNameModalCustom');
-  selectEl.addEventListener('change', ()=>{
-    customEl.style.display = selectEl.value==='Інше...' ? '' : 'none';
-  });
-  document.getElementById('excNameModalSaveBtn').addEventListener('click', ()=>{
-    const name = selectEl.value;
+  function saveName(name, customName){
     updateExcursion(excId, {
       name,
-      customName: name==='Інше...' ? customEl.value : "",
+      customName: name==='Інше...' ? customName : "",
       guideFeeDefault: DEFAULT_GUIDE_FEE[name]||0,
       guideFee: DEFAULT_GUIDE_FEE[name]||0,
       guideFeeReason: ""
     });
     closeAndNotify();
+  }
+  const optionsHtml = EXCURSIONS.map(n=>
+    `<button class="btn btn-ghost btn-small ${n===exc.name?'btn-primary':''}" data-role="excNameOption" data-name="${n}" style="width:100%; text-align:left;">${n==="Інше..." ? "Інше" : n}</button>`
+  ).join('');
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:360px; max-height:80vh; overflow-y:auto;">
+    <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
+      <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">Назва екскурсії</h2>
+      <button class="btn btn-ghost btn-small no-print" id="excNameModalCancelBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:6px;">${optionsHtml}</div>
+    <div id="excNameCustomWrap" style="margin-top:10px; ${exc.name==='Інше...'?'':'display:none;'}">
+      <input type="text" id="excNameModalCustom" placeholder="Назва екскурсії" value="${exc.customName||''}" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box;">
+      <button class="btn btn-primary" id="excNameCustomSaveBtn" style="width:100%; margin-top:10px;">💾 Зберегти</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
+  document.getElementById('excNameModalCancelBtn').addEventListener('click', closeModal);
+  modal.querySelectorAll('[data-role="excNameOption"]').forEach(btn=> btn.addEventListener('click', ()=>{
+    const name = btn.dataset.name;
+    if(name==='Інше...'){
+      document.getElementById('excNameCustomWrap').style.display = '';
+      document.getElementById('excNameModalCustom').focus();
+      return;
+    }
+    saveName(name, "");
+  }));
+  const customSaveBtn = document.getElementById('excNameCustomSaveBtn');
+  if(customSaveBtn) customSaveBtn.addEventListener('click', ()=>{
+    saveName('Інше...', document.getElementById('excNameModalCustom').value);
   });
 }
 function openBusFeeModal(excId, onClose){
@@ -2378,18 +3012,19 @@ function openBusFeeModal(excId, onClose){
   function draw(){
     const calc = preview();
     const feeDiffers = Number(draft.guideFee) !== Number(exc.guideFeeDefault);
-    modal.innerHTML = `<div class="hb-modal-card" style="max-width:380px;">
+    const content = stableModalContent(modal, 'max-width:380px; max-height:85vh; overflow-y:auto;');
+    content.innerHTML = `
       <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
         <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">Автобус і гід</h2>
-        <button class="btn btn-ghost btn-small no-print" id="bfmCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+        <button class="hb-close-btn" id="bfmCloseBtn" title="Закрити">✕</button>
       </div>
-      <div class="field-group" style="flex-wrap:nowrap; margin-bottom:10px;">
-        <span style="flex-shrink:0;">Автобус:</span>
-        <select id="bfmBusOwner" style="flex:1; min-width:0;">
-          <option value="own" ${draft.busOwner==='own'?'selected':''}>наш (1.6 €/км)</option>
-          <option value="partner" ${draft.busOwner==='partner'?'selected':''}>партнерський</option>
-        </select>
-        ${draft.busOwner==='partner' ? `<select class="rate-input" id="bfmBusRate" style="flex-shrink:0;">${BUS_RATES.map(r=>`<option value="${r}" ${Number(draft.busRate)===r?'selected':''}>${r.toFixed(1)}</option>`).join('')}</select>` : ''}
+      <div class="field-group" style="flex-wrap:wrap; margin-bottom:10px;">
+        <span style="flex-shrink:0; width:100%;">Автобус:</span>
+        <div style="display:flex; gap:8px; width:100%;">
+          <button class="btn btn-small ${draft.busOwner==='own'?'btn-primary':'btn-ghost'}" id="bfmOwnBtn" style="flex:1;">наш (1.6 €/км)</button>
+          <button class="btn btn-small ${draft.busOwner==='partner'?'btn-primary':'btn-ghost'}" id="bfmPartnerBtn" style="flex:1;">партнерський</button>
+        </div>
+        ${draft.busOwner==='partner' ? `<div style="display:flex; gap:6px; flex-wrap:wrap; width:100%; margin-top:8px;">${BUS_RATES.map(r=>`<button class="btn btn-small ${Number(draft.busRate)===r?'btn-primary':'btn-ghost'}" data-role="bfmRateOption" data-rate="${r}">${r.toFixed(1)} €/км</button>`).join('')}</div>` : ''}
       </div>
       <div class="field-group" style="margin-bottom:10px;">
         <span>Км екскурсії:</span>
@@ -2403,16 +3038,18 @@ function openBusFeeModal(excId, onClose){
         ${feeDiffers ? `<input type="text" class="reason-input" placeholder="Причина зміни стандартної ціни" id="bfmGuideFeeReason" value="${draft.guideFeeReason||''}">` : ''}
       </div>`}
       <button class="btn btn-primary" id="bfmSaveBtn" style="width:100%; margin-top:14px;">💾 Зберегти</button>
-    </div>`;
+    `;
 
     document.getElementById('bfmCloseBtn').addEventListener('click', closeModal);
-    document.getElementById('bfmBusOwner').addEventListener('change', e=>{
-      draft.busOwner = e.target.value;
-      if(draft.busOwner==='own') draft.busRate = OWN_BUS_RATE;
-      draw();
+    document.getElementById('bfmOwnBtn').addEventListener('click', ()=>{
+      draft.busOwner = 'own'; draft.busRate = OWN_BUS_RATE; draw();
     });
-    const rateEl = document.getElementById('bfmBusRate');
-    if(rateEl) rateEl.addEventListener('change', e=>{ draft.busRate = Number(e.target.value); draw(); });
+    document.getElementById('bfmPartnerBtn').addEventListener('click', ()=>{
+      draft.busOwner = 'partner'; draw();
+    });
+    modal.querySelectorAll('[data-role="bfmRateOption"]').forEach(btn=> btn.addEventListener('click', ()=>{
+      draft.busRate = Number(btn.dataset.rate); draw();
+    }));
     document.getElementById('bfmKm').addEventListener('input', e=>{
       draft.km = e.target.value.replace(',','.');
       const p = modal.querySelector('#bfmKmPreview');
@@ -2448,10 +3085,52 @@ function updateRow(excId, rowId, patch, opts={}){
   if(opts.debounceRender) debouncedPersist('row:'+rowId, ()=> upsertRow(tripId, excId, row));
   else persistNow('row:'+rowId, ()=> upsertRow(tripId, excId, row));
 }
+function openPickTouristsForBusModal(relevant, onApply, onCancel){
+  const existing = document.getElementById('pickTouristsBusModal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'pickTouristsBusModal';
+  modal.className = 'hb-modal-overlay';
+  modal.style.zIndex = String(nextModalZ());
+  const rowsHtml = relevant.map((x,i)=>`
+    <label data-guide-row="${x.t.guide_name||''}" style="display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid #f0f0ea; font-size:13.5px;">
+      <input type="checkbox" data-role="pickTouristCb" data-idx="${i}" style="width:18px; height:18px; flex-shrink:0;">
+      <span style="flex:1;">${x.t.last_name} ${x.t.first_name}</span>
+      <span class="muted">${fmt(Number(x.sel.price)||0)} €</span>
+    </label>
+  `).join('') || `<p class="report-note">Немає записаних туристів на цю екскурсію.</p>`;
+  modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+      <h2 style="font-size:16px; font-weight:700; margin:0;">Частина групи</h2>
+      <button class="btn btn-ghost btn-small" id="pickTouristsCloseXBtn">✕</button>
+    </div>
+    <div style="max-height:45vh; overflow-y:auto; margin-top:6px;">${rowsHtml}</div>
+    <div class="fin-total-row" style="margin-top:10px;"><span id="pickTouristsSummary">Обрано: 0 чол · 0,00 €</span></div>
+    <button class="btn btn-primary" id="pickTouristsApplyBtn" style="width:100%; margin-top:12px;">Застосувати</button>
+  </div>`;
+  document.body.appendChild(modal);
+  function updateSummary(){
+    const checked = Array.from(modal.querySelectorAll('[data-role="pickTouristCb"]:checked'));
+    const picked = checked.map(cb=> relevant[Number(cb.dataset.idx)]);
+    const sum = picked.reduce((s,x)=>s+(Number(x.sel.price)||0),0);
+    document.getElementById('pickTouristsSummary').textContent = `Обрано: ${picked.length} чол · ${fmt(sum)} €`;
+    return picked;
+  }
+  modal.querySelectorAll('[data-role="pickTouristCb"]').forEach(cb=> cb.addEventListener('change', updateSummary));
+  function close(){ modal.remove(); }
+  modal.addEventListener('click', e=>{ if(e.target===modal){ close(); if(onCancel) onCancel(); } });
+  document.getElementById('pickTouristsCloseXBtn').addEventListener('click', ()=>{ close(); if(onCancel) onCancel(); });
+  document.getElementById('pickTouristsApplyBtn').addEventListener('click', ()=>{
+    const picked = updateSummary();
+    close();
+    onApply(picked);
+  });
+}
 function openRowDetailModal(excId, rowId, onClose){
   const tripData = getTripData(currentTripId);
   const exc = tripData.excursions.find(e=>e.id===excId);
   if(!exc) return;
+  const displayName = exc.name==="Інше..." ? (exc.customName || "Інше") : exc.name;
   const rawRow = exc.rows.find(x=>x.id===rowId);
   if(!rawRow) return;
   const tripGuideNames = tripData.guides.map(g=>g.name);
@@ -2478,6 +3157,8 @@ function openRowDetailModal(excId, rowId, onClose){
     const r = preview();
     const hasPerson = !!r.person;
     const amountsEditable = editable && hasPerson;
+    const ticketsApply = calcExcursion(exc).ticketsApply;
+    const isSimplePartnerView = !r.isGuide && hasPerson && !ticketsApply;
     const resultHtml = !hasPerson
           ? `<span class="muted">оберіть гіда/партнера</span>`
           : r.isGuide
@@ -2485,26 +3166,33 @@ function openRowDetailModal(excId, rowId, onClose){
             : (exc.busOwner==='own'
                 ? `<span class="muted">винен нам ${fmt(r.settlement)} €</span>`
                 : `<span class="muted">розрахунок з партнером</span>`);
-    modal.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
-      <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px;">
-        <h2 style="flex:1; font-size:18px; font-weight:700; margin:0;">Учасник екскурсії</h2>
-        <button class="btn btn-ghost btn-small no-print" id="rdmCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
+    const content = stableModalContent(modal, 'max-width:400px;');
+    content.innerHTML = `
+      <div class="hb-modal-head" style="margin-bottom:2px;">
+        <h2 class="hb-modal-title">Учасник екскурсії</h2>
+        <button class="hb-close-btn" id="rdmCloseBtn" title="Закрити">✕</button>
       </div>
+      <p class="hb-modal-subtitle" style="margin-bottom:8px;">${numberedExcursionLabel(tripData, exc)}</p>
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
         ${!hasPerson
-          ? `<select class="person-select" id="rdmPerson" style="flex:1; min-width:0; box-sizing:border-box; background:#c9cdbe;" ${editable?'':'disabled'}>${personSelectHTML(r, tripGuideNames, takenGuides)}</select>`
+          ? `<button class="btn btn-primary btn-small no-print" id="rdmPersonPickBtn" style="flex:1;" ${editable?'':'disabled'}>— виберіть гіда/партнера —</button>`
           : `<span class="person-chip" style="background:${personColor(r)};">${r.label}</span>`
         }
       </div>
-      ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<button class="btn btn-primary btn-small no-print" id="rdmFillTourists" style="width:100%; margin-bottom:10px;" title="Заповнити чол/суму з даних гіда в списку туристів">📋 Підтягнути з списку туристів</button>` : ''}
+      ${r.isGuide && hasPerson && amountsEditable && exc.name!=='Інше...' ? `<div style="text-align:center; margin-bottom:10px;"><button class="btn btn-primary btn-small no-print" id="rdmFillTourists" title="Заповнити чол/суму з даних гіда в списку туристів">${icon('clipboard')}Зі списку</button></div>` : ''}
+      ${!r.isGuide && hasPerson && amountsEditable && exc.name==='Скіатос' ? `<div style="text-align:center; margin-bottom:10px;"><button class="btn btn-primary btn-small no-print" id="rdmFillPartnerFromSkiatos" title="Заповнити чол зі списку на Скіатос">${icon('clipboard')}Зі списку на Скіатос</button></div>` : ''}
       ${r.isTest ? `<div style="font-size:11px; color:#b45309; font-weight:700; margin-bottom:8px;">🧪 ТЕСТ — не враховується в реальних розрахунках</div>` : ''}
       ${r.personType==='partner' && r.person===CUSTOM_PARTNER_VALUE ? `<input type="text" placeholder="Назва партнера" id="rdmCustomName" value="${r.customPartnerName||''}" style="width:100%; box-sizing:border-box; margin-bottom:8px;" ${editable?'':'disabled'}>` : ''}
+      ${isSimplePartnerView ? `
+      <div class="row-card-fields" style="grid-template-columns:1fr;">
+        <label>Чол<input type="text" inputmode="decimal" class="num-input" id="rdmChol" value="${r.chol}" ${amountsEditable?'':'disabled'}></label>
+      </div>` : `
       <div class="row-card-fields">
         <label>Чол<input type="text" inputmode="decimal" class="num-input" id="rdmChol" value="${r.chol}" ${amountsEditable?'':'disabled'} title="${hasPerson?'':'Спочатку оберіть гіда або партнера'}"></label>
         <label>Зібрано €${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input num-input-wide" id="rdmZibrano" value="${r.zibrano}" ${amountsEditable?'':'disabled'}>` : `<span class="muted" style="display:block; padding:6px 0;">—</span>`}</label>
-        ${calcExcursion(exc).ticketsApply ? `<label>Квитки €${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input" id="rdmQuitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted" style="display:block; padding:6px 0;">—</span>`}</label>` : ''}
-      </div>
-      ${(()=>{
+        ${ticketsApply ? `<label>Квитки €${r.isGuide ? `<input type="text" inputmode="decimal" class="num-input" id="rdmQuitky" value="${r.quitky}" ${amountsEditable?'':'disabled'}>` : `<span class="muted" style="display:block; padding:6px 0;">—</span>`}</label>` : ''}
+      </div>`}
+      ${isSimplePartnerView ? '' : (()=>{
         const isGuideViewer = currentProfile && currentProfile.role==='guide';
         if(isGuideViewer && r.isGuide && hasPerson){
           return `<div class="row-card-result">
@@ -2519,18 +3207,18 @@ function openRowDetailModal(excId, rowId, onClose){
         ${hasPerson && r.isGuide ? `<div class="row-card-split muted">Гід 10%: ${fmt(r.gInc)} € · Офіс 90%: ${fmt(r.oInc)} €</div>` : ''}`;
       })()}
       <div style="display:flex; gap:8px; margin-top:14px;">
-        ${editable ? `<button class="btn btn-primary" id="rdmSaveBtn" style="flex:1;">💾 Зберегти</button>` : ''}
-        ${editable ? `<button class="btn btn-danger-ghost" id="rdmDeleteBtn" title="Видалити рядок">🗑️</button>` : ''}
+        ${editable ? `<button class="btn btn-primary" id="rdmSaveBtn" style="flex:1;">${icon('save')}Зберегти</button>` : ''}
+        ${editable ? `<button class="btn btn-danger-ghost" id="rdmDeleteBtn" title="Видалити рядок">${icon('trash')}</button>` : ''}
       </div>
-    </div>`;
+    `;
 
     document.getElementById('rdmCloseBtn').addEventListener('click', closeModal);
-    const personSel = document.getElementById('rdmPerson');
-    if(personSel) personSel.addEventListener('change', e=>{
-      if(!e.target.value) return;
-      const [ptype, pname] = e.target.value.split('::');
-      Object.assign(draft, {personType:ptype, person:pname});
-      draw();
+    const personPickBtn = document.getElementById('rdmPersonPickBtn');
+    if(personPickBtn) personPickBtn.addEventListener('click', ()=>{
+      openPersonPickerModal(tripGuideNames, takenGuides, (ptype, pname)=>{
+        Object.assign(draft, {personType:ptype, person:pname});
+        draw();
+      });
     });
     const custEl = document.getElementById('rdmCustomName');
     if(custEl) custEl.addEventListener('input', e=>{ draft.customPartnerName = e.target.value; });
@@ -2540,60 +3228,95 @@ function openRowDetailModal(excId, rowId, onClose){
     if(zEl) zEl.addEventListener('input', e=>{ draft.zibrano = parseDecimalInput(e.target.value); });
     const qEl = document.getElementById('rdmQuitky');
     if(qEl) qEl.addEventListener('input', e=>{ draft.quitky = parseDecimalInput(e.target.value); });
-    const fillBtn = document.getElementById('rdmFillTourists');
-    if(fillBtn) fillBtn.addEventListener('click', async ()=>{
-      fillBtn.disabled = true; fillBtn.textContent = 'Перевіряю…';
-      const byGuideExc = await loadTripGuideExcursionStats();
-      const stats = (byGuideExc[draft.person]||{})[exc.name];
-      if(!stats || stats.count<=0){
+    async function runFillFromListFlow({ relevant, error, notAllowed, hadSiblingExclusions, contextNote, noDataNote }){
+      if(notAllowed){ showAppAlert('Це не твій рядок. Тільки сам гід або призначений "відповідальний гід" на цю екскурсію може підтягнути сюди туристів.'); return; }
+      if(error){ showAppAlert(friendlyErrorMessage(error)); return; }
+
+      if(!relevant.length){
         const infoModal = document.createElement('div');
         infoModal.className = 'hb-modal-overlay';
         infoModal.style.zIndex = String(nextModalZ());
         infoModal.innerHTML = `<div class="hb-modal-card" style="max-width:340px;">
           <h2 style="font-size:16px; font-weight:700; margin-bottom:10px;">Немає даних</h2>
-          <p style="margin:0 0 16px; font-size:14px;">У списку туристів поки немає даних для цієї екскурсії у гіда <b>${draft.person}</b>.</p>
-          <button class="btn btn-primary" id="fillInfoOkBtn" style="width:100%;">Зрозуміло</button>
+          <p style="margin:0 0 16px; font-size:14px;">${hadSiblingExclusions ? 'Усі відповідні туристи вже призначені в інший автобус.' : noDataNote}</p>
+          <div style="text-align:center;"><button class="btn btn-primary" id="fillInfoOkBtn">Зрозуміло</button></div>
         </div>`;
         document.body.appendChild(infoModal);
-        function closeInfo(){ infoModal.remove(); fillBtn.disabled = false; fillBtn.textContent = '📋 Підтягнути з списку туристів'; }
+        function closeInfo(){ infoModal.remove(); }
         infoModal.addEventListener('click', e=>{ if(e.target===infoModal) closeInfo(); });
         document.getElementById('fillInfoOkBtn').addEventListener('click', closeInfo);
         return;
       }
+
+      const availCount = relevant.length;
+      const availSum = relevant.reduce((s,x)=>s+(Number(x.sel.price)||0),0);
       const oldChol = draft.chol, oldZibrano = draft.zibrano;
       const confirmModal = document.createElement('div');
       confirmModal.className = 'hb-modal-overlay';
       confirmModal.style.zIndex = String(nextModalZ());
       confirmModal.innerHTML = `<div class="hb-modal-card" style="max-width:340px;">
         <h2 style="font-size:16px; font-weight:700; margin-bottom:12px;">Підтягнути з туристів?</h2>
+        ${contextNote ? `<p class="report-note" style="margin:0 0 10px; text-align:center;">${contextNote}</p>` : ''}
         <div style="background:var(--whitewash); border-radius:10px; padding:12px; text-align:center; margin-bottom:10px;">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin-bottom:4px;">Нові значення</div>
-          <div style="font-size:22px; font-weight:700;">${stats.count} чол · ${fmt(stats.sum)} €</div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin-bottom:4px;">${hadSiblingExclusions ? 'Доступно (без уже призначених в інший автобус)' : 'Доступно на цю екскурсію'}</div>
+          <div style="font-size:22px; font-weight:700;">${availCount} чол · ${fmt(availSum)} €</div>
         </div>
         <div class="muted" style="font-size:12.5px; text-align:center; margin-bottom:14px;">Поточні: ${oldChol} чол · ${fmt(oldZibrano)} €</div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn btn-primary" id="fillConfirmOkBtn" style="flex:1;">Підставити</button>
-          <button class="btn btn-ghost" id="fillConfirmCancelBtn" style="flex:1;">Скасувати</button>
+        <p class="report-note" style="margin:0 0 10px; text-align:center;">Усі ці туристи їдуть саме в цей автобус, чи тільки частина (решта — в інший автобус)?</p>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <button class="btn btn-primary" id="fillConfirmOkBtn">Так, усі</button>
+          <button class="btn btn-ghost" id="fillConfirmPickBtn">Оберу сам</button>
+          <button class="btn btn-ghost" id="fillConfirmCancelBtn">Скасувати</button>
         </div>
       </div>`;
       document.body.appendChild(confirmModal);
-      function closeConfirm(){
-        confirmModal.remove();
-        fillBtn.disabled = false; fillBtn.textContent = '📋 Підтягнути з списку туристів';
-      }
+      function closeConfirm(){ confirmModal.remove(); }
       confirmModal.addEventListener('click', e=>{ if(e.target===confirmModal) closeConfirm(); });
       document.getElementById('fillConfirmCancelBtn').addEventListener('click', closeConfirm);
       document.getElementById('fillConfirmOkBtn').addEventListener('click', ()=>{
-        draft.chol = stats.count; draft.zibrano = stats.sum;
+        draft.chol = availCount; draft.zibrano = availSum;
+        draft.assignedTouristIds = relevant.map(x=>x.t.id);
         confirmModal.remove();
         draw();
+      });
+      const pickBtn = document.getElementById('fillConfirmPickBtn');
+      if(pickBtn) pickBtn.addEventListener('click', ()=>{
+        confirmModal.remove();
+        openPickTouristsForBusModal(relevant, (picked)=>{
+          draft.chol = picked.length;
+          draft.zibrano = picked.reduce((s,x)=>s+(Number(x.sel.price)||0),0);
+          draft.assignedTouristIds = picked.map(x=>x.t.id);
+          draw();
+        }, ()=>{});
+      });
+    }
+    const fillBtn = document.getElementById('rdmFillTourists');
+    if(fillBtn) fillBtn.addEventListener('click', async ()=>{
+      fillBtn.disabled = true; fillBtn.textContent = 'Перевіряю…';
+      const { relevant, error, notAllowed, hadSiblingExclusions, isOwnRow } = await fetchRelevantTouristsForGuideRow(excId, exc, displayName, tripData, draft.person);
+      fillBtn.disabled = false; fillBtn.textContent = '📋 Зі списку';
+      runFillFromListFlow({
+        relevant, error, notAllowed, hadSiblingExclusions,
+        contextNote: !isOwnRow ? 'Ти призначений(а) відповідальним гідом — тут показані туристи всіх гідів на цю екскурсію.' : '',
+        noDataNote: `У списку туристів поки немає даних для цієї екскурсії${isOwnRow ? ` у гіда <b>${draft.person}</b>` : ''}.`
+      });
+    });
+    const fillPartnerBtn = document.getElementById('rdmFillPartnerFromSkiatos');
+    if(fillPartnerBtn) fillPartnerBtn.addEventListener('click', async ()=>{
+      fillPartnerBtn.disabled = true; fillPartnerBtn.textContent = 'Перевіряю…';
+      const { relevant, error, notAllowed, hadSiblingExclusions } = await fetchRelevantSkiatosExtrasForPartner(excId, exc, displayName, tripData, draft.person);
+      fillPartnerBtn.disabled = false; fillPartnerBtn.textContent = '📋 Зі списку на Скіатос';
+      runFillFromListFlow({
+        relevant, error, notAllowed, hadSiblingExclusions,
+        contextNote: '',
+        noDataNote: `У списку на Скіатос немає людей від "${draft.person}".`
       });
     });
     const saveBtn = document.getElementById('rdmSaveBtn');
     if(saveBtn) saveBtn.addEventListener('click', ()=>{
       updateRow(excId, rowId, {
         personType: draft.personType, person: draft.person, customPartnerName: draft.customPartnerName,
-        chol: draft.chol, zibrano: draft.zibrano, quitky: draft.quitky
+        chol: draft.chol, zibrano: draft.zibrano, quitky: draft.quitky, assignedTouristIds: draft.assignedTouristIds
       });
       closeAndNotify();
     });
@@ -2647,7 +3370,7 @@ document.getElementById('addExcursionBtn').addEventListener('click', async ()=>{
   renderAll();
   await upsertExcursion(currentTripId, exc);
   for(const r of exc.rows) await upsertRow(currentTripId, exc.id, r);
-  openExcNameModal(exc.id, ()=> openExcursionModal(exc.id));
+  openExcCreateModal(exc.id, ()=> openExcursionModal(exc.id));
 });
 document.getElementById('printBtn').addEventListener('click', ()=> window.print());
 
@@ -2722,8 +3445,8 @@ function showFinanceNotifyList(reports){
         <div class="fin-row"><span class="fin-label">Залишок</span><span>${fmt(balance)} €</span></div>
         <div class="fin-row"><span class="fin-label">Здано менеджеру</span><span>${fmt(r.handed_over||0)} €</span></div>
         <div class="no-print" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn btn-ghost btn-small" data-role="finNotifyCorrect" data-trip="${r.trip_id}" data-guide="${r.guide_name}">🔓 Відкрити для корекції</button>
-          <button class="btn btn-primary btn-small" data-role="finNotifyAccept" data-trip="${r.trip_id}" data-guide="${r.guide_name}">✅ Прийняти звіт</button>
+          <button class="btn btn-ghost btn-small" data-role="finNotifyCorrect" data-trip="${r.trip_id}" data-guide="${r.guide_name}">🔓 Виправити</button>
+          <button class="btn btn-primary btn-small" data-role="finNotifyAccept" data-trip="${r.trip_id}" data-guide="${r.guide_name}">✅ Прийняти</button>
         </div>
       </div>
     </details>`;
@@ -2770,14 +3493,9 @@ function showFinanceNotifyList(reports){
   panel.addEventListener('click', (e)=>{ if(e.target===panel) panel.remove(); });
 }
 setInterval(()=>{ if(currentProfile && currentProfile.role==='manager') checkFinanceSubmissions(); }, 60000);
-setInterval(async ()=>{
-  const activeTag = document.activeElement && document.activeElement.tagName;
-  const userIsTyping = activeTag==='INPUT' || activeTag==='TEXTAREA' || activeTag==='SELECT';
-  if(currentSection==='profit' && currentTripId && document.visibilityState==='visible' && !userIsTyping){
-    await loadTripData(currentTripId);
-    renderAll();
-  }
-}, 30000);
+// Прибутковість/Калькулятор екскурсій оновлюється в реальному часі через Supabase Realtime
+// (setupProfitRealtimeSubscription) — окремий таймер на автооновлення тут більше не потрібен
+// і тільки викликав зайве блимання екрана.
 
 document.getElementById('tabManagerBtn').addEventListener('click', ()=>{
   if(currentProfile.role !== 'manager') return; // hidden for guides anyway; RLS blocks regardless
@@ -3803,7 +4521,7 @@ function openExcursionListPreviewModal(tripId, guideName, g){
     <p class="report-note" style="margin-top:0;">${def?def.label:''} · Гід: ${guideName}</p>
     <div style="max-height:50vh; overflow-y:auto; margin-top:6px;">${rowsHtml}</div>
     ${totalHtml}
-    <button class="btn btn-primary" id="excListPreviewDownloadBtn" style="width:100%; margin-top:12px;">⬇ Завантажити PDF</button>
+    <button class="btn btn-primary" id="excListPreviewDownloadBtn" style="width:100%; margin-top:12px;">⬇ PDF</button>
   </div>`;
   document.body.appendChild(modal);
   modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
@@ -4957,7 +5675,7 @@ async function saveFinanceReportToStorage(report, received, paid, totalReceived,
     const path = `${report.trip_id}/finance-report/${safePathSlug(report.guide_name)}/report_${tripFileTag(report.trip_id)}.xlsx`;
     const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, blob, { upsert:true });
     if(error){ if(!silent) showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); return false; }
-    if(!silent) showAppAlert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити збережений" — з будь-якого пристрою, включно з менеджером.');
+    if(!silent) showAppAlert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити" — з будь-якого пристрою, включно з менеджером.');
     return true;
   } catch(err){
     console.error(err);
@@ -5076,7 +5794,7 @@ function openMrSectionModal(sectionKey){
   } else if(sectionKey==='paid'){
     bodyHtml = `
       <div class="no-print" style="margin-bottom:10px;">
-        <button class="btn btn-primary btn-small" id="mrRefreshAllBtn">🔄 Оновити все з фінансових звітів гідів</button>
+        <button class="btn btn-primary btn-small" id="mrRefreshAllBtn">🔄 Оновити все</button>
       </div>
       <div class="no-print" style="margin-bottom:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <span style="font-size:13px; font-weight:600;">Наш автобус (по кілометражу):</span>
@@ -5376,20 +6094,29 @@ function renderFinanceReport(report){
   if(tdForSync){
     const collectedMap = {}, ticketsMap = {};
     const expectedGuideFeeKeys = new Set();
+    const excLabelCounts = {};
+    (tdForSync.excursions||[]).forEach(exc=>{
+      const lbl = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+      excLabelCounts[lbl] = (excLabelCounts[lbl]||0) + 1;
+    });
     (tdForSync.excursions||[]).forEach(exc=>{
       const excLabel = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+      const hasMultipleBuses = excLabelCounts[excLabel] > 1;
       const calc = calcExcursion(exc);
       const myRow = calc.rowResults.find(r=>r.isGuide && !r.isTest && r.person===report.guide_name);
+      // Якщо на цю назву є кілька автобусів (окремих екскурсій), Екскурсійка не знає, хто на якому —
+      // тому в такому разі довіряємо тільки вручну введеному значенню саме в цьому конкретному
+      // автобусі (і підсумовуємо по всіх автобусах цієї назви), а не сумарним даним з Екскурсійки.
       const actualKey = report.guide_name+'|'+excLabel;
-      const actual = actualCollected ? actualCollected[actualKey] : null;
+      const actual = (!hasMultipleBuses && actualCollected) ? actualCollected[actualKey] : null;
       const collectedAmount = actual ? actual.sum : (myRow ? Number(myRow.zibrano)||0 : 0);
-      if(collectedAmount > 0) collectedMap[excLabel] = collectedAmount;
-      if(myRow && calc.ticketsApply && Number(myRow.quitky) > 0) ticketsMap[excLabel] = Number(myRow.quitky);
+      if(collectedAmount > 0) collectedMap[excLabel] = (collectedMap[excLabel]||0) + collectedAmount;
+      if(myRow && calc.ticketsApply && Number(myRow.quitky) > 0) ticketsMap[excLabel] = (ticketsMap[excLabel]||0) + Number(myRow.quitky);
       // Гонорар гіда потрапляє у Фінзвіт тільки якщо це НАШ автобус — на партнерському автобусі
       // екскурсовода оплачує партнер напряму, а наша частка цієї витрати вже врахована через
       // взаєморозрахунок "Ми→партнеру"/"Партнер→нам", тож окремий рядок тут був би подвійним рахунком.
       if(exc.busOwner==='own' && exc.payerGuide===report.guide_name && Number(exc.guideFee) > 0 && !NO_GUIDE_FEE_EXCURSIONS.includes(exc.name)){
-        const itemKey = 'guidefee_'+excLabel;
+        const itemKey = hasMultipleBuses ? 'guidefee_'+exc.id : 'guidefee_'+excLabel;
         expectedGuideFeeKeys.add(itemKey);
         const amount = Number(exc.guideFee);
         let feeEntry = finEntriesByKey(report.entries, itemKey)[0];
@@ -5484,7 +6211,7 @@ function renderFinanceReport(report){
     ${finLeaf('Квитки (напр. Скіатос)', finSumByKey(report.entries,'tickets'), '', true, '(авто з Прибутковості)')}
     ${guideFeeExcursions.map(name=>{
       const onOwnBus = finExcursionOnOwnBus(name);
-      const sum = finSumByKey(report.entries,'guidefee_'+name);
+      const sum = report.entries.filter(e=>e.isGuideFeeEntry && e.excursionName===name).reduce((s,e)=>s+(Number(e.amount)||0),0);
       return finLeaf(`Екскурсовод ${name}`, sum, '', true, onOwnBus?'(авто з Прибутковості)':'(не наш автобус)');
     }).join('')}
     ${finLeaf('Подарунок туристам', finSumByKey(report.entries,'gift'), 'data-modal="gift"')}
@@ -5510,7 +6237,7 @@ function renderFinanceReport(report){
 
     ${isManagerCorrecting ? `<div class="no-print" style="margin-top:12px; background:#fce8ee; border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
       <span style="font-weight:700;">✏️ Режим корекції — ви редагуєте звіт гіда ${report.guide_name}</span>
-      <button class="btn btn-ghost btn-small" id="finExitCorrectionBtn">🔒 Завершити корекцію</button>
+      <button class="btn btn-ghost btn-small" id="finExitCorrectionBtn">🔒 Завершити</button>
     </div>` : ''}
 
     <div class="row-card-summary fin-section-summary" data-role="finSectionOpen" data-section="received" style="margin-top:14px;">
@@ -5533,7 +6260,7 @@ function renderFinanceReport(report){
           <button class="btn ${report.submitted?'btn-ghost':'btn-primary'}" id="finSubmitBtn" ${report.submitted?'disabled':''} style="width:100%; padding:14px;">
             ${report.submitted ? `✅ Відправлено${report.submitted_at ? ' · '+new Date(report.submitted_at).toLocaleString('uk-UA') : ''}` : '📤 Відправити менеджеру'}
           </button>
-          ${report.submitted ? `<button class="btn btn-ghost btn-small" id="finReopenBtn" style="margin-top:8px;">🔓 Виправити і відправити ще раз</button>` : ''}
+          ${report.submitted ? `<button class="btn btn-ghost btn-small" id="finReopenBtn" style="margin-top:8px;">🔓 Виправити знову</button>` : ''}
         `}
       </div>
     </div>
@@ -5551,7 +6278,7 @@ function renderFinanceReport(report){
     </div>
 
     <div class="no-print" style="margin-top:16px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--line); padding-top:14px;">
-      <button class="btn btn-ghost btn-small" id="finDownloadSavedBtn">⬇ Завантажити збережений</button>
+      <button class="btn btn-ghost btn-small" id="finDownloadSavedBtn">⬇ Завантажити</button>
     </div>
   `;
 
@@ -5692,7 +6419,7 @@ async function downloadXlsxSnapshot(storagePath, notFoundMsg){
 }
 function saveDownloadButtonsHtml(idPrefix){
   return `<button class="btn btn-ghost btn-small no-print" id="${idPrefix}SaveBtn">💾 Зберегти</button>
-    <button class="btn btn-ghost btn-small no-print" id="${idPrefix}DownloadBtn">⬇ Завантажити збережений</button>`;
+    <button class="btn btn-ghost btn-small no-print" id="${idPrefix}DownloadBtn">⬇ Завантажити</button>`;
 }
 function wireSaveDownloadButtons(idPrefix, storagePath, buildRowsFn, sheetName){
   const saveBtn = document.getElementById(idPrefix+'SaveBtn');
@@ -5703,7 +6430,7 @@ function wireSaveDownloadButtons(idPrefix, storagePath, buildRowsFn, sheetName){
       const rows = buildRowsFn();
       const error = await saveXlsxSnapshot(storagePath, rows, sheetName);
       if(error) showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error));
-      else showAppAlert('Збережено в сховище. Тепер можна завантажити кнопкою "⬇ Завантажити збережений" з будь-якого пристрою.');
+      else showAppAlert('Збережено в сховище. Тепер можна завантажити кнопкою "⬇ Завантажити" з будь-якого пристрою.');
     } catch(err){
       console.error(err); showAppAlert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
     } finally {
@@ -6175,7 +6902,7 @@ async function showCorrectionsHistoryModal(tripId){
   modal.style.zIndex = '850';
   modal.innerHTML = `<div class="hb-modal-card" style="max-width:640px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
-      <p class="report-title" style="margin:0;">📜 Історія корекцій</p>
+      <p class="report-title" style="margin:0;">📜 Історія</p>
       <button class="btn btn-ghost btn-small" id="correctionsHistoryCloseBtn">✕ Закрити</button>
     </div>
     <p class="report-note" style="margin-top:0;">${def?def.label:''}</p>
@@ -6311,7 +7038,7 @@ function openProfitCorrectionModal(tripId, r, field){
     <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Коментар (обов'язково — чому виправляєш)</label>
     <textarea id="profitCorrectionComment" rows="3" placeholder="напр. Гід помилково вписав не ту суму, пояснив і підтвердив правильну" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; margin-bottom:12px; resize:vertical;"></textarea>
     <div style="display:flex; gap:10px;">
-      <button class="btn btn-primary" id="profitCorrectionSaveBtn" style="flex:1;">💾 Зберегти корекцію</button>
+      <button class="btn btn-primary" id="profitCorrectionSaveBtn" style="flex:1;">💾 Зберегти</button>
       <button class="btn btn-ghost" id="profitCorrectionCancelBtn" style="flex:1;">Скасувати</button>
     </div>
   </div>`;
@@ -6325,7 +7052,7 @@ function openProfitCorrectionModal(tripId, r, field){
     const saveBtn = document.getElementById('profitCorrectionSaveBtn');
     saveBtn.disabled = true; saveBtn.textContent = 'Зберігаю…';
     const result = await applyProfitCorrection(tripId, r.guide, r.excName, field, newVal, comment);
-    if(result.error){ showAppAlert('Не вдалося зберегти: ' + result.error); saveBtn.disabled=false; saveBtn.textContent='💾 Зберегти корекцію'; return; }
+    if(result.error){ showAppAlert('Не вдалося зберегти: ' + result.error); saveBtn.disabled=false; saveBtn.textContent='💾 Зберегти'; return; }
     modal.remove();
     const profitDiff = result.newProfit - result.oldProfit;
     showAppAlert(`✅ Виправлено.\n\nПрибуток гіда з цієї екскурсії: було ${fmt(result.oldProfit)} € → стало ${fmt(result.newProfit)} € (${profitDiff>=0?'+':''}${fmt(profitDiff)} €).\n% гіда: було ${fmt(result.oldPct)} € → стало ${fmt(result.newPct)} €.`);
@@ -6388,7 +7115,7 @@ function renderReconciliationCheckFromRows(tripId, rows, tripWide){
       let bits = [`Список: ${r.auto.count} чол / ${fmt(r.auto.sum)} €`, `Прибутковість: ${r.manual.count} чол / ${fmt(r.manual.sum)} €`];
       const noFinRecord = r.finAmt===0 && r.auto.sum>0;
       bits.push(`Фінзвіт: ${fmt(r.finAmt)} €${noFinRecord ? ' (немає запису)' : ''}`);
-      lines.push(`<div>💰 <b>Зібрано / кількість:</b> ${bits.join(' · ')} <button class="btn btn-ghost btn-small no-print" data-role="reconcileFix" data-idx="${i}" data-field="zibrano" style="padding:1px 6px; font-size:11px;">✏️ Виправити</button> <button class="btn btn-ghost btn-small no-print" data-role="reconcileShowNames" data-idx="${i}" style="padding:1px 6px; font-size:11px;">👥 Хто в списку</button> <button class="btn btn-ghost btn-small no-print" data-role="reconcilePointGuide" data-idx="${i}" style="padding:1px 6px; font-size:11px;">🔗 Вказати гіда</button></div>`);
+      lines.push(`<div>💰 <b>Зібрано / кількість:</b> ${bits.join(' · ')} <button class="btn btn-ghost btn-small no-print" data-role="reconcileFix" data-idx="${i}" data-field="zibrano" style="padding:1px 6px; font-size:11px;">✏️ Виправити</button> <button class="btn btn-ghost btn-small no-print" data-role="reconcileShowNames" data-idx="${i}" style="padding:1px 6px; font-size:11px;">👥 Список</button> <button class="btn btn-ghost btn-small no-print" data-role="reconcilePointGuide" data-idx="${i}" style="padding:1px 6px; font-size:11px;">🔗 Гід</button></div>`);
       if(r.pointedGuideResult){
         lines.push(`<div style="color:#0369a1;">🔗 У звіті <b>${r.pointedGuideResult.guide}</b> знайдено: ${fmt(r.pointedGuideResult.amount)} €</div>`);
       }
@@ -6486,10 +7213,10 @@ async function renderReportsSection(){
       <select id="reportsExcTripSelect" style="padding:8px 10px; border:2px solid var(--line); border-radius:8px;">
         ${[...TRIPS_DEF].filter(d=> new Date() > d.end).sort((a,b)=>b.start-a.start).map(d=>`<option value="${d.id}">${d.label}</option>`).join('')}
       </select>
-      <button class="btn btn-primary btn-small" id="reportsExcDownloadBtn">⬇ Завантажити прибутковість екскурсій</button>
-      <button class="btn btn-ghost btn-small" id="reportsReconcileBtn">🔍 Знайти нестиковки</button>
-      <button class="btn btn-ghost btn-small" id="reportsCorrectionsHistoryBtn">📜 Історія корекцій</button>
-      <button class="btn btn-ghost btn-small" id="reportsDrilldownBtn">👁 Переглянути по гідах</button>
+      <button class="btn btn-primary btn-small" id="reportsExcDownloadBtn">⬇ Прибутковість</button>
+      <button class="btn btn-ghost btn-small" id="reportsReconcileBtn">🔍 Нестиковки</button>
+      <button class="btn btn-ghost btn-small" id="reportsCorrectionsHistoryBtn">📜 Історія</button>
+      <button class="btn btn-ghost btn-small" id="reportsDrilldownBtn">👁 По гідах</button>
     </div>
     <div id="reportsReconcileResult" style="margin-top:10px;"></div>
   `;
@@ -6516,7 +7243,7 @@ async function renderReportsSection(){
       if(!state.trips[tripId]) await loadTripData(tripId);
       await renderReconciliationCheck(tripId);
     } finally {
-      reconcileBtn.disabled = false; reconcileBtn.textContent = '🔍 Знайти нестиковки';
+      reconcileBtn.disabled = false; reconcileBtn.textContent = '🔍 Нестиковки';
     }
   });
 
@@ -6535,7 +7262,7 @@ async function renderReportsSection(){
     try{
       await renderReportsGuideDrilldown(tripId);
     } finally {
-      drilldownBtn.disabled = false; drilldownBtn.textContent = '👁 Переглянути по гідах';
+      drilldownBtn.disabled = false; drilldownBtn.textContent = '👁 По гідах';
     }
   });
   block.querySelectorAll('.reports-overview-row').forEach(row=> row.addEventListener('click', async ()=>{
@@ -6594,42 +7321,55 @@ function computeProfitExcursionGroups(tripId){
   if(!td) return [];
   const actualMap = profitActualCollectedCache[tripId] || {};
   const groups = [];
+  // Скільки окремих екскурсій (автобусів) має кожна назва — якщо більше одного, Екскурсійка
+  // фізично не може сказати, який турист на якому автобусі, тож автосинхронізацію для таких
+  // назв вимикаємо і лишаємо ручне введення "Чол"/"Зібрано" по кожному автобусу окремо.
+  const excLabelCounts = {};
+  (td.excursions||[]).forEach(exc=>{
+    const lbl = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+    excLabelCounts[lbl] = (excLabelCounts[lbl]||0) + 1;
+  });
   (td.excursions||[]).forEach(exc=>{
     const excLabel = exc.name==='Інше...' ? (exc.customName||'Інше') : exc.name;
+    const hasMultipleBuses = excLabelCounts[excLabel] > 1;
 
-    // Якщо в гіда є реальні дані в Екскурсійці по цій екскурсії, але рядка для нього в Прибутковості
-    // ще взагалі не існує (наприклад, його додали пізніше) — створюємо рядок, інакше цей гід ніколи
-    // не з'явиться в списку, скільки б реальних даних не було.
-    (td.guides||[]).forEach(guideObj=>{
-      const gName = guideObj.name;
-      const hasRow = (exc.rows||[]).some(row=> row.personType==='guide' && row.person===gName);
-      if(hasRow) return;
-      const actual = actualMap[gName+'|'+excLabel];
-      if(!actual || actual.count<=0) return;
-      const newRowObj = { id: uid(), personType:'guide', person:gName, customPartnerName:'', chol:actual.count, zibrano:actual.sum, quitky:0, received:false, receivedBy:'', receivedAt:null };
-      exc.rows = exc.rows || [];
-      exc.rows.push(newRowObj);
-      upsertRow(tripId, exc.id, newRowObj);
-    });
+    if(!hasMultipleBuses){
+      // Якщо в гіда є реальні дані в Екскурсійці по цій екскурсії, але рядка для нього в Прибутковості
+      // ще взагалі не існує (наприклад, його додали пізніше) — створюємо рядок, інакше цей гід ніколи
+      // не з'явиться в списку, скільки б реальних даних не було.
+      (td.guides||[]).forEach(guideObj=>{
+        const gName = guideObj.name;
+        const hasRow = (exc.rows||[]).some(row=> row.personType==='guide' && row.person===gName);
+        if(hasRow) return;
+        const actual = actualMap[gName+'|'+excLabel];
+        if(!actual || actual.count<=0) return;
+        const newRowObj = { id: uid(), personType:'guide', person:gName, customPartnerName:'', chol:actual.count, zibrano:actual.sum, quitky:0, received:false, receivedBy:'', receivedAt:null };
+        exc.rows = exc.rows || [];
+        exc.rows.push(newRowObj);
+        upsertRow(tripId, exc.id, newRowObj, true);
+      });
+    }
 
     const calc = calcExcursion(exc);
 
-    // Спершу синхронізуємо "Чол" і "Зібрано" з реальними даними Екскурсійки для КОЖНОГО гідівського
-    // рядка — навіть якщо в Прибутковості це поле ще ніколи не заповнювалось (chol=0), бо інакше
-    // такий рядок відфільтрується нижче ще до того, як побачить реальні дані.
-    calc.rowResults.filter(r=>r.isGuide && !r.isTest).forEach(r=>{
-      const actualKey = r.person+'|'+excLabel;
-      const actual = actualMap[actualKey];
-      if(!actual) return;
-      const rawRow = (exc.rows||[]).find(row=>row.id===r.id);
-      if(!rawRow) return;
-      let changed = false;
-      if(Math.abs((Number(rawRow.zibrano)||0) - actual.sum) > 0.001){ rawRow.zibrano = actual.sum; changed = true; }
-      if(Number(rawRow.chol)!==actual.count){ rawRow.chol = actual.count; changed = true; }
-      if(changed) upsertRow(tripId, exc.id, rawRow);
-    });
+    if(!hasMultipleBuses){
+      // Спершу синхронізуємо "Чол" і "Зібрано" з реальними даними Екскурсійки для КОЖНОГО гідівського
+      // рядка — навіть якщо в Прибутковості це поле ще ніколи не заповнювалось (chol=0), бо інакше
+      // такий рядок відфільтрується нижче ще до того, як побачить реальні дані.
+      calc.rowResults.filter(r=>r.isGuide && !r.isTest).forEach(r=>{
+        const actualKey = r.person+'|'+excLabel;
+        const actual = actualMap[actualKey];
+        if(!actual) return;
+        const rawRow = (exc.rows||[]).find(row=>row.id===r.id);
+        if(!rawRow) return;
+        let changed = false;
+        if(Math.abs((Number(rawRow.zibrano)||0) - actual.sum) > 0.001){ rawRow.zibrano = actual.sum; changed = true; }
+        if(Number(rawRow.chol)!==actual.count){ rawRow.chol = actual.count; changed = true; }
+        if(changed) upsertRow(tripId, exc.id, rawRow, true);
+      });
+    }
 
-    const calcSynced = calcExcursion(exc); // перерахунок уже з синхронізованими rows
+    const calcSynced = hasMultipleBuses ? calc : calcExcursion(exc); // перерахунок уже з синхронізованими rows (пропускаємо повторний, якщо синхронізації не було)
     const realRows = calcSynced.rowResults.filter(r=>!r.isTest && r.chol>0);
     if(!realRows.length) return;
     const guideFeeVal = NO_GUIDE_FEE_EXCURSIONS.includes(exc.name) ? 0 : (Number(exc.guideFee)||0);
@@ -6685,6 +7425,7 @@ function openProfitExcursionDetailModal(tripId, excId){
   const groups = computeProfitExcursionGroups(tripId);
   const g = groups.find(x=>x.excId===excId);
   if(!g) return;
+  const hasSiblingBuses = groups.filter(x=>x.excLabel===g.excLabel).length > 1;
   const readOnly = !(currentProfile && currentProfile.role==='manager');
   const existing = document.getElementById('profitExcDetailModal');
   if(existing) existing.remove();
@@ -6745,6 +7486,7 @@ function openProfitExcursionDetailModal(tripId, excId){
       <button class="btn btn-ghost btn-small" id="profitExcDetailCloseXBtn" style="flex-shrink:0; margin-left:8px;">✕</button>
     </div>
     <p class="muted" style="font-size:12.5px; margin-top:2px;">${g.isOwnBus?'наш автобус':'партнерський'} ${g.totalPeople} чол</p>
+    ${hasSiblingBuses ? `<p style="font-size:11.5px; margin-top:4px; padding:6px 8px; background:#fff7ed; border-radius:6px; color:#9a5b1a;">⚠ На цю екскурсію є декілька автобусів — "Чол" і "Зібрано" тут вводяться вручну для КОЖНОГО автобуса окремо (автоматика з Екскурсійки вимкнена, бо вона не знає, хто на якому автобусі).</p>` : ''}
     <p class="report-note" style="margin-top:2px;">
       <span ${fld('data-role="profitFieldOpen" data-field="km"')} style="${clk}">${fmt(g.km)} км</span>,
       <span ${fld('data-role="profitFieldOpen" data-field="busRate"')} style="${clk}">${fmt(g.busRate)} €/км</span>
@@ -6819,14 +7561,22 @@ function openProfitFieldEditModal(tripId, excId, field, rowId){
   document.getElementById('profitFieldCloseXBtn').addEventListener('click', ()=> modal.remove());
   document.getElementById('profitFieldSaveBtn').addEventListener('click', async ()=>{
     const val = parseDecimalInput(document.getElementById('profitFieldValue').value);
-    if(field==='km'){ exc.km = val; await upsertExcursion(tripId, exc); }
-    else if(field==='busRate'){ exc.busRate = val; await upsertExcursion(tripId, exc); }
-    else if(field==='guideFee'){ exc.guideFee = val; await upsertExcursion(tripId, exc); }
-    else if(field==='weOwePartner'){ exc.toPartnerOverride = val; await upsertExcursion(tripId, exc); }
-    else if(field==='partnerOwesUs'){ exc.fromPartnerOverride = val; await upsertExcursion(tripId, exc); }
-    else if(field==='zibrano'){ if(row){ row.zibrano = val; await upsertRow(tripId, exc.id, row); } }
-    else if(field==='tickets'){ if(row){ row.quitky = val; await upsertRow(tripId, exc.id, row); } }
+    let result;
+    if(field==='km'){ exc.km = val; result = await upsertExcursion(tripId, exc); }
+    else if(field==='busRate'){ exc.busRate = val; result = await upsertExcursion(tripId, exc); }
+    else if(field==='guideFee'){ exc.guideFee = val; result = await upsertExcursion(tripId, exc); }
+    else if(field==='weOwePartner'){ exc.toPartnerOverride = val; result = await upsertExcursion(tripId, exc); }
+    else if(field==='partnerOwesUs'){ exc.fromPartnerOverride = val; result = await upsertExcursion(tripId, exc); }
+    else if(field==='zibrano'){ if(row){ row.zibrano = val; result = await upsertRow(tripId, exc.id, row); } }
+    else if(field==='tickets'){ if(row){ row.quitky = val; result = await upsertRow(tripId, exc.id, row); } }
     modal.remove();
+    if(result && result.error && /foreign key constraint/i.test(result.error.message||'')){
+      // Дані заїзду застаріли в кеші — оновлюємо їх самі, щоб не змушувати перезавантажувати сторінку вручну.
+      delete state.trips[tripId];
+      await loadTripData(tripId);
+      showTripProfitabilityView(tripId);
+      return;
+    }
     const listWrap = document.getElementById('tripProfitListWrap');
     if(listWrap) listWrap.innerHTML = buildProfitExcursionListHtml(tripId);
     openProfitExcursionDetailModal(tripId, excId);
@@ -7303,18 +8053,20 @@ async function showGuideSingleView(tripId, guideName, target){
   const paidHtml = paid.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>';
   container.innerHTML = `
     <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Отримано</p>
-    <div class="fin-panel" style="margin-bottom:8px;">${receivedHtml}</div>
+    <div class="fin-panel" style="margin-bottom:4px;">${receivedHtml}</div>
+    <div class="fin-total-row" style="margin-bottom:8px;"><span>Разом отримано</span><span>${fmt(totalReceived)} €</span></div>
     <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Затрати</p>
-    <div class="fin-panel" style="margin-bottom:8px;">${paidHtml}</div>
+    <div class="fin-panel" style="margin-bottom:4px;">${paidHtml}</div>
+    <div class="fin-total-row" style="margin-bottom:8px;"><span>Разом затрати</span><span>${fmt(totalPaid)} €</span></div>
     <div class="fin-row"><span class="fin-label">Залишок</span><span>${fmt(balance)} €</span></div>
     <div class="fin-row"><span class="fin-label">Здано менеджеру</span><span>${fmt(rep.handed_over||0)} €</span></div>
     <p class="${rep.submitted?'muted':'profit-neg'}" style="font-size:11.5px; margin-top:4px; font-weight:${rep.submitted?'400':'600'};">${rep.submitted ? '✅ Відправлено'+(rep.submitted_at?' · '+new Date(rep.submitted_at).toLocaleString('uk-UA'):'') : '⚠ Ще не відправлено'}</p>
     ${rep.accepted
       ? `<p class="profit-pos" style="font-weight:700; margin-top:6px;">🔒 Прийнято${rep.accepted_at ? ' · '+new Date(rep.accepted_at).toLocaleString('uk-UA') : ''}</p>
-         <button class="btn btn-ghost btn-small no-print" id="guideSingleUnacceptBtn" style="margin-top:8px;">🔓 Зняти прийняття і відкрити для корекції</button>`
-      : rep.submitted ? `<button class="btn btn-primary btn-small no-print" id="guideSingleAcceptBtn" style="margin-top:8px;">✅ Прийняти звіт (заблокувати)</button>` : ''
+         <button class="btn btn-ghost btn-small no-print" id="guideSingleUnacceptBtn" style="margin-top:8px;">🔓 Зняти прийняття</button>`
+      : rep.submitted ? `<button class="btn btn-primary btn-small no-print" id="guideSingleAcceptBtn" style="margin-top:8px;">✅ Прийняти</button>` : ''
     }
-    ${!rep.accepted ? `<button class="btn btn-ghost btn-small no-print" id="guideSingleCorrectBtn" style="margin-top:8px;">🔓 Відкрити для корекції</button>` : ''}
+    ${!rep.accepted ? `<button class="btn btn-ghost btn-small no-print" id="guideSingleCorrectBtn" style="margin-top:8px;">🔓 Виправити</button>` : ''}
   `;
   const correctBtn = document.getElementById('guideSingleCorrectBtn');
   if(correctBtn) correctBtn.addEventListener('click', async ()=>{
@@ -7443,15 +8195,17 @@ async function renderReportsGuideDrilldown(tripId){
       const balance = totalReceived - totalPaid;
       finHtml = `
         <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Отримано</p>
-        <div class="fin-panel" style="margin-bottom:8px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}${e.currency && e.currency!=='EUR' ? ` <span class="muted" style="font-size:11px;">(${fmt(e.origAmount)} ${e.currency}, курс ${e.rate})</span>` : ''}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+        <div class="fin-panel" style="margin-bottom:4px;">${received.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}${e.currency && e.currency!=='EUR' ? ` <span class="muted" style="font-size:11px;">(${fmt(e.origAmount)} ${e.currency}, курс ${e.rate})</span>` : ''}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+        <div class="fin-total-row" style="margin-bottom:8px;"><span>Разом отримано</span><span>${fmt(totalReceived)} €</span></div>
         <p class="muted" style="font-size:11.5px; margin:0 0 3px;">Затрати</p>
-        <div class="fin-panel" style="margin-bottom:8px;">${paid.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+        <div class="fin-panel" style="margin-bottom:4px;">${paid.map(e=>`<div class="fin-list-row"><span style="flex:1;">${e.label}</span><span>${fmt(e.amount)} €</span></div>`).join('') || '<div class="fin-list-row"><span class="muted">—</span></div>'}</div>
+        <div class="fin-total-row" style="margin-bottom:8px;"><span>Разом затрати</span><span>${fmt(totalPaid)} €</span></div>
         <div class="fin-row"><span class="fin-label">Залишок</span><span>${fmt(balance)} €</span></div>
         <div class="fin-row"><span class="fin-label">Здано менеджеру</span><span>${fmt(rep.handed_over||0)} €</span></div>
         <p class="${rep.submitted?'muted':'profit-neg'}" style="font-size:11.5px; margin-top:4px; font-weight:${rep.submitted?'400':'600'};">${rep.submitted ? '✅ Відправлено'+(rep.submitted_at?' · '+new Date(rep.submitted_at).toLocaleString('uk-UA'):'') : '⚠ Ще не відправлено'}</p>
         ${rep.accepted
           ? `<p class="profit-pos" style="font-weight:700; margin-top:6px;">🔒 Прийнято${rep.accepted_at ? ' · '+new Date(rep.accepted_at).toLocaleString('uk-UA') : ''}</p>`
-          : rep.submitted ? `<button class="btn btn-primary btn-small no-print" data-role="mrAcceptFinReport" data-guide="${g}" style="margin-top:8px;">✅ Прийняти звіт (заблокувати)</button>` : ''
+          : rep.submitted ? `<button class="btn btn-primary btn-small no-print" data-role="mrAcceptFinReport" data-guide="${g}" style="margin-top:8px;">✅ Прийняти</button>` : ''
         }
       `;
     }
@@ -7708,7 +8462,7 @@ async function renderStatsSection(){
       </div>
       <div class="fin-total-row" style="margin-top:8px;"><span>Загальний прибуток за сезон</span><span>${fmt(grandExcProfit)} €</span></div>
       <div class="no-print" style="margin-top:10px;">
-        <button class="btn btn-ghost btn-small" id="statsSeasonPrintBtn">🖨 Друк статистики по екскурсіям</button>
+        <button class="btn btn-ghost btn-small" id="statsSeasonPrintBtn">🖨 Друк статистики</button>
       </div>
     </div>
   `;
@@ -7863,9 +8617,9 @@ function renderManagerReport(report, officeTotal, missing, skipModalReopen){
     <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:16px; border-top:1px solid var(--line); padding-top:14px;">
       <button class="btn btn-ghost btn-small" id="mrExportExcelBtn">📥 Excel</button>
       <button class="btn btn-ghost btn-small" id="mrExportWordBtn">📥 Word</button>
-      <button class="btn btn-ghost btn-small" id="mrPrintBtn">🖨 Друк / PDF</button>
-      <button class="btn btn-primary btn-small" id="mrSaveToStorageBtn">💾 Зберегти в сховище</button>
-      <button class="btn btn-ghost btn-small" id="mrDownloadSavedBtn">⬇ Завантажити збережений</button>
+      <button class="btn btn-ghost btn-small" id="mrPrintBtn">🖨 Друк</button>
+      <button class="btn btn-primary btn-small" id="mrSaveToStorageBtn">💾 Зберегти</button>
+      <button class="btn btn-ghost btn-small" id="mrDownloadSavedBtn">⬇ Завантажити</button>
     </div>
   `;
 
@@ -7893,18 +8647,18 @@ function renderManagerReport(report, officeTotal, missing, skipModalReopen){
       const path = `${report.trip_id}/manager-report/report_${tripFileTag(report.trip_id)}.xlsx`;
       const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, blob, { upsert:true });
       if(error){ showAppAlert('Не вдалося зберегти: ' + friendlyErrorMessage(error)); }
-      else { showAppAlert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити збережений" — з будь-якого пристрою.'); }
+      else { showAppAlert('Звіт збережено в сховище. Тепер його можна завантажити кнопкою "⬇ Завантажити" — з будь-якого пристрою.'); }
     } catch(err){
       console.error(err);
       showAppAlert('Помилка при збереженні: ' + (err && err.message ? err.message : err));
     } finally {
-      btn.disabled = false; btn.textContent = '💾 Зберегти в сховище';
+      btn.disabled = false; btn.textContent = '💾 Зберегти';
     }
   });
   document.getElementById('mrDownloadSavedBtn').addEventListener('click', async ()=>{
     const path = `${report.trip_id}/manager-report/report_${tripFileTag(report.trip_id)}.xlsx`;
     const { data, error } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(path, 3600);
-    if(error){ showAppAlert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти в сховище").'); return; }
+    if(error){ showAppAlert('Ще немає збереженої версії цього звіту (спочатку натисни "💾 Зберегти").'); return; }
     window.open(data.signedUrl, '_blank');
   });
 
@@ -8278,8 +9032,8 @@ async function renderSkiatosManifest(){
     return `<div style="margin-bottom:14px;">
       <p style="font-weight:700; margin:0 0 4px;">${g}</p>
       ${canAdd && g===myGuideName ? (iAmIn
-          ? `<button class="btn btn-ghost btn-small no-print" data-role="manRemoveSelf" data-guide="${g}" style="margin-bottom:8px;">✕ Я не їду</button>`
-          : `<button class="btn btn-primary btn-small no-print" data-role="manAddSelf" data-guide="${g}" style="margin-bottom:8px;">+ Я теж їду</button>`
+          ? `<button class="btn btn-ghost btn-small no-print" data-role="manRemoveSelf" data-guide="${g}" style="margin-bottom:8px;">✕ Не їду</button>`
+          : `<button class="btn btn-primary btn-small no-print" data-role="manAddSelf" data-guide="${g}" style="margin-bottom:8px;">+ Я їду</button>`
         ) : ''}
       <div class="table-scroll"><table class="report-table" style="font-size:12.5px;">
         <thead><tr><th>№</th><th style="text-align:left;">Ім'я</th><th>Вік</th><th>Паспорт</th><th>Ціна</th><th></th></tr></thead>
@@ -8356,7 +9110,7 @@ async function renderSkiatosManifest(){
         ${extraPersonRowHtml(0)}
       </div>
       <div class="no-print" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
-        <button class="btn btn-ghost btn-small" type="button" data-role="addExtraRowBtn">+ Додати ще одну людину</button>
+        <button class="btn btn-ghost btn-small" type="button" data-role="addExtraRowBtn">+ Додати людину</button>
         <button class="btn btn-primary btn-small" data-role="addExtraParticipant">Додати всіх</button>
       </div>
     </details>` : ''}
@@ -8414,9 +9168,9 @@ async function renderSkiatosManifest(){
     <div class="manager-only fin-total-row" style="margin-top:10px;"><span>Загалом до сплати катеру</span><span>${fmt(grandTotal)} €</span></div>
     <div class="no-print manager-only" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin-top:14px; border-top:1px solid var(--line); padding-top:14px;">
       <button class="btn btn-ghost btn-small" id="manSaveBtn">💾 Зберегти</button>
-      <button class="btn btn-ghost btn-small" id="manDownloadBtn">⬇ Завантажити збережений</button>
-      <button class="btn btn-ghost btn-small" id="manExportBtn">📥 Excel (внутрішній)</button>
-      <button class="btn btn-ghost btn-small" id="manExportFerryBtn">📥 Список для порому</button>
+      <button class="btn btn-ghost btn-small" id="manDownloadBtn">⬇ Завантажити</button>
+      <button class="btn btn-ghost btn-small" id="manExportBtn">📥 Excel</button>
+      <button class="btn btn-ghost btn-small" id="manExportFerryBtn">📥 Для порому</button>
     </div>
   `;
 
@@ -8943,7 +9697,7 @@ function renderTripPrepView(){
     <button class="btn btn-ghost btn-small tp-view-only-ok ${tabClass('rooms', hotelDone)}" data-tpview="rooms" ${overviewConfirmed?'':'disabled title="'+lockedTitle+'"'}>${overviewConfirmed?'':'🔒 '}${hotelDone?'✓ ':''}Готель</button>
     <button class="btn btn-ghost btn-small tp-view-only-ok ${tabClass('buses', busesDone)}" data-tpview="buses" ${overviewConfirmed?'':'disabled title="'+lockedTitle+'"'}>${overviewConfirmed?'':'🔒 '}${busesDone?'✓ ':''}Автобуси</button>
     <button class="btn btn-ghost btn-small tp-view-only-ok ${tripPrepView==='docs'?'active-tab':''}" data-tpview="docs" ${overviewConfirmed?'':'disabled title="'+lockedTitle+'"'}>${overviewConfirmed?'':'🔒 '}Документи</button>
-    <button class="btn btn-primary btn-small" id="tpHandoverToGuidesBtn" style="margin-left:auto;" title="Копіює розподілених по автобусах туристів у робочий список кожного гіда (без дублів). Роби це, коли список групи по автобусах готовий.">📤 Передати гіду</button>
+    <button class="btn btn-primary btn-small" id="tpHandoverToGuidesBtn" style="margin-left:auto;" title="Копіює розподілених по автобусах туристів у робочий список кожного гіда (без дублів). Роби це, коли список групи по автобусах готовий.">📤 Гіду</button>
   </div>
   <div id="tripPrepContent" class="${lockThisView?'tp-readonly':''}"></div>
   <div class="no-print" style="position:sticky; bottom:0; margin-top:20px; padding:10px 14px; background:${lockThisView?'#7c2d12':'var(--ochre)'}; color:#fff; border-radius:10px; font-weight:700; text-align:center; font-size:14px; box-shadow:0 -2px 8px rgba(0,0,0,.15);">
@@ -8983,7 +9737,7 @@ function renderTripPrepView(){
       }
       hbShowToast(totalAdded ? `✅ Передано ${totalAdded} чол. по всіх гідах` : 'Усі вже передані — новеньких немає.');
     } finally {
-      handoverBtn.disabled = false; handoverBtn.textContent = '📤 Передати гіду';
+      handoverBtn.disabled = false; handoverBtn.textContent = '📤 Гіду';
     }
   });
   if(tripPrepView==='overview') renderTripPrepOverview();
@@ -9059,12 +9813,12 @@ function renderTripPrepOverview(){
         ? `<div class="step-block no-print" style="margin-top:14px; background:#fff7ed; border-color:#fdba74;">
             <p class="step-title" style="margin:0 0 6px;">❗ Є ${unrecognizedForGate.length ? unrecognizedForGate.length+' нерозпізнаних міст' : ''}${unrecognizedForGate.length && missingCityForGate.length ? ' і ' : ''}${missingCityForGate.length ? missingCityForGate.length+' заявок без міста' : ''}</p>
             <p class="report-note">Поки їх не виправлено, недоступні вкладки "Готель", "Автобуси" і "Документи".</p>
-            ${unrecognizedForGate.length ? `<button class="btn btn-primary btn-small" id="tpOpenCityWizardBtn" style="margin-top:6px;">🏙 Розпізнати нерозпізнані міста</button>` : ''}
+            ${unrecognizedForGate.length ? `<button class="btn btn-primary btn-small" id="tpOpenCityWizardBtn" style="margin-top:6px;">🏙 Розпізнати міста</button>` : ''}
             ${missingCityBlockHtml}
           </div>`
         : `<div class="step-block no-print" style="margin-top:14px; background:#f0fdf4; border-color:#86efac;">
             <p class="report-note" style="margin:0 0 8px;">Усі міста посадки розпізнані і вказані. Натисни, щоб підтвердити список і відкрити решту вкладок.</p>
-            <button class="btn btn-primary btn-small" id="tpConfirmOverviewBtn">✅ Таблиці скореговані</button>
+            <button class="btn btn-primary btn-small" id="tpConfirmOverviewBtn">✅ Скореговано</button>
           </div>`)
     : `<div class="step-block no-print" style="margin-top:14px;">
         <details>
@@ -9078,7 +9832,7 @@ function renderTripPrepOverview(){
                     ${allKnownCities().map(c=>`<option value="${c}">${c}</option>`).join('')}
                   </select>
                   <button class="btn btn-ghost btn-small no-print" data-role="tpApplyCityFixInline" data-raw="${item.raw}">Виправити всюди</button>
-                  <button class="btn btn-ghost btn-small no-print" data-role="tpAddCityInline" data-raw="${item.raw}">🆕 Це нове місто</button>
+                  <button class="btn btn-ghost btn-small no-print" data-role="tpAddCityInline" data-raw="${item.raw}">🆕 Нове місто</button>
                 </div>
               </div>`).join('')
             : ''}
@@ -9109,9 +9863,9 @@ function renderTripPrepOverview(){
         </div>
         <div id="tripPrepImportStatus" class="report-note" style="margin-top:6px;"></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-          <button class="btn btn-danger-ghost btn-small" id="tpClearKonstantinBtn">🗑️ Очистити список Konstantin</button>
-          <button class="btn btn-danger-ghost btn-small" id="tpClearGreatBtn">🗑️ Очистити список Great Aleksander</button>
-          <button class="btn btn-danger-ghost btn-small" id="tpClearTouristsBtn">🗑️ Очистити обидва</button>
+          <button class="btn btn-danger-ghost btn-small" id="tpClearKonstantinBtn">🗑️ Очистити Konstantin</button>
+          <button class="btn btn-danger-ghost btn-small" id="tpClearGreatBtn">🗑️ Очистити Aleksander</button>
+          <button class="btn btn-danger-ghost btn-small" id="tpClearTouristsBtn">🗑️ Очистити все</button>
         </div>
       </details>
     </div>
@@ -9360,8 +10114,8 @@ function renderTripPrepOverview(){
         <h2 style="flex:1; font-size:16px; font-weight:700; margin:0;">Заявка</h2>
         <button class="btn btn-ghost btn-small no-print" id="tpRowMenuCloseBtn" title="Закрити" style="font-size:16px; padding:5px 11px;">✕</button>
       </div>
-      <button class="btn btn-ghost" id="tpRowMenuMoveBtn" style="width:100%; text-align:left;">🔄 Перенести в інший готель</button>
-      <button class="btn btn-ghost" id="tpRowMenuDeleteBtn" style="width:100%; text-align:left; color:#dc2626; margin-top:6px;">🗑️ Видалити всю заявку</button>
+      <div style="text-align:center;"><button class="btn btn-ghost" id="tpRowMenuMoveBtn">🔄 Інший готель</button></div>
+      <div style="text-align:center; margin-top:6px;"><button class="btn btn-ghost" id="tpRowMenuDeleteBtn" style="color:#dc2626;">🗑️ Видалити заявку</button></div>
     </div>`;
     document.body.appendChild(modal);
     const close = ()=> modal.remove();
@@ -9571,8 +10325,8 @@ async function renderTripPrepBuses(){
         </div>
         <div style="margin-top:6px; padding-top:6px; border-top:1px dashed #fdba74;">
           <span class="muted">Або це нове місто — запам'ятати його напрям на майбутнє:</span><br>
-          <button class="btn btn-ghost btn-small no-print" data-role="tpRegisterCityDirection" data-raw="${rawCity}" data-direction="blue" style="margin-top:4px; background:#eff6ff; border-color:#93c5fd;">🔵 Напрям Чернівці</button>
-          <button class="btn btn-ghost btn-small no-print" data-role="tpRegisterCityDirection" data-raw="${rawCity}" data-direction="pink" style="margin-top:4px; background:#fdf2f8; border-color:#f9a8d4;">🌸 Напрям Закарпаття</button>
+          <button class="btn btn-ghost btn-small no-print" data-role="tpRegisterCityDirection" data-raw="${rawCity}" data-direction="blue" style="margin-top:4px; background:#eff6ff; border-color:#93c5fd;">🔵 Чернівці</button>
+          <button class="btn btn-ghost btn-small no-print" data-role="tpRegisterCityDirection" data-raw="${rawCity}" data-direction="pink" style="margin-top:4px; background:#fdf2f8; border-color:#f9a8d4;">🌸 Закарпаття</button>
         </div>
       </div>`;
     }).join('');
@@ -9600,7 +10354,7 @@ async function renderTripPrepBuses(){
         <span style="font-weight:700;">${b} — ${busCount[b]} ос.${busCfg.border_point ? ` <span class="muted" style="font-weight:400; font-size:12px;">(кордон: ${busCfg.border_point})</span>` : ''}</span>
         <span style="display:flex; gap:6px;">
           <button class="btn btn-ghost btn-small no-print" data-role="tpOpenSeatChart" data-bus="${b}">🪑 Розсадка</button>
-          <button class="btn btn-danger-ghost btn-small no-print" data-role="tpResetBus" data-bus="${b}">🔄 Обнулити цей автобус</button>
+          <button class="btn btn-danger-ghost btn-small no-print" data-role="tpResetBus" data-bus="${b}">🔄 Обнулити автобус</button>
         </span>
       </summary>
       ${rows.map(gk=>{
@@ -9701,7 +10455,7 @@ async function renderTripPrepBuses(){
 
   content.innerHTML = `
     <div class="step-block no-print" style="margin-bottom:14px;">
-      <p class="report-note" style="margin:0;">«📤 Передати гіду» (кнопка вгорі, поруч із вкладками) копіює розподілених по автобусах туристів у робочий список кожного гіда (без дублів — вже додані пропускаються). Роби це, коли список групи по автобусах готовий.</p>
+      <p class="report-note" style="margin:0;">«📤 Гіду» (кнопка вгорі, поруч із вкладками) копіює розподілених по автобусах туристів у робочий список кожного гіда (без дублів — вже додані пропускаються). Роби це, коли список групи по автобусах готовий.</p>
     </div>
     <div class="step-block no-print" style="margin-bottom:14px;">
       <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">🔍 Знайти учасника (прізвище або номер заявки)</label>
@@ -9711,7 +10465,7 @@ async function renderTripPrepBuses(){
     ${configPanelHtml}
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <p class="fin-section-title" style="margin:0;">Розподілені по автобусах</p>
-      <button class="btn btn-danger-ghost btn-small no-print" id="tpResetAllBuses">🔄 Обнулити всі автобуси</button>
+      <button class="btn btn-danger-ghost btn-small no-print" id="tpResetAllBuses">🔄 Обнулити всі</button>
     </div>
     ${assignedHtml}
     <p class="fin-section-title">Ще не розподілені (${unassigned.length})</p>
@@ -9721,7 +10475,7 @@ async function renderTripPrepBuses(){
     <p class="report-note">Цих людей не можна призначити на автобус, поки не вказано місто посадки — вони не з'являються у списку вище й не потраплять у розсадку.</p>
     ${noCityHtml}
     <p class="fin-section-title">🚶 Без автобуса (${selfArrivingGroups.length})</p>
-    <p class="report-note">Автобуса нема, але признач відповідального гіда — тоді цих людей теж можна буде передати гіду кнопкою "📤 Передати гіду" вгорі, окремо від автобусів.</p>
+    <p class="report-note">Автобуса нема, але признач відповідального гіда — тоді цих людей теж можна буде передати гіду кнопкою "📤 Гіду" вгорі, окремо від автобусів.</p>
     ${selfArrivingHtml}
   `;
 
@@ -10224,7 +10978,7 @@ function openAutoSeatPlanModal(busName){
   if(result.error){
     panel.innerHTML = `<div class="hb-modal-card" style="max-width:400px;">
       <p style="font-size:14px;">${result.error}</p>
-      <button class="btn btn-ghost" id="tpAutoSeatCloseBtn" style="width:100%; margin-top:12px;">Закрити</button>
+      <div style="text-align:center; margin-top:12px;"><button class="btn btn-ghost" id="tpAutoSeatCloseBtn">Закрити</button></div>
     </div>`;
     document.body.appendChild(panel);
     document.getElementById('tpAutoSeatCloseBtn').addEventListener('click', closeAutoSeatPlanModal);
@@ -10259,7 +11013,7 @@ function openAutoSeatPlanModal(busName){
     </div>
     <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
       <button class="btn btn-primary" id="tpAutoSeatApplyBtn" style="flex:1; min-width:140px;" ${plan.length?'':'disabled'}>✅ Застосувати</button>
-      <button class="btn btn-ghost" id="tpAutoSeatRedoBtn" style="flex:1; min-width:140px;">🔄 Переробити розсадку</button>
+      <button class="btn btn-ghost" id="tpAutoSeatRedoBtn" style="flex:1; min-width:140px;">🔄 Переробити</button>
       <button class="btn btn-ghost" id="tpAutoSeatRulesBtn" style="flex:1; min-width:140px;">⚙️ Правила</button>
       <button class="btn btn-ghost" id="tpAutoSeatCancelBtn" style="flex:1; min-width:140px;">Скасувати</button>
     </div>
@@ -10430,17 +11184,17 @@ function renderCityWizardStep(){
     <p class="report-note" style="margin-bottom:14px;">Стосується: ${item.names.join(', ')}</p>
     <p style="font-size:13px; font-weight:600; margin-bottom:8px;">Це нове місто, яким раніше не користувались?</p>
     <div style="display:flex; gap:10px; margin-bottom:16px;">
-      <button class="btn btn-primary" id="tpCityNewBtn" style="flex:1;">🆕 Так, нове — додати</button>
-      <button class="btn btn-ghost" id="tpCityKnownBtn" style="flex:1;">Ні, це вже відоме</button>
+      <button class="btn btn-primary" id="tpCityNewBtn" style="flex:1;">🆕 Так, нове</button>
+      <button class="btn btn-ghost" id="tpCityKnownBtn" style="flex:1;">Ні, відоме</button>
     </div>
     <div id="tpCityKnownPanel" style="display:none;">
       <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">Яке це насправді місто?</label>
       <select id="tpCityKnownSelect" style="width:100%; padding:8px; border:2px solid var(--line); border-radius:8px; box-sizing:border-box; margin-bottom:10px;">
         ${allKnownCities().map(c=>`<option value="${c}">${c}</option>`).join('')}
       </select>
-      <button class="btn btn-primary" id="tpCityFixConfirmBtn" style="width:100%;">Виправити всюди й далі</button>
+      <button class="btn btn-primary" id="tpCityFixConfirmBtn" style="width:100%;">Виправити всюди</button>
     </div>
-    <button class="btn btn-ghost" id="tpCitySkipBtn" style="width:100%; margin-top:10px;">Пропустити поки що</button>
+    <div style="text-align:center; margin-top:10px;"><button class="btn btn-ghost" id="tpCitySkipBtn">Пропустити</button></div>
   </div>`;
   document.body.appendChild(panel);
   document.getElementById('tpCityNewBtn').addEventListener('click', ()=>{
@@ -10750,13 +11504,13 @@ function renderBusSeatChart(busName){
   content.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
       <p class="report-title" style="margin:0;">🪑 Розсадка: ${busName}</p>
-      <button class="btn btn-ghost btn-small no-print" id="tpBackToBusesBtn">← Назад до автобусів</button>
+      <button class="btn btn-ghost btn-small no-print" id="tpBackToBusesBtn">← До автобусів</button>
     </div>
     <div class="no-print" style="display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;">
       <span style="font-size:13px;">Фізичний автобус: <b>${layoutName || 'загальна схема'}</b> <span class="muted">(змінити — у вкладці "Автобуси")</span></span>
-      <button class="btn btn-primary btn-small" id="tpAutoSeatBtn">🧠 Розсадити автоматично</button>
-      <button class="btn btn-ghost btn-small" id="tpSeatRulesMainBtn">⚙️ Правила розсадки</button>
-      <button class="btn btn-danger-ghost btn-small" id="tpClearSeatChartBtn">🗑️ Очистити розсадку цього автобуса</button>
+      <button class="btn btn-primary btn-small" id="tpAutoSeatBtn">🧠 Автоматично</button>
+      <button class="btn btn-ghost btn-small" id="tpSeatRulesMainBtn">⚙️ Правила</button>
+      <button class="btn btn-danger-ghost btn-small" id="tpClearSeatChartBtn">🗑️ Очистити автобус</button>
     </div>
     <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">
       <div style="flex:1; min-width:280px;">
@@ -10803,8 +11557,8 @@ function openSeatActionModal(busName, seatNum, existing){
         <h2 style="font-size:18px; font-weight:700; margin-bottom:4px;">Місце ${seatNum}</h2>
         <p style="font-size:14px; color:var(--ink-soft); margin-bottom:16px;">${existing.full_name}</p>
         <div id="tpSeatActionButtons" style="display:flex; flex-direction:column; gap:8px;">
-          <button class="btn btn-primary" id="tpSeatMoveBtn">🔀 Перенести на інше місце</button>
-          <button class="btn btn-ghost" id="tpSeatClearBtn" style="color:var(--bad); border-color:var(--bad);">🗑 Звільнити місце</button>
+          <button class="btn btn-primary" id="tpSeatMoveBtn">🔀 Інше місце</button>
+          <button class="btn btn-ghost" id="tpSeatClearBtn" style="color:var(--bad); border-color:var(--bad);">🗑 Звільнити</button>
           <button class="btn btn-ghost" id="tpSeatCancelBtn">Скасувати</button>
         </div>
         <div id="tpSeatMoveForm" style="display:none; margin-top:14px;">
@@ -10964,7 +11718,7 @@ function docOpenPrintWindow(title, bodyHtml){
       @media print { .no-print{ display:none; } }
     </style>
   </head><body>
-    <div class="no-print"><button onclick="window.print()" style="padding:10px 18px; font-size:14px; cursor:pointer;">🖨 Друк / Зберегти як PDF</button></div>
+    <div class="no-print"><button onclick="window.print()" style="padding:10px 18px; font-size:14px; cursor:pointer;">🖨 Друк / PDF</button></div>
     ${bodyHtml}
   </body></html>`);
   win.document.close();
@@ -11002,12 +11756,12 @@ async function renderTripPrepDocs(){
 
     <div style="display:flex; flex-direction:column; gap:10px; align-items:flex-start; margin-top:10px;">
       <div><b>Рум-лист:</b>
-        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="konstantin" data-fmt="excel">📥 Konstantin — Excel</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="konstantin" data-fmt="excel">📥 Konstantin</button>
         <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="konstantin" data-fmt="word">Word</button>
         <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="konstantin" data-fmt="pdf">PDF</button>
       </div>
       <div>
-        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="greataleksander" data-fmt="excel">📥 Great Aleksander — Excel</button>
+        <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="greataleksander" data-fmt="excel">📥 Aleksander</button>
         <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="greataleksander" data-fmt="word">Word</button>
         <button class="btn btn-ghost btn-small" data-role="tpDocRooming" data-hotel="greataleksander" data-fmt="pdf">PDF</button>
       </div>
@@ -11719,7 +12473,7 @@ const SEAT_CELL_MAP = {
       <p class="report-title" style="margin-top:0;">Документи — ${guideName}</p>
       <p class="report-note">Відкриється у новій вкладці — там же можна зберегти як PDF (Друк → Зберегти як PDF).</p>
       ${itemsHtml}
-      <button class="btn btn-ghost btn-small" id="pkgPreviewCloseBtn" style="width:100%; margin-top:6px;">Закрити</button>
+      <div style="text-align:center; margin-top:6px;"><button class="btn btn-ghost btn-small" id="pkgPreviewCloseBtn">Закрити</button></div>
     </div>`;
     document.body.appendChild(panel);
     panel.querySelectorAll('[data-role="pkgPreviewOpen"]').forEach(btn=> btn.addEventListener('click', ()=>{
@@ -11767,8 +12521,8 @@ const SEAT_CELL_MAP = {
     packagesWrap.innerHTML = tripDataForPackages.guides.map(g=>`
       <div class="fin-row" style="flex-wrap:wrap;">
         <span class="fin-label" style="font-weight:700;">${g.name}</span>
-        <button class="btn btn-primary btn-small no-print" data-role="tpPkgPrepare" data-guide="${g.name}">🔧 Підготувати документи в тур</button>
-        <button class="btn btn-ghost btn-small no-print" data-role="tpPkgPreview" data-guide="${g.name}">👁 Передивитись документи</button>
+        <button class="btn btn-primary btn-small no-print" data-role="tpPkgPrepare" data-guide="${g.name}">🔧 Документи</button>
+        <button class="btn btn-ghost btn-small no-print" data-role="tpPkgPreview" data-guide="${g.name}">👁 Документи</button>
         <button class="btn btn-ghost btn-small no-print" data-role="tpPkgPrint" data-guide="${g.name}">🖨 Друк</button>
       </div>
     `).join('');
@@ -12184,10 +12938,10 @@ function hbRenderShell(){
           <option value="greataleksander" ${hbCurrentHotel==='greataleksander'?'selected':''}>Great Aleksander 3*</option>
         </select>
       </label>
-      <button class="btn btn-ghost btn-small no-print" onclick="hbManualRefresh()">🔄 Оновити з хмари</button>
-      <button class="btn btn-danger-ghost btn-small no-print" onclick="hbClearHotelBookings()">🗑️ Обнулити цей готель (цей заїзд)</button>
-      <button class="btn btn-primary btn-small no-print" onclick="hbOpenWizard()">👥 Розселити по черзі</button>
-      <button class="btn btn-ghost btn-small no-print" onclick="hbOpenPlannerModal()">🧩 Порадити все одразу (список)</button>
+      <button class="btn btn-ghost btn-small no-print" onclick="hbManualRefresh()">🔄 Оновити</button>
+      <button class="btn btn-danger-ghost btn-small no-print" onclick="hbClearHotelBookings()">🗑️ Обнулити готель</button>
+      <button class="btn btn-primary btn-small no-print" onclick="hbOpenWizard()">👥 По черзі</button>
+      <button class="btn btn-ghost btn-small no-print" onclick="hbOpenPlannerModal()">🧩 Порадити все</button>
       ${(currentProfile.role==='manager' && new Date() >= (TRIPS_DEF.find(d=>d.label===hbCurrentPeriod)||{}).start) ? `<button class="btn btn-ghost btn-small no-print manager-only" onclick="hbToggleManagerUnlock()">${hbManagerUnlocked ? '🔒 Заблокувати назад' : '🔓 Дозволити бронювання (заїзд почався)'}</button>` : ''}
     </div>
 
@@ -12513,7 +13267,7 @@ function hbLookupRequestInModal(){
         : `<div style="margin-top:4px; font-size:12px; color:#b45309;">⚠️ Система вважає частину людей поселеною, але не знаходить їх у жодній кімнаті цього готелю зараз — це може бути застаріла позначка з попередньої дії на цій сторінці.</div>`)
     : '';
   const resetBtn = remainingMembers.length < matched.length
-    ? `<button onclick="hbModalResetRemaining('${reqNum}')" class="btn btn-ghost btn-small" style="display:block; width:100%; margin-top:6px; box-sizing:border-box;">🔄 Це помилка — показати всіх ${matched.length} знову</button>`
+    ? `<div style="text-align:center; margin-top:6px;"><button onclick="hbModalResetRemaining('${reqNum}')" class="btn btn-ghost btn-small">🔄 Показати ${matched.length} знову</button></div>`
     : '';
 
   infoEl.innerHTML = `<div style="padding:8px 10px; background:#eff6ff; border:2px solid #93c5fd; border-radius:8px; font-size:12.5px;">
@@ -12521,14 +13275,14 @@ function hbLookupRequestInModal(){
     ${locationNote}
     ${resetBtn}
     ${linkedBookings.length ? `<div style="margin-top:4px; color:#7c3aed;">🔗 Пов'язана з: №${linkedBookings.join(', №')}</div>
-      <button onclick="hbModalSuggestLinkedRooms()" class="btn btn-primary btn-small" style="display:block; width:100%; margin-top:6px; box-sizing:border-box;">💡 Запропонувати кімнати для всіх пов'язаних</button>
+      <button onclick="hbModalSuggestLinkedRooms()" class="btn btn-primary btn-small" style="display:block; width:100%; margin-top:6px; box-sizing:border-box;">💡 Запропонувати кімнати</button>
       <div style="margin-top:8px; padding:8px; border:2px solid var(--line); border-radius:8px;">
         <div class="muted" style="font-size:11px; text-transform:uppercase; margin-bottom:6px;">Або вкажи кімнати сам:</div>
         ${linkedBookings.map(b=>`<div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
           <span style="font-size:12.5px; min-width:60px;">№${b}:</span>
           <input type="number" class="hb-manual-link-room" data-req="${b}" placeholder="№ кімнати" style="width:100px; padding:4px 6px; border:2px solid var(--line); border-radius:6px;">
         </div>`).join('')}
-        <button onclick="hbModalApplyManualLinkedRooms()" class="btn btn-ghost btn-small" style="display:block; width:100%; margin-top:6px; box-sizing:border-box;">✅ Поселити за цими номерами</button>
+        <button onclick="hbModalApplyManualLinkedRooms()" class="btn btn-ghost btn-small" style="display:block; width:100%; margin-top:6px; box-sizing:border-box;">✅ Поселити тут</button>
       </div>` : ''}
     <div id="hbModalLinkedPlanInfo"></div>
   </div>`;
@@ -12672,7 +13426,7 @@ function hbOpenRoomDetailModal(roomNum){
 
   const addWrap = document.getElementById('hbRaAddSharerWrap');
   addWrap.innerHTML = occupancy<capacity
-    ? `<button onclick="hbStartAddSharer()" class="btn" style="width:100%; background:#f97316; color:#fff; padding:12px;">➕ Підселити ще одну заявку (${capacity-occupancy} місць вільно)</button>`
+    ? `<button onclick="hbStartAddSharer()" class="btn" style="width:100%; background:#f97316; color:#fff; padding:12px;">➕ Підселити (${capacity-occupancy} вільно)</button>`
     : '';
 
   document.getElementById('hbRoomActionsModal').classList.remove('app-hidden');
@@ -12804,7 +13558,7 @@ async function hbConfirmBooking(){
 
     const requestTourists = (tripPrepData.tourists||[]).filter(t=>(t.booking_number||'').replace(/^#/,'')===requestNum);
     if(requestTourists.length && requestTourists[0].target_hotel && requestTourists[0].target_hotel !== hbCurrentHotel){
-      return showAppAlert(`⛔ Заявка №${requestNum} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — натисни "⋮" навпроти неї у вкладці "Огляд і імпорт" і обери "🔄 Перенести в інший готель".`);
+      return showAppAlert(`⛔ Заявка №${requestNum} призначена для готелю "${HB_HOTEL_STRUCTURE[requestTourists[0].target_hotel].name}" (за базовим файлом), а не для "${HB_HOTEL_STRUCTURE[hbCurrentHotel].name}". Забронювати її сюди не можна.\n\nЯкщо це навмисно (треба перевести групу в інший готель) — натисни "⋮" навпроти неї у вкладці "Огляд і імпорт" і обери "🔄 Інший готель".`);
     }
   }
 
@@ -13366,7 +14120,7 @@ function hbRenderWizard(){
       ${comments.length ? `<div style="font-size:12px; margin-top:6px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:6px;">📝 ${comments.join(' | ')}</div>` : ''}
       <div style="margin-top:10px;"><div class="muted" style="font-size:11.5px; text-transform:uppercase; margin-bottom:4px;">Обери, яку заявку зараз поселяєш (можна в кілька кімнат):</div><div style="display:flex; gap:6px; flex-wrap:wrap;">${chipsHtml}</div></div>
       ${suggestionHtml}
-      <div style="margin-top:10px;"><button onclick="hbWizardSuggestFamily()" class="btn btn-primary btn-small">💡 Як би я поселив цю заявку (можливо в кілька кімнат)</button><div id="hbWizardFamilySuggestion" style="margin-top:8px;"></div></div>
+      <div style="margin-top:10px;"><button onclick="hbWizardSuggestFamily()" class="btn btn-primary btn-small">💡 Як поселити</button><div id="hbWizardFamilySuggestion" style="margin-top:8px;"></div></div>
     </div>
   `;
 
@@ -13522,7 +14276,7 @@ function hbModalSuggestLinkedRooms(){
   infoEl.innerHTML = `<div style="margin-top:6px; padding:8px; background:#ecfdf5; border:2px solid #6ee7b7; border-radius:8px; font-size:12px;">
     <b>💡 Пропозиція для пов'язаних:</b> ${HB_HOTEL_STRUCTURE[plan.hotel].name}<br>
     ${plan.assignments.map(a=>`№${a.requestNum} (${a.total} чол) → кімната ${a.roomNum}${a.needsExtraBed?' 🛏️':''}${a.isSplit?' ⚠️ розбито':''}`).join('<br>')}
-    <div style="margin-top:6px;"><button onclick="hbModalApplyLinkedPlan()" class="btn btn-primary btn-small">✅ Погодити всі</button></div>
+    <div style="margin-top:6px;"><button onclick="hbModalApplyLinkedPlan()" class="btn btn-primary btn-small">✅ Погодити все</button></div>
   </div>`;
 }
 
@@ -13614,7 +14368,7 @@ function hbWizardSuggestFamily(){
   resEl.innerHTML = `<div style="padding:10px; background:#ecfdf5; border:2px solid #6ee7b7; border-radius:10px;">
     <div style="font-weight:600; font-size:13px; margin-bottom:6px;">${HB_HOTEL_STRUCTURE[bestPlan.hotel].name}:</div>
     ${bestPlan.assignments.map(a=>`<div style="font-size:13px;">№${a.requestNum} (${a.total} чол) → кімната ${a.roomNum} (поверх ${a.floor})${a.needsExtraBed?' 🛏️ +екстраліжко':''}${a.isSplit?' <span style="color:#b45309;">⚠️ розбито</span>':''}</div>`).join('')}
-    <button onclick="hbWizardApplyFamilyPlan()" class="btn btn-primary btn-small" style="margin-top:8px; width:100%;">✅ Погодити всі пропозиції</button>
+    <button onclick="hbWizardApplyFamilyPlan()" class="btn btn-primary btn-small" style="margin-top:8px; width:100%;">✅ Погодити все</button>
   </div>`;
 }
 
@@ -13774,7 +14528,7 @@ function hbWizardRenderSelectionPanel(){
         <input type="checkbox" id="hbWizardSeekingCb">
         <span style="font-size:13px;">🔄 Залишити місце і шукати підселення</span>
       </label>
-      <button onclick="hbWizardConfirmSubBooking()" class="btn btn-primary" style="width:100%;">✅ Поселити обраних сюди</button>
+      <button onclick="hbWizardConfirmSubBooking()" class="btn btn-primary" style="width:100%;">✅ Поселити сюди</button>
     </div>
   `;
 }
